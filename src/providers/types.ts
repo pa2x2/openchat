@@ -62,6 +62,7 @@ export interface ChatProvider {
   connect(cfg: ConnectionConfig): Promise<ConnectionInfo>;
   listModels(): Promise<ModelInfo[]>;
   listChats(): Promise<ChatSummary[]>;
+  /** Creates a backend chat. `title` may be ignored by the backend. */
   createChat(opts?: { model?: ModelRef; title?: string }): Promise<ChatSummary>;
   deleteChat(id: ChatId): Promise<void>;
 
