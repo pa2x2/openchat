@@ -1,21 +1,65 @@
-import { Link, Stack } from "expo-router";
-import { Pressable, Text, View, FlatList } from "react-native";
-import { Button } from "@/src/ui/Button";
-import { themes } from "@/src/ui/theme";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, FlatList, Pressable, Text, View } from "react-native";
+import { Link, Stack, useRouter } from "expo-router";
 import { useColorScheme } from "nativewind";
+import { themes } from "@/src/ui/theme";
+import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
+import { formatTimestamp } from "@/src/lib/time";
+import { useChatsStore } from "@/src/stores/chats";
+import { useMessagesStore } from "@/src/stores/messages";
 
 /**
- * Chat list screen (placeholder).
- *
- * Not connected to a backend yet: renders the empty state, entry points
- * to the settings/demo screens, and a static sample of the chat-list
- * row shape. Will be driven by the chats store once chat data exists.
+ * Chat list screen: every conversation the server knows about, newest
+ * first, cached locally for instant launch. Tapping a row opens the
+ * transcript; long-press deletes (when the provider supports it).
  */
-const SAMPLE_ROWS = [{ id: "demo-1", title: "Sample conversation", updatedAt: "Sep 18, 2026" }];
-
 export default function ChatListScreen() {
   const { colorScheme } = useColorScheme();
   const scheme = colorScheme ?? "light";
+  const router = useRouter();
+  const chats = useChatsStore((state) => state.chats);
+  const refreshChats = useChatsStore((state) => state.refresh);
+  const capabilities = useProviderCapabilities();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Startup: warm the provider from the persisted profile, then reconcile
+  // the list against the server.
+  useEffect(() => {
+    void (async () => {
+      await getProvider();
+      await refreshChats();
+    })();
+  }, [refreshChats]);
+
+  const onRefresh = useCallback(() => {
+    void (async () => {
+      setRefreshing(true);
+      await refreshChats();
+      setRefreshing(false);
+    })();
+  }, [refreshChats]);
+
+  function confirmDelete(id: string, title: string) {
+    Alert.alert("Delete chat", `Delete “${title || "this chat"}”?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            const provider = await getProvider();
+            if (!provider) return;
+            try {
+              await provider.deleteChat(id);
+            } finally {
+              useChatsStore.getState().remove(id);
+              useMessagesStore.getState().removeChat(id);
+            }
+          })();
+        },
+      },
+    ]);
+  }
 
   return (
     <View style={themes[scheme]} className="flex-1 bg-background">
@@ -24,27 +68,36 @@ export default function ChatListScreen() {
           title: "OpenChat",
           headerTintColor: "rgb(var(--oc-text))",
           headerRight: () => (
-            <Button
-              label="New chat"
-              size="sm"
-              variant="ghost"
-              onPress={() => {
-                /* not wired up yet */
-              }}
-            />
+            <Pressable
+              onPress={() => router.push("/chat/new")}
+              accessibilityLabel="New chat"
+              className="px-2 py-1"
+              testID="new-chat"
+            >
+              <Text className="text-base font-semibold text-primary">New chat</Text>
+            </Pressable>
           ),
         }}
       />
       <FlatList
-        data={SAMPLE_ROWS}
+        data={chats}
         keyExtractor={(item) => item.id}
         contentContainerClassName="p-3 gap-2"
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         renderItem={({ item }) => (
-          <Pressable className="rounded-xl border border-border bg-surface p-4 active:bg-surface-hover">
+          <Pressable
+            className="rounded-xl border border-border bg-surface p-4 active:bg-surface-hover"
+            onPress={() => router.push(`/chat/${item.id}`)}
+            onLongPress={
+              capabilities?.deleteChat ? () => confirmDelete(item.id, item.title) : undefined
+            }
+            testID={`chat-row-${item.id}`}
+          >
             <Text className="text-base font-semibold text-text" numberOfLines={1}>
-              {item.title}
+              {item.title || "Untitled"}
             </Text>
-            <Text className="mt-1 text-sm text-text-muted">{item.updatedAt}</Text>
+            <Text className="mt-1 text-sm text-text-muted">{formatTimestamp(item.updatedAt)}</Text>
           </Pressable>
         )}
         ListEmptyComponent={
