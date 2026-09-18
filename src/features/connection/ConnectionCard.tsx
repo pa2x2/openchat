@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { Button } from "@/src/ui/Button";
 import { Input } from "@/src/ui/Input";
+import { loadPassword, savePassword } from "@/src/lib/secrets";
 import { openCodeDescriptor } from "@/src/providers/registry";
 import type { ConnectionConfig } from "@/src/providers/types";
 import { useConnectionStore } from "@/src/stores/connection";
@@ -42,11 +43,18 @@ export function ConnectionCard() {
     setLocalError(null);
     markConnecting();
     try {
+      const typedPassword = values.password?.trim() ?? "";
+      const storedPassword = typedPassword ? undefined : await loadPassword(descriptor.id);
+      const password = typedPassword || storedPassword;
       const cfg: ConnectionConfig = {
         baseUrl: values.baseUrl ?? "",
+        credentials: password ? { password } : undefined,
       };
       const provider = descriptor.create(cfg);
       const info = await provider.connect(cfg);
+      if (typedPassword) {
+        await savePassword(descriptor.id, typedPassword);
+      }
       saveProfile({
         providerId: descriptor.id,
         baseUrl: cfg.baseUrl,
@@ -92,6 +100,7 @@ export function ConnectionCard() {
           value={values[field.key] ?? ""}
           onChangeText={(text) => setValues((prev) => ({ ...prev, [field.key]: text }))}
           placeholder={field.placeholder}
+          secureTextEntry={field.secure}
           autoCapitalize="none"
           autoCorrect={false}
           error={field.key === "baseUrl" ? (localError ?? undefined) : undefined}

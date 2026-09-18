@@ -1,6 +1,11 @@
 import { ConnectionError } from "@/src/providers/types";
 import type { OpenCodeClient } from "@opencode/client";
-import { normalizeBaseUrl, timeoutSignal, toConnectionError } from "../client";
+import {
+  createOpenCodeClient,
+  normalizeBaseUrl,
+  timeoutSignal,
+  toConnectionError,
+} from "../client";
 import { OpenCodeProvider } from "../provider";
 
 function clientError(reason: string, cause?: unknown): Error {
@@ -30,6 +35,38 @@ function stubClient(overrides: Partial<OpenCodeClient> = {}): OpenCodeClient {
 }
 
 const factoryOf = (client: OpenCodeClient) => () => client;
+
+const ok = (body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+
+const captureAuthHeader = async (password?: string): Promise<string | null> => {
+  let captured: RequestInit | undefined;
+  const spyFetch = (async (input: string | URL, init?: RequestInit) => {
+    captured = init;
+    return ok({ version: "2.0.8" });
+  }) as unknown as typeof fetch;
+  const client = createOpenCodeClient(
+    { baseUrl: "http://srv", credentials: password ? { password } : undefined },
+    spyFetch,
+  );
+  await client.server.info();
+  return new Headers(captured?.headers ?? undefined).get("authorization");
+};
+
+describe("createOpenCodeClient auth", () => {
+  it("sends basic auth only when a password is configured", async () => {
+    await expect(captureAuthHeader("secret")).resolves.toBe(
+      "Basic b3BlbmNvZGU6c2VjcmV0", // base64("opencode:secret")
+    );
+  });
+
+  it("omits the header without credentials", async () => {
+    await expect(captureAuthHeader(undefined)).resolves.toBeNull();
+  });
+});
 
 describe("normalizeBaseUrl", () => {
   it("trims and strips trailing slashes", () => {

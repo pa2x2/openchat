@@ -20,6 +20,11 @@ import type {
 
 export interface ConnectionConfig {
   baseUrl: string;
+  /**
+   * Optional server password. The stock v2 server always enforces basic
+   * auth (username "opencode"); empty means an unauthenticated deployment.
+   */
+  credentials?: { password?: string };
 }
 
 export interface ConnectionInfo {
@@ -72,10 +77,12 @@ export interface ChatProvider {
 
 /** A single connection-form field, described by the provider. */
 export interface ConfigField {
-  key: "baseUrl";
+  key: "baseUrl" | "password";
   label: string;
   description?: string;
   required: boolean;
+  /** Render as a password input. */
+  secure?: boolean;
   placeholder?: string;
   keyboardType?: "default" | "url";
 }

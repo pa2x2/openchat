@@ -9,8 +9,12 @@ describe("provider registry", () => {
 
   it("describes the connection form fields", () => {
     const keys = openCodeDescriptor.fields.map((field) => field.key);
-    expect(keys).toEqual(["baseUrl"]);
-    expect(openCodeDescriptor.fields[0]?.required).toBe(true);
+    expect(keys).toEqual(["baseUrl", "password"]);
+    const baseUrl = openCodeDescriptor.fields[0];
+    const password = openCodeDescriptor.fields[1];
+    expect(baseUrl?.required).toBe(true);
+    expect(password?.required).toBe(false);
+    expect(password?.secure).toBe(true);
   });
 
   it("constructs a provider with server-driven capabilities", () => {
