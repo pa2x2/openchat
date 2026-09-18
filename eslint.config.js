@@ -21,6 +21,13 @@ module.exports = defineConfig([
     },
   },
   {
+    // The adapter itself owns OpenCode API knowledge.
+    files: ["src/providers/opencode/**"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
     ignores: [".expo/**", "node_modules/**", "dist/**", ".agents-workspaces/**"],
   },
 ]);

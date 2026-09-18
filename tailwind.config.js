@@ -18,6 +18,7 @@ module.exports = {
         primary: "rgb(var(--oc-primary) / <alpha-value>)",
         "primary-foreground": "rgb(var(--oc-primary-foreground) / <alpha-value>)",
         danger: "rgb(var(--oc-danger) / <alpha-value>)",
+        success: "rgb(var(--oc-success) / <alpha-value>)",
       },
     },
   },

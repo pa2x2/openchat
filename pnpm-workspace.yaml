@@ -1,2 +1,7 @@
 allowBuilds:
+  msgpackr-extract: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - "@opencode/client@2.0.7"
+  - "@opencode/protocol@2.0.7"
+  - "@opencode/schema@2.0.7"

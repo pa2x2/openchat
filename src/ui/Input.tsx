@@ -10,12 +10,26 @@ export interface InputProps {
   error?: string;
   secureTextEntry?: boolean;
   multiline?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  autoCorrect?: boolean;
   className?: string;
   testID?: string;
 }
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  { value, onChangeText, placeholder, label, error, secureTextEntry, multiline, className, testID },
+  {
+    value,
+    onChangeText,
+    placeholder,
+    label,
+    error,
+    secureTextEntry,
+    multiline,
+    autoCapitalize,
+    autoCorrect,
+    className,
+    testID,
+  },
   ref,
 ) {
   return (
@@ -29,6 +43,8 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         placeholderTextColor="rgb(var(--oc-text-muted))"
         secureTextEntry={secureTextEntry}
         multiline={multiline}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
         accessibilityLabel={label ?? placeholder}
         className={cn(
           "w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-text",

@@ -23,6 +23,7 @@ export const lightTokens = {
   "--oc-primary": "16 163 127",
   "--oc-primary-foreground": "255 255 255",
   "--oc-danger": "220 38 38",
+  "--oc-success": "22 163 74",
 } satisfies Record<`--oc-${string}`, string>;
 
 export const darkTokens: Record<keyof typeof lightTokens, string> = {
@@ -36,6 +37,7 @@ export const darkTokens: Record<keyof typeof lightTokens, string> = {
   "--oc-primary": "25 195 125",
   "--oc-primary-foreground": "255 255 255",
   "--oc-danger": "239 68 68",
+  "--oc-success": "34 197 94",
 };
 
 export const lightTheme = vars(lightTokens);

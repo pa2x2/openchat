@@ -1,15 +1,15 @@
 import { Link } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { colorScheme as colorSchemeApi, useColorScheme } from "nativewind";
+import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { Button } from "@/src/ui/Button";
 import { themes } from "@/src/ui/theme";
 
 /**
- * Settings screen (placeholder).
+ * Settings screen.
  *
- * Currently hosts the theme toggle and the design-primitives demo entry
- * point; the server connection form (provider, URL, password) will be
- * added here.
+ * Hosts the server connection form, the theme toggle and the
+ * design-primitives demo entry point.
  */
 export default function SettingsScreen() {
   const { colorScheme } = useColorScheme();
@@ -22,6 +22,8 @@ export default function SettingsScreen() {
   return (
     <View style={themes[scheme]} className="flex-1 bg-background">
       <ScrollView contentContainerClassName="p-4 gap-4">
+        <ConnectionCard />
+
         <View className="gap-3 rounded-xl border border-border bg-surface p-4">
           <Text className="text-base font-semibold text-text">Appearance</Text>
           <Text className="text-sm text-text-muted">Current scheme: {scheme}</Text>
@@ -30,13 +32,6 @@ export default function SettingsScreen() {
             variant="secondary"
             onPress={toggleScheme}
           />
-        </View>
-
-        <View className="gap-3 rounded-xl border border-border bg-surface p-4">
-          <Text className="text-base font-semibold text-text">Connection</Text>
-          <Text className="text-sm text-text-muted">
-            Server setup coming soon: provider (OpenCode), URL, password.
-          </Text>
         </View>
 
         <Link href="/ui-demo" asChild>
