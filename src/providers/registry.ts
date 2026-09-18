@@ -21,6 +21,14 @@ export const openCodeDescriptor: ProviderDescriptor = {
       placeholder: "https://opencode.example.com",
       keyboardType: "url",
     },
+    {
+      key: "password",
+      label: "Password",
+      description: "The server's password (opencode serve prints one on startup).",
+      required: false,
+      secure: true,
+      placeholder: "Server password",
+    },
   ],
   create(cfg: ConnectionConfig) {
     return new OpenCodeProvider(cfg);

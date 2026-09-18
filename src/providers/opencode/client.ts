@@ -7,10 +7,14 @@
  */
 
 import { OpenCode, type OpenCodeClient } from "@opencode/client";
+import { encode as base64 } from "js-base64";
 import { fetch as streamingFetch } from "expo/fetch";
 import { ConnectionError, type ConnectionConfig } from "@/src/providers/types";
 
 export type { OpenCodeClient };
+
+/** Basic auth username required by the OpenCode v2 server. */
+const AUTH_USERNAME = "opencode";
 
 /** Normalized, validated base URL (no trailing slash). Throws ConnectionError. */
 export function normalizeBaseUrl(raw: string): string {
@@ -33,13 +37,21 @@ export function normalizeBaseUrl(raw: string): string {
 /**
  * Creates the OpenCode client. `expo/fetch` is the default transport:
  * React Native's built-in fetch buffers whole responses, which the event
- * stream needs.
+ * stream needs. When a password is configured, requests carry basic auth
+ * (the v2 server requires username "opencode").
  */
 export function createOpenCodeClient(
   cfg: ConnectionConfig,
   fetchImpl: typeof fetch = streamingFetch,
 ): OpenCodeClient {
-  return OpenCode.make({ baseUrl: normalizeBaseUrl(cfg.baseUrl), fetch: fetchImpl });
+  const password = cfg.credentials?.password;
+  return OpenCode.make({
+    baseUrl: normalizeBaseUrl(cfg.baseUrl),
+    fetch: fetchImpl,
+    ...(password
+      ? { headers: { authorization: `Basic ${base64(`${AUTH_USERNAME}:${password}`)}` } }
+      : {}),
+  });
 }
 
 /** A request-scoped AbortController that aborts itself after `ms`. */
