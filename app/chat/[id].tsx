@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, FlatList, KeyboardAvoidingView, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useColorScheme } from "nativewind";
 import { themes } from "@/src/ui/theme";
-import { Bubble } from "@/src/ui";
+import { MessageBubble } from "@/src/features/chat/MessageBubble";
 import { Composer } from "@/src/features/chat/Composer";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
 import {
@@ -18,7 +18,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
-import type { ModelInfo } from "@/src/domain";
+import type { Message, ModelInfo } from "@/src/domain";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
 const NEW_CHAT = "new";
@@ -52,6 +52,7 @@ export default function ChatScreen() {
   const [draftModel, setDraftModel] = useState<ModelInfo["ref"] | null>(null);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
+  const showReasoning = capabilities?.reasoning === true;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const defaultModel = useSettingsStore((state) =>
     providerId ? state.defaultModels[providerId] : undefined,
@@ -140,6 +141,13 @@ export default function ChatScreen() {
     }
   }
 
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) => (
+      <MessageBubble colorScheme={scheme} message={item} showReasoning={showReasoning} />
+    ),
+    [scheme, showReasoning],
+  );
+
   const title = isDraft ? "New chat" : chat?.title || "Chat";
 
   return (
@@ -171,7 +179,7 @@ export default function ChatScreen() {
               {isDraft ? "Say something to start" : "No messages yet"}
             </Text>
             <Text className="mt-2 text-center text-sm text-text-muted">
-              Replies stream in as plain text for now.
+              Replies stream in with rich formatting.
             </Text>
           </View>
         ) : (
@@ -180,22 +188,7 @@ export default function ChatScreen() {
             data={[...messages].reverse()}
             keyExtractor={(message) => message.id}
             contentContainerClassName="px-2 py-3 gap-1"
-            renderItem={({ item }) => (
-              <Bubble
-                role={item.role}
-                text={item.status === "streaming" && item.text.length === 0 ? "…" : item.text}
-                status={
-                  item.status === "streaming"
-                    ? "streaming…"
-                    : item.status === "error"
-                      ? "failed"
-                      : item.status === "interrupted"
-                        ? "stopped"
-                        : undefined
-                }
-                testID={`bubble-${item.role}`}
-              />
-            )}
+            renderItem={renderMessage}
           />
         )}
 

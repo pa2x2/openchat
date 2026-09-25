@@ -1,0 +1,283 @@
+import type { MarkdownStyleMap } from "@ronradtke/react-native-markdown-display";
+import type { ColorSchemeName } from "@/src/ui/theme";
+
+interface Palette {
+  background: string;
+  surface: string;
+  surfaceHover: string;
+  border: string;
+  text: string;
+  muted: string;
+  primary: string;
+  primaryForeground: string;
+  danger: string;
+  code: string;
+  codeText: string;
+  codeMuted: string;
+}
+
+const lightPalette: Palette = {
+  background: "#ffffff",
+  surface: "#f4f4f5",
+  surfaceHover: "#e4e4e7",
+  border: "#e4e4e7",
+  text: "#18181b",
+  muted: "#71717a",
+  primary: "#10a37f",
+  primaryForeground: "#ffffff",
+  danger: "#dc2626",
+  code: "#f4f4f5",
+  codeText: "#18181b",
+  codeMuted: "#52525b",
+};
+
+const darkPalette: Palette = {
+  background: "#212121",
+  surface: "#2a2a2c",
+  surfaceHover: "#3a3a3c",
+  border: "#404044",
+  text: "#ededed",
+  muted: "#9b9ba0",
+  primary: "#19c37d",
+  primaryForeground: "#ffffff",
+  danger: "#ef4444",
+  code: "#151517",
+  codeText: "#ededed",
+  codeMuted: "#a1a1aa",
+};
+
+function paletteFor(scheme: ColorSchemeName): Palette {
+  return scheme === "dark" ? darkPalette : lightPalette;
+}
+
+/**
+ * Markdown uses real React Native styles rather than NativeWind classes. Keep
+ * the maps stable and role-aware so a streaming update only reparses the
+ * message that actually changed.
+ */
+export function getMarkdownStyles(
+  role: "user" | "assistant",
+  scheme: ColorSchemeName,
+): MarkdownStyleMap {
+  const palette = paletteFor(scheme);
+  const foreground = role === "user" ? palette.primaryForeground : palette.text;
+  const muted = role === "user" ? "#d1fae5" : palette.muted;
+  const quoteBackground = role === "user" ? "rgba(255,255,255,0.14)" : palette.surface;
+  const quoteBorder = role === "user" ? "rgba(255,255,255,0.55)" : palette.primary;
+  const inlineCodeBackground = role === "user" ? "rgba(0,0,0,0.18)" : palette.surfaceHover;
+  const codeBorder = role === "user" ? "rgba(255,255,255,0.25)" : palette.border;
+  const tableHeader = role === "user" ? "rgba(0,0,0,0.16)" : palette.surfaceHover;
+  const tableRow = role === "user" ? "rgba(255,255,255,0.08)" : palette.background;
+  const linkColor = role === "user" ? "#d1fae5" : palette.primary;
+
+  return {
+    body: {
+      color: foreground,
+      width: "100%",
+    },
+    text: {
+      color: foreground,
+      fontSize: 16,
+      lineHeight: 23,
+    },
+    textgroup: {
+      color: foreground,
+    },
+    paragraph: {
+      color: foreground,
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    heading1: {
+      color: foreground,
+      fontSize: 28,
+      lineHeight: 34,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    heading2: {
+      color: foreground,
+      fontSize: 24,
+      lineHeight: 30,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    heading3: {
+      color: foreground,
+      fontSize: 20,
+      lineHeight: 26,
+      marginTop: 10,
+      marginBottom: 6,
+    },
+    heading4: {
+      color: foreground,
+      fontSize: 18,
+      lineHeight: 24,
+      marginTop: 10,
+      marginBottom: 6,
+    },
+    heading5: {
+      color: foreground,
+      fontSize: 16,
+      lineHeight: 22,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    heading6: {
+      color: foreground,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    strong: {
+      color: foreground,
+      fontWeight: "700",
+    },
+    em: {
+      color: foreground,
+      fontStyle: "italic",
+    },
+    s: {
+      color: muted,
+      textDecorationLine: "line-through",
+    },
+    ins: {
+      color: foreground,
+      textDecorationLine: "underline",
+    },
+    blockquote: {
+      color: foreground,
+      backgroundColor: quoteBackground,
+      borderColor: quoteBorder,
+      borderLeftWidth: 3,
+      marginLeft: 2,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 6,
+    },
+    bullet_list: {
+      marginTop: 4,
+      marginBottom: 4,
+    },
+    ordered_list: {
+      marginTop: 4,
+      marginBottom: 4,
+    },
+    list_item: {
+      color: foreground,
+      marginTop: 2,
+      marginBottom: 2,
+    },
+    bullet_list_icon: {
+      color: muted,
+    },
+    ordered_list_icon: {
+      color: muted,
+    },
+    code_inline: {
+      color: role === "user" ? palette.primaryForeground : palette.danger,
+      backgroundColor: inlineCodeBackground,
+      borderColor: codeBorder,
+      borderWidth: 1,
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+    },
+    code_block: {
+      color: palette.codeText,
+      backgroundColor: palette.code,
+      borderColor: palette.border,
+    },
+    fence: {
+      backgroundColor: palette.code,
+      borderColor: palette.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      overflow: "hidden",
+    },
+    fence_header: {
+      backgroundColor: role === "user" ? "rgba(0,0,0,0.28)" : palette.surface,
+      borderBottomColor: palette.border,
+    },
+    fence_language_label: {
+      color: palette.codeMuted,
+      fontFamily: "monospace",
+      fontSize: 11,
+    },
+    fence_copy_button: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    fence_copy_text: {
+      color: palette.codeMuted,
+      fontSize: 11,
+    },
+    fence_code: {
+      backgroundColor: palette.code,
+      padding: 12,
+    },
+    fence_token: {
+      color: palette.codeText,
+      fontFamily: "monospace",
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    table: {
+      borderColor: palette.border,
+      borderWidth: 1,
+      borderRadius: 6,
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    thead: {
+      backgroundColor: tableHeader,
+    },
+    tbody: {
+      backgroundColor: tableRow,
+    },
+    th: {
+      color: foreground,
+      fontWeight: "700",
+      padding: 8,
+    },
+    tr: {
+      borderBottomColor: palette.border,
+      borderBottomWidth: 1,
+    },
+    td: {
+      color: foreground,
+      padding: 8,
+    },
+    link: {
+      color: linkColor,
+      textDecorationLine: "underline",
+    },
+    blocklink: {
+      color: linkColor,
+    },
+    image: {
+      borderColor: palette.border,
+    },
+    hr: {
+      backgroundColor: palette.border,
+      marginTop: 12,
+      marginBottom: 12,
+    },
+    hardbreak: {
+      color: foreground,
+    },
+    softbreak: {
+      color: foreground,
+    },
+    pre: {
+      color: palette.codeText,
+    },
+    inline: {
+      color: foreground,
+    },
+    span: {
+      color: foreground,
+    },
+  };
+}

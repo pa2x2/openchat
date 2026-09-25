@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { cn } from "@/src/lib/cn";
 
 export interface ComposerProps {
@@ -25,6 +25,8 @@ export function Composer({ onSend, onStop }: ComposerProps) {
     await onSend(trimmed);
   }
 
+  const sendDisabled = text.trim().length === 0;
+
   return (
     <View className="flex-row items-end gap-2 border-t border-border bg-background px-3 py-2">
       <TextInput
@@ -38,34 +40,42 @@ export function Composer({ onSend, onStop }: ComposerProps) {
         testID="composer-input"
       />
       {streaming ? (
-        <TouchableOpacity
-          onPress={onStop}
+        <Pressable
+          accessibilityHint="Stops the current response"
           accessibilityLabel="Stop generating"
-          className="rounded-xl bg-surface px-4 py-3 active:bg-surface-hover"
+          accessibilityRole="button"
+          accessibilityState={{ busy: true }}
+          className="flex-row items-center gap-2 rounded-xl bg-danger px-4 py-3 active:bg-danger/80"
+          onPress={onStop}
           testID="composer-stop"
         >
-          <Text className="text-base font-semibold text-text">Stop</Text>
-        </TouchableOpacity>
+          <View className="h-3 w-3 rounded-[2px] bg-primary-foreground" />
+          <Text className="text-base font-semibold text-primary-foreground">Stop</Text>
+        </Pressable>
       ) : (
-        <TouchableOpacity
-          onPress={() => void handleSend()}
-          disabled={text.trim().length === 0}
+        <Pressable
+          accessibilityHint="Sends the message"
           accessibilityLabel="Send message"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: sendDisabled }}
           className={cn(
             "rounded-xl px-4 py-3",
-            text.trim().length > 0 ? "bg-primary active:bg-primary/80" : "bg-surface",
+            !sendDisabled && "bg-primary active:bg-primary/80",
+            sendDisabled && "bg-surface",
           )}
+          disabled={sendDisabled}
+          onPress={() => void handleSend()}
           testID="composer-send"
         >
           <Text
             className={cn(
               "text-base font-semibold",
-              text.trim().length > 0 ? "text-primary-foreground" : "text-text-muted",
+              sendDisabled ? "text-text-muted" : "text-primary-foreground",
             )}
           >
             Send
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
