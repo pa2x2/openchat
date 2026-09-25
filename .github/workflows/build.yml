@@ -1,0 +1,75 @@
+name: Build & Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**"
+      - "!**.md"
+      - "!docker/**"
+      - "!.github/workflows/docker-opencode.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test App
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Set up JDK
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check code format
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Run unit tests
+        run: pnpm test
+
+      - name: Generate native project
+        run: pnpm exec expo prebuild --platform android --clean --no-install
+
+      # No keystore env is set, so the release build falls back to the debug key.
+      - name: Build app
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: universal-release-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/app-universal-release.apk
