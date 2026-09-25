@@ -32,11 +32,13 @@ export function ConnectionCard() {
   const statusLabel =
     connectionState === "connected"
       ? profile?.serverVersion
-        ? `Connected ✓ — OpenCode server v${profile.serverVersion}`
-        : "Connected ✓"
+        ? `Connected — OpenCode v${profile.serverVersion}`
+        : "Connected"
       : connectionState === "connecting"
         ? "Connecting…"
-        : "Not connected";
+        : profile
+          ? "Saved — tap Connect to check the server"
+          : "Not connected";
 
   async function handleConnect() {
     setBusy(true);
@@ -76,17 +78,24 @@ export function ConnectionCard() {
     markDisconnected();
   }
 
+  const statusTone =
+    connectionState === "connected"
+      ? "bg-success"
+      : connectionState === "connecting"
+        ? "bg-primary"
+        : "bg-text-faint";
+
   return (
-    <View className="gap-3 rounded-xl border border-border bg-surface p-4">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-base font-semibold text-text">Connection</Text>
+    <View className="gap-3 rounded-[20px] bg-surface p-4">
+      <View className="flex-row items-center gap-2">
+        <View className={`h-2 w-2 rounded-full ${statusTone}`} />
         <Text
           testID="connection-status"
           accessibilityLabel="Connection status"
           className={
             connectionState === "connected"
-              ? "text-sm font-medium text-success"
-              : "text-sm font-medium text-text-muted"
+              ? "flex-1 text-sm font-medium text-success"
+              : "flex-1 text-sm font-medium text-text-muted"
           }
         >
           {statusLabel}
@@ -111,21 +120,21 @@ export function ConnectionCard() {
       {connectionState === "connected" ? (
         <Button
           label="Disconnect"
-          variant="secondary"
+          variant="ghost"
           onPress={handleDisconnect}
           disabled={busy}
           testID="connection-disconnect"
         />
       ) : (
         <Button
-          label="Connect"
+          label={busy ? "Connecting…" : "Connect"}
           onPress={handleConnect}
           disabled={busy}
           testID="connection-connect"
         />
       )}
 
-      <Text className="text-xs text-text-muted">
+      <Text className="text-xs leading-[18px] text-text-muted">
         Run a server with the config in docker/opencode, then enter its URL here.
       </Text>
     </View>

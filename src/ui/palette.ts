@@ -21,31 +21,44 @@ export type PaletteEntry = Record<ColorSchemeName, string>;
 /** Semantic colour names. Keys are the API; values are per-scheme hex. */
 export const palette = {
   /** App canvas. Also the base layer behind every screen. */
-  background: { light: "#ffffff", dark: "#212121" },
-  /** Cards, list rows, inputs — one step above the canvas. */
-  surface: { light: "#f4f4f5", dark: "#2a2a2c" },
-  /** Pressed/hover state for surfaces. */
-  surfaceHover: { light: "#e4e4e7", dark: "#3a3a3c" },
+  background: { light: "#ffffff", dark: "#121212" },
+  /** Grouped rows, inputs, search fields — one step above the canvas. */
+  surface: { light: "#f4f4f4", dark: "#212121" },
+  /** Pressed state for surfaces. */
+  surfaceHover: { light: "#ececec", dark: "#2c2c2c" },
+  /** Floating chrome: header buttons, the composer, sheets and menus. */
+  elevated: { light: "#ffffff", dark: "#242424" },
   /** Scrim behind modals and sheets. */
   overlay: { light: "#000000", dark: "#000000" },
   /** Hairlines and card outlines. */
-  border: { light: "#e4e4e7", dark: "#404044" },
+  border: { light: "#e5e5e5", dark: "#2f2f2f" },
   /** Primary body text. */
-  text: { light: "#18181b", dark: "#ededed" },
-  /** Secondary text: timestamps, hints, placeholders. */
-  textMuted: { light: "#71717a", dark: "#9b9ba0" },
-  /** Accent: active tab, links, primary buttons. */
-  primary: { light: "#10a37f", dark: "#19c37d" },
+  text: { light: "#0d0d0d", dark: "#ececec" },
+  /** Secondary text: timestamps, hints, section labels. */
+  textMuted: { light: "#6b6b6b", dark: "#a3a3a3" },
+  /** Placeholders and disabled icons. */
+  textFaint: { light: "#9a9a9a", dark: "#707070" },
+  /** Accent: send button, links, checks, toggles. */
+  primary: { light: "#2f7bf5", dark: "#4b8ffa" },
   /** Text/icon colour that sits on top of `primary` or `danger`. */
   primaryForeground: { light: "#ffffff", dark: "#ffffff" },
-  danger: { light: "#dc2626", dark: "#ef4444" },
-  success: { light: "#16a34a", dark: "#22c55e" },
+  /** The user's own messages. */
+  userBubble: { light: "#e8f2fe", dark: "#1c2d45" },
+  userBubbleText: { light: "#1f5eb4", dark: "#b3d1ff" },
+  danger: { light: "#e02e2a", dark: "#ef4444" },
+  success: { light: "#1fa463", dark: "#22c55e" },
   /** Markdown code blocks: panel background. */
-  code: { light: "#f4f4f5", dark: "#151517" },
+  code: { light: "#f7f7f8", dark: "#1b1b1b" },
   /** Markdown code text. */
-  codeText: { light: "#18181b", dark: "#ededed" },
+  codeText: { light: "#0d0d0d", dark: "#ececec" },
   /** Markdown code chrome: language label, copy button. */
-  codeMuted: { light: "#52525b", dark: "#a1a1aa" },
+  codeMuted: { light: "#6b6b6b", dark: "#a1a1aa" },
+  /** Decorative icon tints, e.g. the new-chat suggestion chips. */
+  tintViolet: { light: "#c061cb", dark: "#dc8add" },
+  tintAmber: { light: "#e5a50a", dark: "#f6d32d" },
+  tintGreen: { light: "#2ec27e", dark: "#57e389" },
+  tintBlue: { light: "#3584e4", dark: "#62a0ea" },
+  tintOrange: { light: "#e66100", dark: "#ffa348" },
 } satisfies Record<string, PaletteEntry>;
 
 export type PaletteKey = keyof typeof palette;
@@ -85,4 +98,14 @@ export function hexToTriplet(hex: string): string {
   }
   const channels = [0, 2, 4].map((offset) => parseInt(full.slice(offset, offset + 2), 16));
   return channels.join(" ");
+}
+
+/**
+ * `#ffffff`, 0.5 -> `"rgba(255, 255, 255, 0.5)"`.
+ *
+ * For the places that need a translucent version of a palette colour as a
+ * real style value: fades behind floating chrome and shadows.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+  return `rgba(${hexToTriplet(hex).split(" ").join(", ")}, ${alpha})`;
 }

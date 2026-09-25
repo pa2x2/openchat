@@ -15,33 +15,35 @@ export interface BubbleProps {
   testID?: string;
 }
 
+/**
+ * One message. The user's side is a tinted pill on the right; the
+ * assistant's side has no bubble at all and reads as page text, full width.
+ */
 export function Bubble({ text, children, role, status, className, testID }: BubbleProps) {
   const isUser = role === "user";
   const content =
     children ??
     (text !== undefined ? (
-      <Text className={cn("text-base", isUser ? "text-primary-foreground" : "text-text")}>
+      <Text
+        className={cn("text-base leading-[23px]", isUser ? "text-user-bubble-text" : "text-text")}
+      >
         {text}
       </Text>
     ) : null);
 
   return (
-    <View className={cn("px-3", className)} testID={testID}>
-      <View
-        className={cn(
-          "max-w-[85%] rounded-2xl px-4 py-2.5",
-          isUser ? "self-end rounded-br-md bg-primary" : "self-start rounded-bl-md bg-surface",
-        )}
-      >
-        {content}
-      </View>
+    <View className={cn("px-4", className)} testID={testID}>
+      {isUser ? (
+        <View className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5">
+          {content}
+        </View>
+      ) : (
+        <View className="w-full">{content}</View>
+      )}
       {status ? (
         <Text
           accessibilityLabel={status}
-          className={cn(
-            "mt-1 px-1 text-xs",
-            isUser ? "self-end text-primary-foreground/70" : "self-start text-text-muted",
-          )}
+          className={cn("mt-1 px-1 text-xs text-text-muted", isUser ? "self-end" : "self-start")}
         >
           {status}
         </Text>

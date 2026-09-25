@@ -43,14 +43,14 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.textFaint}
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
         accessibilityLabel={label ?? placeholder}
         className={cn(
-          "w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-text",
+          "w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-text",
           "focus:border-primary",
           error && "border-danger",
         )}

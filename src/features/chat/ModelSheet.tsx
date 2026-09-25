@@ -1,5 +1,6 @@
 /**
- * Model picker sheet: the provider's model catalog in a bottom sheet.
+ * Model picker sheet: the provider's model catalog in a bottom sheet,
+ * grouped by the upstream provider that serves each model.
  *
  * The list comes from the models store (cached locally, refreshed from the
  * server every time the sheet opens). Selecting a row reports the model and
@@ -7,11 +8,14 @@
  * current chat or save it as the default).
  */
 
-import { useEffect } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
+import { useEffect, useMemo } from "react";
+import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import type { ModelInfo, ModelRef } from "@/src/domain";
+import { cn } from "@/src/lib/cn";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
 import { Button } from "@/src/ui/Button";
+import { Icon } from "@/src/ui/Icon";
+import { GroupLabel } from "@/src/ui/ListGroup";
 import { Sheet } from "@/src/ui/Sheet";
 
 export interface ModelSheetProps {
@@ -20,9 +24,11 @@ export interface ModelSheetProps {
   /** Currently active model, marked with a check. */
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
+  /** Muted line under the title, e.g. what the choice applies to. */
+  subtitle?: string;
 }
 
-export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetProps) {
+export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: ModelSheetProps) {
   const models = useModelsStore((state) => state.models);
   const loading = useModelsStore((state) => state.loading);
   const error = useModelsStore((state) => state.error);
@@ -32,19 +38,35 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
     if (visible) void refresh();
   }, [visible, refresh]);
 
+  const sections = useMemo(() => {
+    const byProvider = new Map<string, ModelInfo[]>();
+    for (const model of models) {
+      const list = byProvider.get(model.ref.provider) ?? [];
+      list.push(model);
+      byProvider.set(model.ref.provider, list);
+    }
+    return [...byProvider].map(([provider, data]) => ({ provider, data }));
+  }, [models]);
+
   function handleSelect(model: ModelInfo) {
     onSelect(model);
     onClose();
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Model" height="70%" testID="model-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Model"
+      subtitle={subtitle}
+      testID="model-sheet"
+    >
       {loading && models.length === 0 ? (
-        <View className="flex-1 items-center justify-center" testID="model-loading">
+        <View className="items-center justify-center py-16" testID="model-loading">
           <ActivityIndicator accessibilityLabel="Loading models" />
         </View>
       ) : error && models.length === 0 ? (
-        <View className="flex-1 items-center justify-center gap-3 px-8">
+        <View className="items-center justify-center gap-3 px-8 py-10">
           <Text className="text-center text-sm text-danger" testID="model-error">
             {error}
           </Text>
@@ -56,7 +78,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
           />
         </View>
       ) : models.length === 0 ? (
-        <View className="flex-1 items-center justify-center gap-3 px-8">
+        <View className="items-center justify-center gap-3 px-8 py-10">
           <Text className="text-center text-sm text-text-muted" testID="model-empty">
             No models found on this server.
           </Text>
@@ -68,34 +90,48 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
           />
         </View>
       ) : (
-        <FlatList
-          data={models}
+        <SectionList
+          sections={sections}
+          style={{ flexGrow: 0, flexShrink: 1 }}
+          stickySectionHeadersEnabled={false}
           keyExtractor={(model) => `${model.ref.provider}/${model.ref.id}`}
-          renderItem={({ item }) => {
+          renderSectionHeader={({ section }) => <GroupLabel>{section.provider}</GroupLabel>}
+          renderItem={({ item, index, section }) => {
             const active = selected ? sameModelRef(item.ref, selected) : false;
+            const first = index === 0;
+            const last = index === section.data.length - 1;
             return (
-              <Pressable
-                onPress={() => handleSelect(item)}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.label}, ${item.ref.provider}`}
-                accessibilityState={{ selected: active }}
-                className="flex-row items-center gap-3 border-b border-border px-1 py-3 active:bg-surface-hover"
-                testID={`model-option-${item.ref.provider}-${item.ref.id}`}
+              <View
+                className={cn(
+                  "overflow-hidden bg-surface",
+                  first && "rounded-t-[20px]",
+                  last && "rounded-b-[20px]",
+                )}
               >
-                <View className="flex-1">
-                  <Text className="text-base font-semibold text-text" numberOfLines={1}>
-                    {item.label}
-                  </Text>
-                  <Text className="mt-0.5 text-xs text-text-muted" numberOfLines={1}>
-                    {item.ref.provider} · {item.ref.id}
-                  </Text>
-                </View>
-                {active ? (
-                  <Text className="text-base font-bold text-primary" testID="model-selected">
-                    ✓
-                  </Text>
-                ) : null}
-              </Pressable>
+                {!first ? <View className="mx-4 h-px bg-border" /> : null}
+                <Pressable
+                  onPress={() => handleSelect(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.label}, ${item.ref.provider}`}
+                  accessibilityState={{ selected: active }}
+                  className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-hover"
+                  testID={`model-option-${item.ref.provider}-${item.ref.id}`}
+                >
+                  <View className="flex-1">
+                    <Text className="text-base font-medium text-text" numberOfLines={1}>
+                      {item.label}
+                    </Text>
+                    <Text className="mt-0.5 text-[13px] text-text-muted" numberOfLines={1}>
+                      {item.ref.id}
+                    </Text>
+                  </View>
+                  {active ? (
+                    <View testID="model-selected">
+                      <Icon name="check" size={22} tone="primary" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              </View>
             );
           }}
         />

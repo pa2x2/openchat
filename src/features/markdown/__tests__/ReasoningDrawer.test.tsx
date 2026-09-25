@@ -41,7 +41,7 @@ describe("ReasoningDrawer", () => {
   it("shows a streaming label while the answer is live", async () => {
     const tree = await render(<ReasoningDrawer enabled streaming text="thinking" />);
     expect(
-      tree.root.findByProps({ testID: "reasoning-toggle" }).findByProps({ children: "Reasoning…" }),
+      tree.root.findByProps({ testID: "reasoning-toggle" }).findByProps({ children: "Thinking…" }),
     ).toBeTruthy();
   });
 });

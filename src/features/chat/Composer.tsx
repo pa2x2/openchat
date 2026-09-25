@@ -1,15 +1,16 @@
 /**
- * Message composer: attachments, the text input, and send — which becomes
- * stop while a reply is streaming. Stop renders only when the caller passes
- * `onStop` (gated by the provider's interrupt capability at the call site),
- * and the attach button only when the caller passes `onAttach` (gated by the
- * provider's attachments capability).
+ * Message composer: a floating pill with attach, the text input, and a round
+ * send button — which becomes stop while a reply is streaming. Stop renders
+ * only when the caller passes `onStop` (gated by the provider's interrupt
+ * capability at the call site), and the attach button only when the caller
+ * passes `onAttach` (gated by the provider's attachments capability).
  */
 
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { Pressable, TextInput, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
+import { Icon } from "@/src/ui/Icon";
 import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
 
@@ -22,30 +23,47 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
+  /** Reports whether the field has text, e.g. to hide suggestions. */
+  onDraftChange?: (hasText: boolean) => void;
 }
 
-export function Composer({
-  onSend,
-  onStop,
-  onAttach,
-  attachments = [],
-  onRemoveAttachment,
-}: ComposerProps) {
+export interface ComposerHandle {
+  /** Replaces the draft with `text` and focuses the field. */
+  insert: (text: string) => void;
+}
+
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
+  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, onDraftChange },
+  ref,
+) {
   const [text, setText] = useState("");
+  const input = useRef<TextInput>(null);
   const streaming = Boolean(onStop);
-  const { colors } = useAppTheme();
+  const { colors, floatingShadow } = useAppTheme();
+
+  function updateText(next: string) {
+    setText(next);
+    onDraftChange?.(next.length > 0);
+  }
+
+  useImperativeHandle(ref, () => ({
+    insert: (next) => {
+      updateText(next);
+      input.current?.focus();
+    },
+  }));
 
   async function handleSend() {
     const trimmed = text.trim();
     if ((!trimmed && attachments.length === 0) || streaming) return;
-    setText("");
+    updateText("");
     await onSend(trimmed, attachments);
   }
 
   const sendDisabled = text.trim().length === 0 && attachments.length === 0;
 
   return (
-    <View className="border-t border-border bg-background">
+    <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
       {attachments.length > 0 ? (
         <AttachmentChips
           attachments={attachments}
@@ -53,27 +71,31 @@ export function Composer({
           testID="composer-attachments"
         />
       ) : null}
-      <View className="flex-row items-end gap-2 px-3 py-2">
+      <View className="flex-row items-end">
         {onAttach && !streaming ? (
           <Pressable
             accessibilityHint="Attaches a photo or a file to your message"
             accessibilityLabel="Add attachment"
             accessibilityRole="button"
-            className="rounded-xl border border-border bg-surface px-3 py-3 active:bg-surface-hover"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
             onPress={onAttach}
             testID="composer-attach"
           >
-            <Text className="text-xl leading-none text-text">+</Text>
+            <Icon name="plus" size={26} />
           </Pressable>
         ) : null}
         <TextInput
+          ref={input}
           value={text}
-          onChangeText={setText}
-          placeholder="Message"
-          placeholderTextColor={colors.textMuted}
+          onChangeText={updateText}
+          placeholder="Ask anything"
+          placeholderTextColor={colors.textFaint}
           multiline
           accessibilityLabel="Message"
-          className="max-h-32 flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-base text-text focus:border-primary"
+          className={cn(
+            "max-h-36 min-h-11 flex-1 py-2.5 text-base leading-[22px] text-text",
+            onAttach && !streaming ? "px-1" : "px-3",
+          )}
           testID="composer-input"
         />
         {streaming ? (
@@ -82,12 +104,11 @@ export function Composer({
             accessibilityLabel="Stop generating"
             accessibilityRole="button"
             accessibilityState={{ busy: true }}
-            className="flex-row items-center gap-2 rounded-xl bg-danger px-4 py-3 active:bg-danger/80"
+            className="m-0.5 h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
             onPress={onStop}
             testID="composer-stop"
           >
             <View className="h-3 w-3 rounded-[2px] bg-primary-foreground" />
-            <Text className="text-base font-semibold text-primary-foreground">Stop</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -96,25 +117,21 @@ export function Composer({
             accessibilityRole="button"
             accessibilityState={{ disabled: sendDisabled }}
             className={cn(
-              "rounded-xl px-4 py-3",
-              !sendDisabled && "bg-primary active:bg-primary/80",
-              sendDisabled && "bg-surface",
+              "m-0.5 h-10 w-10 items-center justify-center rounded-full",
+              sendDisabled ? "bg-surface-hover" : "bg-primary active:opacity-80",
             )}
             disabled={sendDisabled}
             onPress={() => void handleSend()}
             testID="composer-send"
           >
-            <Text
-              className={cn(
-                "text-base font-semibold",
-                sendDisabled ? "text-text-muted" : "text-primary-foreground",
-              )}
-            >
-              Send
-            </Text>
+            <Icon
+              name="arrow-up"
+              size={22}
+              tone={sendDisabled ? "textFaint" : "primaryForeground"}
+            />
           </Pressable>
         )}
       </View>
     </View>
   );
-}
+});

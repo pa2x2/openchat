@@ -1,33 +1,33 @@
-import { memo } from "react";
-import { Pressable, Text, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { memo, useEffect, useRef, useState } from "react";
+import { Pressable, Share, Text, View } from "react-native";
 import type { Message } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { ReasoningDrawer } from "@/src/features/markdown/ReasoningDrawer";
 import { AttachmentStrip } from "./AttachmentChips";
 import { Bubble } from "@/src/ui";
+import { Icon, type IconName } from "@/src/ui/Icon";
+import { Pulse } from "@/src/ui/Pulse";
 
 export interface MessageBubbleProps {
   message: Message;
   showReasoning: boolean;
   /**
-   * When set, the bubble offers a regenerate action. The screen passes it
+   * When set, the reply offers a regenerate action. The screen passes it
    * only for a reply that can actually be re-run (gated by the provider's
    * regenerate capability and no live turn).
    */
   onRegenerate?: () => void;
 }
 
+/** A terminal outcome worth a line under the reply; live states show inline. */
 function statusFor(message: Message): string | undefined {
   switch (message.status) {
-    case "pending":
-      return "Starting…";
-    case "streaming":
-      return "Generating…";
     case "error":
-      return "Failed";
+      return "Something went wrong";
     case "interrupted":
       return "Stopped";
-    case "complete":
+    default:
       return undefined;
   }
 }
@@ -39,40 +39,148 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const streaming = message.status === "pending" || message.status === "streaming";
   const attachments = message.attachments ?? [];
+  const isUser = message.role === "user";
+  const hasText = message.text.length > 0;
+  const hasReasoning = showReasoning && Boolean(message.reasoning?.trim());
 
+  if (isUser) {
+    return (
+      <View className="mb-4 mt-2" testID={`bubble-${message.role}`}>
+        {attachments.length > 0 ? (
+          <View className={hasText ? "mb-1.5 px-4" : "px-4"}>
+            <AttachmentStrip
+              attachments={attachments}
+              testID={`message-attachments-${message.id}`}
+            />
+          </View>
+        ) : null}
+        {hasText ? (
+          <Bubble role="user" status={statusFor(message)}>
+            <MarkdownContent
+              role="user"
+              streaming={false}
+              text={message.text}
+              testID={`markdown-${message.id}`}
+            />
+          </Bubble>
+        ) : null}
+      </View>
+    );
+  }
+
+  const status = statusFor(message);
   return (
-    <Bubble
-      role={message.role}
-      status={statusFor(message)}
-      testID={`bubble-${message.role}`}
-      text={message.text}
-    >
-      {attachments.length > 0 ? (
-        <View className={message.text ? "mb-2" : undefined}>
-          <AttachmentStrip attachments={attachments} testID={`message-attachments-${message.id}`} />
-        </View>
-      ) : null}
-      <MarkdownContent
-        role={message.role}
-        streaming={streaming}
-        text={message.text}
-        testID={`markdown-${message.id}`}
+    <Bubble role="assistant" className="mb-5 mt-1" testID={`bubble-${message.role}`}>
+      <ReasoningDrawer
+        enabled={showReasoning}
+        streaming={streaming && !hasText}
+        text={message.reasoning}
       />
-      {message.role === "assistant" ? (
-        <ReasoningDrawer enabled={showReasoning} streaming={streaming} text={message.reasoning} />
+      {streaming && !hasText && !hasReasoning ? (
+        <Pulse>
+          <Text className="py-1 text-[15px] text-text-muted" testID="thinking-indicator">
+            Thinking…
+          </Text>
+        </Pulse>
       ) : null}
-      {onRegenerate && !streaming ? (
-        <Pressable
-          accessibilityHint="Runs this reply again and replaces it"
-          accessibilityLabel="Regenerate reply"
-          accessibilityRole="button"
-          className="mt-1 self-start rounded-lg px-2 py-1 active:bg-surface-hover"
-          onPress={onRegenerate}
-          testID="regenerate-button"
+      {hasText ? (
+        <MarkdownContent
+          role="assistant"
+          streaming={streaming}
+          text={message.text}
+          testID={`markdown-${message.id}`}
+        />
+      ) : null}
+      {status ? (
+        <Text
+          accessibilityLabel={status}
+          className={
+            message.status === "error" ? "mt-1 text-sm text-danger" : "mt-1 text-sm text-text-muted"
+          }
         >
-          <Text className="text-xs font-semibold text-text-muted">Regenerate</Text>
-        </Pressable>
+          {status}
+        </Text>
       ) : null}
+      {!streaming ? <MessageActions text={message.text} onRegenerate={onRegenerate} /> : null}
     </Bubble>
   );
 });
+
+function MessageActions({ text, onRegenerate }: { text: string; onRegenerate?: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  function handleCopy() {
+    try {
+      void Clipboard.setStringAsync(text).catch(() => undefined);
+    } catch {
+      // Clipboard support can be unavailable on web or in a restricted host.
+    }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <View className="-ml-2 mt-1 flex-row">
+      {text ? (
+        <>
+          <ActionButton
+            icon={copied ? "check" : "content-copy"}
+            label={copied ? "Copied" : "Copy reply"}
+            onPress={handleCopy}
+            testID="copy-button"
+          />
+          <ActionButton
+            icon="share-variant-outline"
+            label="Share reply"
+            onPress={() => void Share.share({ message: text }).catch(() => undefined)}
+            testID="share-button"
+          />
+        </>
+      ) : null}
+      {onRegenerate ? (
+        <ActionButton
+          icon="refresh"
+          label="Regenerate reply"
+          hint="Runs this reply again and replaces it"
+          onPress={onRegenerate}
+          testID="regenerate-button"
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  hint,
+  onPress,
+  testID,
+}: {
+  icon: IconName;
+  label: string;
+  hint?: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={hint}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+      onPress={onPress}
+      testID={testID}
+    >
+      <Icon name={icon} size={19} tone="textMuted" />
+    </Pressable>
+  );
+}

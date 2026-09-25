@@ -16,7 +16,7 @@ export interface ButtonProps {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-primary active:bg-primary/80",
-  secondary: "bg-surface active:bg-surface-hover border border-border",
+  secondary: "bg-surface active:bg-surface-hover",
   danger: "bg-danger active:bg-danger/80",
   ghost: "bg-transparent active:bg-surface-hover",
 };
@@ -29,9 +29,9 @@ const variantTextClasses: Record<ButtonVariant, string> = {
 };
 
 const sizeClasses: Record<ButtonSize, { button: string; text: string }> = {
-  sm: { button: "px-3 py-1.5 rounded-lg", text: "text-sm" },
-  md: { button: "px-4 py-2.5 rounded-xl", text: "text-base" },
-  lg: { button: "px-5 py-3.5 rounded-xl", text: "text-lg" },
+  sm: { button: "px-3.5 py-1.5 rounded-full", text: "text-sm" },
+  md: { button: "px-5 py-3 rounded-full", text: "text-base" },
+  lg: { button: "px-6 py-3.5 rounded-full", text: "text-lg" },
 };
 
 export function Button({
@@ -60,7 +60,7 @@ export function Button({
       disabled={disabled}
       testID={testID}
     >
-      <Text className={cn("font-semibold", sizes.text, variantTextClasses[variant])}>{label}</Text>
+      <Text className={cn("font-medium", sizes.text, variantTextClasses[variant])}>{label}</Text>
     </Pressable>
   );
 }

@@ -1,41 +1,45 @@
-import { Link } from "expo-router";
+import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { colorScheme as colorSchemeApi } from "nativewind";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
-import { Button } from "@/src/ui/Button";
-import { useAppTheme } from "@/src/ui/theme";
+import { cn } from "@/src/lib/cn";
 import { useProviderCapabilities } from "@/src/lib/providerFactory";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
-import { useSettingsStore } from "@/src/stores/settings";
+import { useSettingsStore, type Appearance } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
+import { Group, GroupLabel, Row } from "@/src/ui/ListGroup";
 import type { ModelInfo } from "@/src/domain";
 
+const APPEARANCES: { value: Appearance; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
 /**
- * Settings screen.
- *
- * Hosts the server connection form, the theme toggle and the
- * design-primitives demo entry point.
+ * Settings screen: the server connection, chat defaults, appearance, and
+ * app info, as grouped lists.
  */
 export default function SettingsScreen() {
-  const { scheme } = useAppTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const capabilities = useProviderCapabilities();
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const defaultModel = useSettingsStore((state) =>
     providerId ? state.defaultModels[providerId] : undefined,
   );
   const setDefaultModel = useSettingsStore((state) => state.setDefaultModel);
+  const appearance = useSettingsStore((state) => state.appearance);
+  const setAppearance = useSettingsStore((state) => state.setAppearance);
   const defaultLabel = useModelsStore((state) =>
     defaultModel
       ? (state.models.find((model) => sameModelRef(model.ref, defaultModel))?.label ?? null)
       : null,
   );
   const [sheetOpen, setSheetOpen] = useState(false);
-
-  const toggleScheme = () => {
-    colorSchemeApi.set(scheme === "light" ? "dark" : "light");
-  };
 
   function handleSelectDefault(model: ModelInfo) {
     if (!providerId) return;
@@ -44,56 +48,87 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScrollView contentContainerClassName="p-4 gap-4">
+      <ScrollView
+        contentContainerClassName="px-4 pt-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <GroupLabel>Server</GroupLabel>
         <ConnectionCard />
 
         {capabilities?.modelSelection === true ? (
-          <View className="gap-3 rounded-xl border border-border bg-surface p-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-base font-semibold text-text">Default model</Text>
-              <Pressable
-                onPress={() => setSheetOpen(true)}
+          <>
+            <GroupLabel>Chat</GroupLabel>
+            <Group>
+              <Row
+                icon="cube-outline"
+                title="Default model"
+                subtitle="For new chats"
+                value={defaultLabel ?? defaultModel?.id ?? "Choose"}
+                chevron
                 accessibilityLabel="Choose default model"
+                onPress={() => setSheetOpen(true)}
                 testID="default-model-button"
+              />
+            </Group>
+          </>
+        ) : null}
+
+        <GroupLabel>Appearance</GroupLabel>
+        <View className="flex-row rounded-[20px] bg-surface p-1" accessibilityRole="radiogroup">
+          {APPEARANCES.map((option) => {
+            const active = option.value === appearance;
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityLabel={option.label}
+                accessibilityState={{ checked: active }}
+                className={cn(
+                  "h-10 flex-1 items-center justify-center rounded-2xl",
+                  active ? "bg-elevated" : "active:bg-surface-hover",
+                )}
+                onPress={() => setAppearance(option.value)}
+                testID={`appearance-${option.value}`}
               >
-                <Text className="text-sm font-semibold text-primary" numberOfLines={1}>
-                  {defaultLabel ?? defaultModel?.id ?? "Choose"}
+                <Text
+                  className={cn(
+                    "text-[15px]",
+                    active ? "font-medium text-text" : "text-text-muted",
+                  )}
+                >
+                  {option.label}
                 </Text>
               </Pressable>
-            </View>
-            <Text className="text-xs text-text-muted">
-              New chats start on this model unless you pick another one.
-            </Text>
-          </View>
-        ) : null}
-
-        <View className="gap-3 rounded-xl border border-border bg-surface p-4">
-          <Text className="text-base font-semibold text-text">Appearance</Text>
-          <Text className="text-sm text-text-muted">Current scheme: {scheme}</Text>
-          <Button
-            label={`Switch to ${scheme === "light" ? "dark" : "light"}`}
-            variant="secondary"
-            onPress={toggleScheme}
-          />
+            );
+          })}
         </View>
 
-        <Link href="/ui-demo" asChild>
-          <Pressable className="rounded-xl border border-border bg-surface p-4 active:bg-surface-hover">
-            <Text className="text-base font-semibold text-text">Design primitives demo</Text>
-            <Text className="mt-1 text-sm text-text-muted">
-              Button, Input, Sheet, Bubble in both schemes
-            </Text>
-          </Pressable>
-        </Link>
-        {capabilities?.modelSelection === true ? (
-          <ModelSheet
-            visible={sheetOpen}
-            onClose={() => setSheetOpen(false)}
-            selected={defaultModel ?? null}
-            onSelect={handleSelectDefault}
+        <GroupLabel>About</GroupLabel>
+        <Group>
+          <Row
+            icon="information-outline"
+            title="Version"
+            value={Constants.expoConfig?.version ?? "—"}
           />
-        ) : null}
+          <Row
+            icon="palette-outline"
+            title="Design primitives"
+            subtitle="Developer preview of the UI building blocks"
+            chevron
+            onPress={() => router.push("/ui-demo")}
+          />
+        </Group>
       </ScrollView>
+      {capabilities?.modelSelection === true ? (
+        <ModelSheet
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          selected={defaultModel ?? null}
+          onSelect={handleSelectDefault}
+          subtitle="Default for new chats"
+        />
+      ) : null}
     </View>
   );
 }

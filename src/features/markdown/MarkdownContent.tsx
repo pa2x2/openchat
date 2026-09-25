@@ -32,7 +32,7 @@ export function MarkdownContent({ text, role, streaming, testID }: MarkdownConte
   const { scheme, colors } = useAppTheme();
   const projection = useMemo(() => projectMarkdown(text, streaming), [text, streaming]);
   const styles = useMemo(() => getMarkdownStyles(role, colors), [role, colors]);
-  const textColor = role === "user" ? colors.primaryForeground : colors.text;
+  const textColor = role === "user" ? colors.userBubbleText : colors.text;
   const markdownSource = useMemo(
     () => (streaming ? projection.stable : sealIncompleteMarkdown(projection.stable)),
     [projection.stable, streaming],
@@ -69,16 +69,16 @@ export function MarkdownContent({ text, role, streaming, testID }: MarkdownConte
         </Markdown>
       ) : null}
       {projection.tail ? (
-        <Text selectable style={{ color: textColor, fontSize: 16, lineHeight: 23 }}>
+        <Text selectable style={{ color: textColor, fontSize: 16, lineHeight: 24 }}>
           {projection.tail}
         </Text>
       ) : null}
       {streaming ? (
         <Text
           accessibilityLabel="Generating"
-          style={{ color: textColor, fontSize: 16, lineHeight: 23 }}
+          style={{ color: textColor, fontSize: 14, lineHeight: 24 }}
         >
-          {projection.tail ? "▋" : "…"}
+          ●
         </Text>
       ) : null}
     </View>

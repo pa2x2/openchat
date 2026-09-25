@@ -2,6 +2,8 @@ export { Button, type ButtonProps } from "./Button";
 export { Input, type InputProps } from "./Input";
 export { Sheet, type SheetProps } from "./Sheet";
 export { Bubble, type BubbleProps } from "./Bubble";
+export { Icon, MenuGlyph, type IconName, type IconProps } from "./Icon";
+export { Group, GroupLabel, Row, type RowProps } from "./ListGroup";
 export {
   useAppTheme,
   themeForScheme,
@@ -9,6 +11,7 @@ export {
   palette,
   paletteKeys,
   hexToTriplet,
+  withAlpha,
   resolvePalette,
   themes,
   lightTokens,

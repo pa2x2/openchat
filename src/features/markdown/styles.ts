@@ -15,15 +15,16 @@ export function getMarkdownStyles(
   palette: ResolvedPalette,
 ): MarkdownStyleMap {
   const isUser = role === "user";
-  const foreground = isUser ? palette.primaryForeground : palette.text;
-  const muted = isUser ? "#d1fae5" : palette.textMuted;
-  const quoteBackground = isUser ? "rgba(255,255,255,0.14)" : palette.surface;
-  const quoteBorder = isUser ? "rgba(255,255,255,0.55)" : palette.primary;
-  const inlineCodeBackground = isUser ? "rgba(0,0,0,0.18)" : palette.surfaceHover;
-  const codeBorder = isUser ? "rgba(255,255,255,0.25)" : palette.border;
-  const tableHeader = isUser ? "rgba(0,0,0,0.16)" : palette.surfaceHover;
-  const tableRow = isUser ? "rgba(255,255,255,0.08)" : palette.background;
-  const linkColor = isUser ? "#d1fae5" : palette.primary;
+  // The user's side sits on the tinted bubble, so it takes the bubble's own
+  // text colour; everything else is the page palette.
+  const foreground = isUser ? palette.userBubbleText : palette.text;
+  const muted = isUser ? palette.userBubbleText : palette.textMuted;
+  const quoteBackground = isUser ? "transparent" : palette.surface;
+  const quoteBorder = isUser ? palette.userBubbleText : palette.border;
+  const inlineCodeBackground = isUser ? palette.background : palette.surface;
+  const tableHeader = palette.surface;
+  const tableRow = palette.background;
+  const linkColor = isUser ? palette.userBubbleText : palette.primary;
 
   return {
     body: {
@@ -33,7 +34,7 @@ export function getMarkdownStyles(
     text: {
       color: foreground,
       fontSize: 16,
-      lineHeight: 23,
+      lineHeight: 24,
     },
     textgroup: {
       color: foreground,
@@ -45,29 +46,33 @@ export function getMarkdownStyles(
     },
     heading1: {
       color: foreground,
-      fontSize: 28,
-      lineHeight: 34,
+      fontSize: 24,
+      lineHeight: 31,
+      fontWeight: "600",
       marginTop: 12,
       marginBottom: 8,
     },
     heading2: {
       color: foreground,
-      fontSize: 24,
-      lineHeight: 30,
+      fontSize: 21,
+      lineHeight: 28,
+      fontWeight: "600",
       marginTop: 12,
       marginBottom: 8,
     },
     heading3: {
       color: foreground,
-      fontSize: 20,
+      fontSize: 19,
       lineHeight: 26,
-      marginTop: 10,
+      fontWeight: "600",
+      marginTop: 14,
       marginBottom: 6,
     },
     heading4: {
       color: foreground,
-      fontSize: 18,
+      fontSize: 17,
       lineHeight: 24,
+      fontWeight: "600",
       marginTop: 10,
       marginBottom: 6,
     },
@@ -107,9 +112,9 @@ export function getMarkdownStyles(
       borderColor: quoteBorder,
       borderLeftWidth: 3,
       marginLeft: 2,
-      paddingHorizontal: 10,
+      paddingHorizontal: 12,
       paddingVertical: 6,
-      borderRadius: 6,
+      borderRadius: 4,
     },
     bullet_list: {
       marginTop: 4,
@@ -131,11 +136,11 @@ export function getMarkdownStyles(
       color: muted,
     },
     code_inline: {
-      color: isUser ? palette.primaryForeground : palette.danger,
+      color: foreground,
       backgroundColor: inlineCodeBackground,
-      borderColor: codeBorder,
-      borderWidth: 1,
-      borderRadius: 4,
+      fontFamily: "monospace",
+      fontSize: 14,
+      borderRadius: 5,
       paddingHorizontal: 4,
       paddingVertical: 1,
     },
@@ -148,17 +153,20 @@ export function getMarkdownStyles(
       backgroundColor: palette.code,
       borderColor: palette.border,
       borderWidth: 1,
-      borderRadius: 8,
+      borderRadius: 16,
+      marginTop: 6,
+      marginBottom: 10,
       overflow: "hidden",
     },
     fence_header: {
-      backgroundColor: isUser ? "rgba(0,0,0,0.28)" : palette.surface,
-      borderBottomColor: palette.border,
+      backgroundColor: palette.code,
+      borderBottomWidth: 0,
+      paddingHorizontal: 6,
+      paddingTop: 4,
     },
     fence_language_label: {
       color: palette.codeMuted,
-      fontFamily: "monospace",
-      fontSize: 11,
+      fontSize: 13,
     },
     fence_copy_button: {
       paddingHorizontal: 8,
@@ -166,22 +174,24 @@ export function getMarkdownStyles(
     },
     fence_copy_text: {
       color: palette.codeMuted,
-      fontSize: 11,
+      fontSize: 13,
     },
     fence_code: {
       backgroundColor: palette.code,
-      padding: 12,
+      paddingHorizontal: 14,
+      paddingTop: 6,
+      paddingBottom: 14,
     },
     fence_token: {
       color: palette.codeText,
       fontFamily: "monospace",
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: 13.5,
+      lineHeight: 20,
     },
     table: {
       borderColor: palette.border,
       borderWidth: 1,
-      borderRadius: 6,
+      borderRadius: 12,
       marginTop: 8,
       marginBottom: 8,
     },

@@ -29,7 +29,7 @@ import {
  */
 
 export type { ColorSchemeName } from "./palette";
-export { palette, paletteKeys, resolvePalette, hexToTriplet } from "./palette";
+export { palette, paletteKeys, resolvePalette, hexToTriplet, withAlpha } from "./palette";
 export type { PaletteKey, ResolvedPalette } from "./palette";
 
 /** CSS variable name for a semantic colour, matching `tailwind.config.js`. */
@@ -104,7 +104,17 @@ export interface AppTheme {
   vars: object;
   /** Pass to `<ThemeProvider>` so headers and the tab bar follow the scheme. */
   navigationTheme: Theme;
+  /**
+   * `boxShadow` for floating chrome (header buttons, the composer). Shadows
+   * barely read on a dark canvas, so dark mode leans on `elevated` instead.
+   */
+  floatingShadow: string;
 }
+
+const floatingShadows: Record<ColorSchemeName, string> = {
+  light: "0px 1px 2px rgba(0, 0, 0, 0.06), 0px 4px 16px rgba(0, 0, 0, 0.08)",
+  dark: "0px 1px 2px rgba(0, 0, 0, 0.4), 0px 4px 16px rgba(0, 0, 0, 0.45)",
+};
 
 /** Resolved theme for an explicit scheme, without subscribing to changes. */
 export function themeForScheme(scheme: ColorSchemeName): AppTheme {
@@ -113,6 +123,7 @@ export function themeForScheme(scheme: ColorSchemeName): AppTheme {
     colors: resolvedByScheme[scheme],
     vars: themes[scheme],
     navigationTheme: navigationThemes[scheme],
+    floatingShadow: floatingShadows[scheme],
   };
 }
 

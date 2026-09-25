@@ -7,7 +7,7 @@
 
 import { Pressable, Text, View } from "react-native";
 import type { AttachmentSource } from "./pickAttachments";
-import { Button } from "@/src/ui/Button";
+import { Icon, type IconName } from "@/src/ui/Icon";
 import { Sheet } from "@/src/ui/Sheet";
 
 export interface AttachSheetProps {
@@ -16,37 +16,39 @@ export interface AttachSheetProps {
   onPick: (source: AttachmentSource) => void;
 }
 
-const OPTIONS: { source: AttachmentSource; title: string; description: string }[] = [
+const OPTIONS: { source: AttachmentSource; title: string; icon: IconName; hint: string }[] = [
   {
     source: "image",
-    title: "Photo",
-    description: "Attach a picture from your library",
+    title: "Photos",
+    icon: "image-outline",
+    hint: "Attach a picture from your library",
   },
   {
     source: "file",
-    title: "File",
-    description: "Attach a document from your device",
+    title: "Files",
+    icon: "file-document-outline",
+    hint: "Attach a document from your device",
   },
 ];
 
 export function AttachSheet({ visible, onClose, onPick }: AttachSheetProps) {
   return (
-    <Sheet visible={visible} onClose={onClose} title="Attach" testID="attach-sheet">
-      <View className="gap-2 pb-2">
+    <Sheet visible={visible} onClose={onClose} testID="attach-sheet">
+      <View className="flex-row gap-2.5">
         {OPTIONS.map((option) => (
           <Pressable
             key={option.source}
             accessibilityRole="button"
             accessibilityLabel={option.title}
-            className="rounded-xl border border-border px-4 py-3 active:bg-surface-hover"
+            accessibilityHint={option.hint}
+            className="h-[88px] flex-1 items-center justify-center gap-2 rounded-[20px] bg-surface active:bg-surface-hover"
             onPress={() => onPick(option.source)}
             testID={`attach-${option.source}`}
           >
-            <Text className="text-base font-semibold text-text">{option.title}</Text>
-            <Text className="mt-0.5 text-sm text-text-muted">{option.description}</Text>
+            <Icon name={option.icon} size={26} />
+            <Text className="text-sm text-text">{option.title}</Text>
           </Pressable>
         ))}
-        <Button label="Cancel" variant="secondary" onPress={onClose} testID="attach-cancel" />
       </View>
     </Sheet>
   );

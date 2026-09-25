@@ -1,13 +1,16 @@
 /**
  * Attachment previews: the files a message carries.
  *
- * Two layouts: a wrapping strip for a transcript bubble, and a scrolling strip
- * for the composer (where the list can outgrow the width).
+ * Two layouts: large previews stacked at the end of a sent message, and a
+ * scrolling row of small thumbnails inside the composer (where the list can
+ * outgrow the width).
  */
 
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { attachmentUri, formatBytes, isImageAttachment } from "@/src/lib/attachments";
+import { cn } from "@/src/lib/cn";
+import { Icon } from "@/src/ui/Icon";
 
 export interface AttachmentStripProps {
   attachments: Attachment[];
@@ -15,12 +18,16 @@ export interface AttachmentStripProps {
   testID?: string;
 }
 
-/** Files of a message already sent, as shown in its bubble. */
+function keyOf(attachment: Attachment): string {
+  return `${attachment.name}-${attachment.mimeType}`;
+}
+
+/** Files of a message already sent, as shown above its bubble. */
 export function AttachmentStrip({ attachments, testID }: AttachmentStripProps) {
   return (
-    <View className="flex-row flex-wrap" testID={testID}>
+    <View className="flex-row flex-wrap justify-end gap-2" testID={testID}>
       {attachments.map((attachment) => (
-        <AttachmentChip key={`${attachment.name}-${attachment.mimeType}`} attachment={attachment} />
+        <AttachmentChip key={keyOf(attachment)} attachment={attachment} size="large" />
       ))}
     </View>
   );
@@ -29,19 +36,16 @@ export function AttachmentStrip({ attachments, testID }: AttachmentStripProps) {
 /** Files staged on the message being written, with a remove control each. */
 export function AttachmentChips({ attachments, onRemove, testID }: AttachmentStripProps) {
   return (
-    <View className="border-b border-border px-3 py-2" testID={testID}>
+    <View className="px-1.5 pb-0.5 pt-1.5" testID={testID}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
-        contentContainerClassName="flex-row"
+        // Room for the remove badges, which overhang each chip's corner.
+        contentContainerClassName="flex-row gap-2 pr-1 pt-1.5"
       >
         {attachments.map((attachment) => (
-          <AttachmentChip
-            key={`${attachment.name}-${attachment.mimeType}`}
-            attachment={attachment}
-            onRemove={onRemove}
-          />
+          <AttachmentChip key={keyOf(attachment)} attachment={attachment} onRemove={onRemove} />
         ))}
       </ScrollView>
     </View>
@@ -52,11 +56,13 @@ export function AttachmentChips({ attachments, onRemove, testID }: AttachmentStr
 export function AttachmentChip({
   attachment,
   onRemove,
+  size = "small",
 }: {
   attachment: Attachment;
   onRemove?: (attachment: Attachment) => void;
+  size?: "small" | "large";
 }) {
-  const size = formatBytes(attachment.size);
+  const bytes = formatBytes(attachment.size);
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()!.toUpperCase()
     : "FILE";
@@ -65,46 +71,52 @@ export function AttachmentChip({
   // arrives; the chip falls back to the file's type.
   const source = attachmentUri(attachment);
   const preview = isImageAttachment(attachment) && source.length > 0;
+  const side = size === "large" ? 150 : 64;
+
   return (
-    <View
-      className="mb-1 mr-2 flex-row items-center gap-2 self-start rounded-xl border border-border bg-surface py-1 pl-1 pr-2"
-      testID={`attachment-chip-${attachment.name}`}
-    >
+    <View testID={`attachment-chip-${attachment.name}`}>
       {preview ? (
         <Image
           accessibilityLabel={attachment.name}
           source={{ uri: source }}
-          style={{ width: 40, height: 40 }}
-          className="rounded-lg"
+          style={{ width: side, height: side }}
+          className={cn("bg-surface", size === "large" ? "rounded-[18px]" : "rounded-[14px]")}
           testID={`attachment-image-${attachment.name}`}
         />
       ) : (
-        <View className="h-10 w-10 items-center justify-center rounded-lg bg-surface-hover">
-          <Text className="text-[10px] font-semibold text-text-muted" numberOfLines={1}>
-            {extension.slice(0, 4)}
-          </Text>
+        <View
+          className={cn(
+            "flex-row items-center gap-2.5 bg-surface pl-2.5 pr-3.5",
+            size === "large" ? "h-16 rounded-2xl" : "h-16 rounded-[14px]",
+          )}
+        >
+          <View className="h-10 w-10 items-center justify-center rounded-[10px] bg-primary">
+            <Text className="text-[10px] font-bold text-primary-foreground" numberOfLines={1}>
+              {extension.slice(0, 4)}
+            </Text>
+          </View>
+          <View className="max-w-40">
+            <Text className="text-sm font-medium text-text" numberOfLines={1}>
+              {attachment.name}
+            </Text>
+            {bytes ? (
+              <Text className="text-xs text-text-muted" numberOfLines={1}>
+                {bytes}
+              </Text>
+            ) : null}
+          </View>
         </View>
       )}
-      <View className="max-w-40">
-        <Text className="text-sm font-medium text-text" numberOfLines={1}>
-          {attachment.name}
-        </Text>
-        {size ? (
-          <Text className="text-xs text-text-muted" numberOfLines={1}>
-            {size}
-          </Text>
-        ) : null}
-      </View>
       {onRemove ? (
         <Pressable
           accessibilityLabel={`Remove ${attachment.name}`}
           accessibilityRole="button"
-          className="rounded-full p-1 active:bg-surface-hover"
+          className="absolute -right-1.5 -top-1.5 h-[22px] w-[22px] items-center justify-center rounded-full bg-text"
           hitSlop={8}
           onPress={() => onRemove(attachment)}
           testID={`attachment-remove-${attachment.name}`}
         >
-          <Text className="text-sm text-text-muted">✕</Text>
+          <Icon name="close" size={14} tone="background" />
         </Pressable>
       ) : null}
     </View>

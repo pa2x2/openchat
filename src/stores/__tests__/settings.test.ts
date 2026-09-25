@@ -39,4 +39,11 @@ describe("settings store", () => {
       id: "big-pickle",
     });
   });
+
+  it("follows the system appearance until told otherwise", () => {
+    const store = createSettingsStore(createMemoryStorage());
+    expect(store.getState().appearance).toBe("system");
+    store.getState().setAppearance("dark");
+    expect(store.getState().appearance).toBe("dark");
+  });
 });
