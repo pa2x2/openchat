@@ -24,7 +24,7 @@ import { chatEvents } from "./events";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import { interrupt, send } from "./prompt";
-import { createChat, deleteChat, listChats } from "./sessions";
+import { createChat, deleteChat, listChats, switchModel } from "./sessions";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
@@ -79,6 +79,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   deleteChat(id: ChatId): Promise<void> {
     return deleteChat(this.client(), id);
+  }
+
+  setChatModel(id: ChatId, model: ModelRef): Promise<void> {
+    return switchModel(this.client(), id, model);
   }
 
   send(chatId: ChatId, msg: UserMessage): Promise<void> {

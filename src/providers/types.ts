@@ -69,6 +69,8 @@ export interface ChatProvider {
   /** Fire-and-forget prompt delivery; streaming arrives via events(). */
   send(chatId: ChatId, msg: UserMessage): Promise<void>;
   interrupt(chatId: ChatId): Promise<void>;
+  /** Switches the model of an existing chat. No variant support in v1. */
+  setChatModel(chatId: ChatId, model: ModelRef): Promise<void>;
 
   /** Normalized event stream for one chat. Pass a signal to stop it. */
   events(chatId: ChatId, signal?: AbortSignal): AsyncIterable<StreamEvent>;

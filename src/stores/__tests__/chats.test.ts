@@ -28,6 +28,7 @@ function makeProvider(overrides: Partial<ChatProvider> = {}): ChatProvider {
     listChats: jest.fn().mockResolvedValue([]),
     createChat: jest.fn(),
     deleteChat: jest.fn(),
+    setChatModel: jest.fn(),
     send: jest.fn(),
     interrupt: jest.fn(),
     events: jest.fn(),

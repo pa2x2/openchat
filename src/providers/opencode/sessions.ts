@@ -3,7 +3,7 @@
  */
 
 import type { SessionInfo } from "@opencode/client";
-import type { ChatId, ChatSummary } from "@/src/domain";
+import type { ChatId, ChatSummary, ModelRef } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
 
 export async function listChats(client: OpenCodeClient): Promise<ChatSummary[]> {
@@ -24,6 +24,17 @@ export async function createChat(
 
 export async function deleteChat(client: OpenCodeClient, id: ChatId): Promise<void> {
   await client.session.remove({ sessionID: id });
+}
+
+export async function switchModel(
+  client: OpenCodeClient,
+  id: ChatId,
+  model: ModelRef,
+): Promise<void> {
+  await client.session.switchModel({
+    sessionID: id,
+    model: { providerID: model.provider, id: model.id },
+  });
 }
 
 export function toChatSummary(session: SessionInfo): ChatSummary {
