@@ -4,3 +4,5 @@ dist/
 web-build/
 .agents-workspaces/
 pnpm-lock.yaml
+# opencode.json is JSONC (comments); prettier's json parser rejects comments.
+docker/opencode/opencode.json
