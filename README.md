@@ -1,140 +1,59 @@
+<div align="center">
+
+<img src="./assets/images/icon.png" alt="OpenChat logo" width="104" />
+
 # OpenChat
 
-A ChatGPT-style mobile client for self-hosted AI backends, built provider-first.
+### A ChatGPT-style app for the AI server you run yourself.
 
-Licensed under MIT (see [LICENSE](LICENSE)).
+Chat with models on your own backend from an Android app that feels like the one you already know.
 
-## Getting Started
+[Download](https://github.com/pa2x2/openchat/releases)
 
-### Prerequisites
+[![Latest release](https://img.shields.io/github/v/release/pa2x2/openchat?include_prereleases&filter=v*&display_name=tag&sort=semver&label=release)](https://github.com/pa2x2/openchat/releases)
+![Android 7+](https://img.shields.io/badge/Android-7%2B-3DDC84?logo=android&logoColor=white)
+[![License](https://img.shields.io/github/license/pa2x2/openchat)](./LICENSE)
 
-| Tool        | Notes                                                                        |
-| ----------- | ---------------------------------------------------------------------------- |
-| Node.js 24+ |                                                                              |
-| pnpm        | Package manager used by this repo.                                           |
-| JDK 17+     | For the Android build (OpenJDK 26 verified).                                 |
-| Android SDK | With build-tools and at least one platform; `ANDROID_HOME` must point at it. |
+</div>
 
-> The project regenerates its native `android/` folder from `app.json` (see
-> [Native folders](#native-folders)). You do not need to hand-edit it.
+OpenChat doesn't come with a backend. You point it at a server you control, and your chats live there.
 
-Install dependencies:
+Today it talks to [OpenCode](https://opencode.ai) servers. The app keeps each backend behind its own adapter, so more can follow.
 
-```sh
-pnpm install
-```
+## What you get
 
-### Run the OpenCode server (for testing)
+**Answers as they stream in.** Replies render as Markdown while they arrive. Code blocks have a copy button, and the model's reasoning sits in a drawer you can open or ignore.
 
-The app talks to an [OpenCode](https://opencode.ai) V2 server over HTTP + SSE.
-For local development:
+**Stop, retry, pick up where you left off.** Interrupt a reply mid-sentence or regenerate it. If the connection drops, the app reconnects and catches up with whatever the server finished in the meantime.
 
-1. Install OpenCode (see the OpenCode docs for your platform).
-2. Start the server from a **dedicated conversations directory** so the app's
-   sessions stay separate from your other OpenCode usage:
+**Your models, your choice.** Set a default model, then switch it for any single chat.
+
+**Photos and files.** Attach them from the camera roll or the file picker. Images go straight to the model. Other files reach the model only if your server's agent can read files.
+
+## Getting started
+
+1. Install the APK from the [releases page](https://github.com/pa2x2/openchat/releases). If you're not sure which one to pick, take `openchat-<version>.apk`.
+2. Run an OpenCode server. The quickest route is the prebuilt Docker image, which ships with a chat agent that has coding tools turned off:
 
    ```sh
-   mkdir -p ~/opencode-chat && cd ~/opencode-chat
-   opencode serve --port 4096
+   docker run -d --name openchat-opencode \
+     -p 4096:4096 \
+     -e OPENCODE_SERVER_PASSWORD=your-secret \
+     -v openchat-conversations:/conversations \
+     -v openchat-data:/root/.local/share/opencode \
+     ghcr.io/pa2x2/openchat-opencode:<image-tag>
    ```
 
-   The server now accepts HTTP requests on port `4096` of the machine it runs
-   on. If you prefer a locked-down agent (no file/coding tools), configure a
-   primary chat agent in that directory's `opencode.json` — see the OpenCode
-   agents documentation for the permission model.
+   Tags are listed on the [releases page](https://github.com/pa2x2/openchat/releases) under `server-opencode-*`. See [docker/opencode](docker/opencode/README.md) for Compose, volumes and config.
 
-   **Attachments:** photos and other files you attach in the app are sent to
-   the server inline, and the server hands the payload back when the app reads
-   a chat's history. Images reach the model directly. Other file types are
-   stored with the message but the model only sees them as a named file in the
-   session's working directory — so a locked-down chat agent (one without
-   file-read permission) will answer that it cannot find the file. Grant the
-   agent permission to read files if you want documents to be readable.
+3. In the app, open Settings and enter the server URL (for example `http://192.168.1.10:4096`) and the password.
 
-3. Reachability depends on where the app runs (see the next two sections):
-   - Android emulator → use `http://10.0.2.2:4096` (the emulator's alias for
-     your host machine).
-   - Physical device over USB → `adb reverse tcp:4096 tcp:4096`, then the app
-     can use `http://localhost:4096`.
+You can also run plain `opencode serve` instead of the image. In that case, start it from an empty directory so the app's chats stay apart from your other OpenCode sessions.
 
-### Run on the Android emulator (primary dev workflow)
+## Contributing
 
-1. Boot an emulator (or create one in Android Studio / `avdmanager`):
+Build instructions and the dev workflow are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-   ```sh
-   emulator -avd Pixel_9a2
-   ```
+## License
 
-2. Build, install, and launch the debug app — this also starts the Metro
-   dev server:
-
-   ```sh
-   pnpm android        # runs expo run:android
-   ```
-
-   **If several devices are attached (e.g. an emulator and a physical phone),
-   always pin the target explicitly**, otherwise the build tooling picks one
-   for you. Pass the device _name_ (as the interactive picker shows it — the
-   AVD name for emulators, not the adb serial):
-
-   ```sh
-   pnpm android --device Pixel_9a2
-   ```
-
-   …or export `ANDROID_SERIAL=emulator-5554` (the id from `adb devices`) in
-   your shell so every adb/Gradle command in that session targets the emulator
-   only.
-
-   The first build bootstraps Gradle and compiles native code (expect several
-   minutes); later builds are incremental. Leave Metro running afterwards.
-
-3. Subsequent sessions only need the emulator + dev server:
-
-   ```sh
-   pnpm start          # Metro; press 'a' to open the app on the emulator
-   ```
-
-Day-to-day edits hot-reload on the emulator. JavaScript-only changes need no
-rebuild; changes to native code or to `app.json`-driven native config require
-re-running `pnpm android`.
-
-### Run on a physical device (Android)
-
-1. Enable Developer options → USB debugging on the device and connect it.
-2. `adb devices` should list it as `device` (authorized).
-3. Run `pnpm android --device` (or select the device when several are attached).
-
-To use a server running on your host machine over USB:
-
-```sh
-adb reverse tcp:4096 tcp:4096
-```
-
-…then point the app at `http://localhost:4096`.
-
-### Native folders
-
-The `android/` directory is generated by Expo prebuild and is **gitignored**:
-
-```sh
-pnpm exec expo prebuild --platform android
-```
-
-If native builds ever misbehave, delete `android/` and regenerate. Committing
-generated native folders is intentionally avoided so config stays in
-`app.json`; if a change ever requires hand-edited native files, that decision
-should be revisited deliberately.
-
-## Scripts
-
-| Command                             | Purpose                                              |
-| ----------------------------------- | ---------------------------------------------------- |
-| `pnpm start`                        | Metro dev server.                                    |
-| `pnpm android`                      | Build + install + launch on Android (dev client).    |
-| `pnpm ios`                          | Same for iOS (macOS + Xcode required).               |
-| `pnpm web`                          | Run in the browser (useful for quick layout checks). |
-| `pnpm typecheck`                    | TypeScript, no emit.                                 |
-| `pnpm lint`                         | ESLint (Expo config).                                |
-| `pnpm test`                         | Jest unit tests.                                     |
-| `pnpm format` / `pnpm format:check` | Prettier.                                            |
-| `pnpm icons`                        | Re-render app icon PNGs from `assets/icon/*.svg`.    |
+MIT. See [LICENSE](LICENSE).
