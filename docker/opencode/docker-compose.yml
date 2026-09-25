@@ -1,0 +1,20 @@
+services:
+  openchat-opencode:
+    image: ghcr.io/pa2x2/openchat-opencode:<image-tag>
+    # To build locally instead of pulling the published image:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    ports:
+      - "4096:4096"
+    environment:
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-your-secret}
+      # OPENCODE_SERVER_USERNAME: opencode
+    volumes:
+      - openchat-conversations:/conversations
+      - openchat-data:/root/.local/share/opencode
+    restart: unless-stopped
+
+volumes:
+  openchat-conversations:
+  openchat-data:

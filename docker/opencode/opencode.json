@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "chat",
+  "share": "disabled",
+  "snapshots": false,
+  "subagent_depth": 1,
+  // Global backstop: V2 defaults to "ask" here, which deadlocks any
+  // non-interactive client. Deny at top level so it covers every agent.
+  "permissions": [
+    { "action": "external_directory", "resource": "*", "effect": "deny" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" }
+  ],
+  "agents": {
+    "chat": {
+      "description": "General-purpose chat agent; coding tools disabled",
+      "mode": "primary",
+      // No subagent rule: chat may fan out to subagents for parallel
+      // research. Reads and web stay at their allow defaults.
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" },
+        { "action": "question", "resource": "*", "effect": "deny" },
+        { "action": "skill", "resource": "*", "effect": "deny" },
+        { "action": "execute", "resource": "*", "effect": "deny" }
+      ]
+    },
+    // general ships with edit/shell allowed; left as-is it would be a
+    // backdoor around chat's denies (children run their own policy).
+    // Constrain it to research so the whole server stays code-free.
+    "general": {
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" },
+        { "action": "question", "resource": "*", "effect": "deny" },
+        { "action": "skill", "resource": "*", "effect": "deny" },
+        { "action": "execute", "resource": "*", "effect": "deny" }
+      ]
+    },
+    // explore is read-only by default; the global backstop already
+    // converts its two "ask" defaults into denies. No override needed.
+    "build": { "disabled": true },
+    "plan": { "disabled": true }
+  }
+}

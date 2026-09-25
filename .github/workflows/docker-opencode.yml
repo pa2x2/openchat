@@ -1,0 +1,101 @@
+name: docker-opencode
+
+on:
+  push:
+    tags:
+      - "server-opencode-*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive versions
+        id: versions
+        run: |
+          CLIENT_VERSION=$(node -p "require('./package.json').dependencies['@opencode/client']")
+          DOCKER_ARG=$(sed -n 's/^ARG OPENCODE_VERSION=//p' docker/opencode/Dockerfile)
+          IMAGE_TAG="${GITHUB_REF_NAME#server-opencode-}"
+          echo "client=$CLIENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "docker_arg=$DOCKER_ARG" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Check server version matches app client
+        run: |
+          if [ "${{ steps.versions.outputs.client }}" != "${{ steps.versions.outputs.docker_arg }}" ]; then
+            echo "::error::Dockerfile OPENCODE_VERSION (${{ steps.versions.outputs.docker_arg }}) != package.json @opencode/client (${{ steps.versions.outputs.client }})"
+            exit 1
+          fi
+
+      - name: Check image tag matches server version
+        run: |
+          IMAGE_TAG="${{ steps.versions.outputs.image_tag }}"
+          CLIENT_VERSION="${{ steps.versions.outputs.client }}"
+          if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "${{ github.ref_name }}" ]; then
+            echo "::error::Tag ${{ github.ref_name }} must be server-opencode-<image-tag>"
+            exit 1
+          fi
+          case "$IMAGE_TAG" in
+            "$CLIENT_VERSION"|"$CLIENT_VERSION"-*)
+              ;;
+            *)
+              echo "::error::Image tag $IMAGE_TAG must be $CLIENT_VERSION or start with $CLIENT_VERSION-"
+              exit 1
+              ;;
+          esac
+
+      - name: Compute image name
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/openchat-opencode"
+          IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tags=$IMAGE:${{ steps.versions.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/opencode
+          file: docker/opencode/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            OPENCODE_VERSION=${{ steps.versions.outputs.client }}
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Release ${{ github.ref_name }}
+
+            Docker image: `${{ steps.meta.outputs.tags }}`
+            Digest: `${{ steps.build.outputs.digest }}`
+
+            ```sh
+            docker pull ${{ steps.meta.outputs.tags }}
+            ```
+          draft: true
+          prerelease: false

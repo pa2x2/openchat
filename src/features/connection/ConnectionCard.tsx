@@ -126,7 +126,7 @@ export function ConnectionCard() {
       )}
 
       <Text className="text-xs text-text-muted">
-        Run a server with the documented opencode.json from the repo, then enter its URL here.
+        Run a server with the config in docker/opencode, then enter its URL here.
       </Text>
     </View>
   );
