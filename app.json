@@ -2,7 +2,6 @@
   "expo": {
     "name": "OpenChat",
     "slug": "openchat",
-    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "openchat",
@@ -18,7 +17,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.openchat"
+      "package": "com.pa2x2.openchat"
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +36,8 @@
       ],
       "expo-secure-store",
       "expo-font",
-      "@react-native-vector-icons/material-design-icons"
+      "@react-native-vector-icons/material-design-icons",
+      "./plugins/withAndroidRelease"
     ],
     "experiments": {
       "typedRoutes": true
