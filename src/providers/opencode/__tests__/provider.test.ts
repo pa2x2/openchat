@@ -22,6 +22,7 @@ function stubClient(overrides: Partial<OpenCodeClient> = {}): OpenCodeClient {
       remove: async () => undefined,
       prompt: async () => ({ id: "msg_1", sessionID: "ses_1" }),
       interrupt: async () => ({ interrupted: true }),
+      switchModel: async () => undefined,
     },
     message: { list: async () => ({ data: [], cursor: {} }) },
     model: { list: async () => ({ location: {}, data: [] }) },
@@ -315,5 +316,23 @@ describe("OpenCodeProvider", () => {
     expect(collected).toEqual([
       { type: "error", message: "Could not reach the server.", retryable: true },
     ]);
+  });
+
+  it("switches the chat model through the client", async () => {
+    let captured: unknown;
+    const client = stubClient({
+      session: {
+        ...stubClient().session,
+        switchModel: (async (input: unknown) => {
+          captured = input;
+        }) as never,
+      },
+    } as Partial<OpenCodeClient>);
+    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(client));
+    await provider.setChatModel("ses_a", { provider: "opencode", id: "big-pickle" });
+    expect(captured).toEqual({
+      sessionID: "ses_a",
+      model: { providerID: "opencode", id: "big-pickle" },
+    });
   });
 });

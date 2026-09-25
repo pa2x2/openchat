@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, FlatList, KeyboardAvoidingView, Text, View } from "react-native";
+import { AppState, FlatList, KeyboardAvoidingView, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useColorScheme } from "nativewind";
 import { themes } from "@/src/ui/theme";
 import { Bubble } from "@/src/ui";
 import { Composer } from "@/src/features/chat/Composer";
+import { ModelSheet } from "@/src/features/chat/ModelSheet";
 import {
   interruptTurn,
   isTurnLive,
@@ -14,6 +15,10 @@ import {
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
+import { sameModelRef, useModelsStore } from "@/src/stores/models";
+import { useSettingsStore } from "@/src/stores/settings";
+import { useConnectionStore } from "@/src/stores/connection";
+import type { ModelInfo } from "@/src/domain";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
 const NEW_CHAT = "new";
@@ -43,8 +48,22 @@ export default function ChatScreen() {
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
 
   const [banner, setBanner] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [draftModel, setDraftModel] = useState<ModelInfo["ref"] | null>(null);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
+  const providerId = useConnectionStore((state) => state.profile?.providerId);
+  const defaultModel = useSettingsStore((state) =>
+    providerId ? state.defaultModels[providerId] : undefined,
+  );
+  const currentModel = isDraft
+    ? (draftModel ?? defaultModel ?? null)
+    : (chat?.model ?? defaultModel ?? null);
+  const currentLabel = useModelsStore((state) =>
+    currentModel
+      ? (state.models.find((model) => sameModelRef(model.ref, currentModel))?.label ?? null)
+      : null,
+  );
 
   // Cold open: reconcile the transcript from the server (cache first),
   // then bury streams this app instance is not going to continue.
@@ -79,7 +98,9 @@ export default function ChatScreen() {
       }
       if (isDraft) {
         // Lazy chat creation: the session exists only once something is said.
-        const created = await provider.createChat();
+        const created = await provider.createChat(
+          currentModel ? { model: currentModel } : undefined,
+        );
         useChatsStore.getState().upsert(created);
         const streaming = sendMessage(created.id, text);
         router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
@@ -98,11 +119,51 @@ export default function ChatScreen() {
     void interruptTurn(chatId);
   }
 
+  async function handleSelectModel(model: ModelInfo) {
+    if (isDraft) {
+      setDraftModel(model.ref);
+      return;
+    }
+    try {
+      const provider = await getProvider();
+      if (!provider) {
+        setBanner("Not connected. Open Settings to connect to a server.");
+        return;
+      }
+      await provider.setChatModel(chatId, model.ref);
+      const current = useChatsStore.getState().chats.find((candidate) => candidate.id === chatId);
+      if (current) useChatsStore.getState().upsert({ ...current, model: model.ref });
+    } catch (error) {
+      setBanner(
+        error instanceof Error && error.message ? error.message : "Could not switch model.",
+      );
+    }
+  }
+
   const title = isDraft ? "New chat" : chat?.title || "Chat";
 
   return (
     <View style={themes[scheme]} className="flex-1 bg-background">
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerRight:
+            capabilities?.modelSelection === true
+              ? () => (
+                  <Pressable
+                    onPress={() => setSheetOpen(true)}
+                    accessibilityLabel="Choose model"
+                    className="max-w-36 px-2 py-1"
+                    testID="model-button"
+                  >
+                    <Text className="text-sm font-semibold text-primary" numberOfLines={1}>
+                      {currentLabel ?? "Model"}
+                    </Text>
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
       <KeyboardAvoidingView behavior="padding" className="flex-1">
         {messages.length === 0 ? (
           <View className="flex-1 items-center justify-center px-8">
@@ -153,6 +214,14 @@ export default function ChatScreen() {
           onSend={handleSend}
           onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
         />
+        {capabilities?.modelSelection === true ? (
+          <ModelSheet
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            selected={currentModel}
+            onSelect={handleSelectModel}
+          />
+        ) : null}
       </KeyboardAvoidingView>
     </View>
   );
