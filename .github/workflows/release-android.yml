@@ -35,11 +35,6 @@ jobs:
             echo "::error::Version $VERSION is not semver X.Y.Z or X.Y.Z-prerelease"
             exit 1
           fi
-          case "$VERSION" in
-            *-*) PRERELEASE=true ;;
-            *) PRERELEASE=false ;;
-          esac
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Check versionCode increased
         run: |
@@ -158,4 +153,4 @@ jobs:
             openchat-x86-${{ github.ref_name }}.apk
             openchat-x86_64-${{ github.ref_name }}.apk
           draft: true
-          prerelease: ${{ steps.version.outputs.prerelease }}
+          prerelease: false
