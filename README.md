@@ -137,3 +137,4 @@ should be revisited deliberately.
 | `pnpm lint`                         | ESLint (Expo config).                                |
 | `pnpm test`                         | Jest unit tests.                                     |
 | `pnpm format` / `pnpm format:check` | Prettier.                                            |
+| `pnpm icons`                        | Re-render app icon PNGs from `assets/icon/*.svg`.    |

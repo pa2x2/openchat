@@ -13,7 +13,8 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "jest"
+    "test": "jest",
+    "icons": "sh scripts/generate-icons.sh"
   },
   "dependencies": {
     "@opencode/client": "2.0.16",
