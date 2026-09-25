@@ -52,6 +52,7 @@
     "zustand": "5.0.15"
   },
   "devDependencies": {
+    "@types/node": "^24.13.6",
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.3.0",
     "eslint": "^9.25.0",

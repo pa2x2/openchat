@@ -31,7 +31,6 @@ describe("MarkdownContent", () => {
   it("renders stable markdown and keeps a live tail as plain text", async () => {
     const tree = await render(
       <MarkdownContent
-        colorScheme="light"
         role="assistant"
         streaming
         text={"# Done\n\nA paragraph is still arriving"}
@@ -49,7 +48,6 @@ describe("MarkdownContent", () => {
   it("renders terminal markdown and copies fenced code", async () => {
     const tree = await render(
       <MarkdownContent
-        colorScheme="light"
         role="assistant"
         streaming={false}
         text={"```ts\nconst answer = 42;\n```"}
@@ -67,7 +65,6 @@ describe("MarkdownContent", () => {
   it("does not render remote images when image handlers are disabled", async () => {
     const tree = await render(
       <MarkdownContent
-        colorScheme="light"
         role="user"
         streaming={false}
         text="![remote](https://example.com/image.png)"

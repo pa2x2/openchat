@@ -56,4 +56,13 @@ describe("Input", () => {
     input.props.onChangeText("https://x");
     expect(onChangeText).toHaveBeenCalledWith("https://x");
   });
+
+  it("passes the placeholder a real colour, not a CSS variable", async () => {
+    // A `var(--oc-*)` string here is silently dropped by RN, which leaves the
+    // placeholder invisible or the wrong colour in dark mode.
+    const tree = await render(<Input value="" onChangeText={jest.fn()} placeholder="Type" />);
+    const input = tree.root.findByProps({ accessibilityLabel: "Type" });
+
+    expect(input.props.placeholderTextColor).toMatch(/^#[0-9a-f]{3,6}$/i);
+  });
 });

@@ -1,8 +1,6 @@
 import { ScrollView, View, Text } from "react-native";
 import { useState } from "react";
-import { useColorScheme } from "nativewind";
 import { Button, Input, Sheet, Bubble } from "@/src/ui";
-import { themes } from "@/src/ui/theme";
 
 /**
  * Dev-only showcase for the design primitives. Kept out of the
@@ -10,13 +8,11 @@ import { themes } from "@/src/ui/theme";
  * once the real screens cover the primitives.
  */
 export default function UiDemoScreen() {
-  const { colorScheme } = useColorScheme();
-  const scheme = colorScheme ?? "light";
   const [input, setInput] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
-    <View style={themes[scheme]} className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <ScrollView contentContainerClassName="p-4 gap-6">
         <View className="gap-2">
           <Text className="text-sm font-semibold uppercase tracking-wide text-text-muted">

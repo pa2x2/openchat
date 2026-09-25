@@ -1,11 +1,11 @@
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { colorScheme as colorSchemeApi, useColorScheme } from "nativewind";
+import { colorScheme as colorSchemeApi } from "nativewind";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
 import { Button } from "@/src/ui/Button";
-import { themes } from "@/src/ui/theme";
+import { useAppTheme } from "@/src/ui/theme";
 import { useProviderCapabilities } from "@/src/lib/providerFactory";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
@@ -19,8 +19,7 @@ import type { ModelInfo } from "@/src/domain";
  * design-primitives demo entry point.
  */
 export default function SettingsScreen() {
-  const { colorScheme } = useColorScheme();
-  const scheme = colorScheme ?? "light";
+  const { scheme } = useAppTheme();
   const capabilities = useProviderCapabilities();
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const defaultModel = useSettingsStore((state) =>
@@ -44,7 +43,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={themes[scheme]} className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <ScrollView contentContainerClassName="p-4 gap-4">
         <ConnectionCard />
 

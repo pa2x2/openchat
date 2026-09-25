@@ -5,7 +5,7 @@ import Markdown, {
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useMemo } from "react";
 import { Linking, Text, View } from "react-native";
-import type { ColorSchemeName } from "@/src/ui/theme";
+import { useAppTheme } from "@/src/ui/theme";
 import { projectMarkdown } from "./streamProjection";
 import { getMarkdownStyles } from "./styles";
 
@@ -16,7 +16,6 @@ export interface MarkdownContentProps {
   text: string;
   role: "user" | "assistant";
   streaming: boolean;
-  colorScheme: ColorSchemeName;
   testID?: string;
 }
 
@@ -29,16 +28,11 @@ function isSafeLink(url: string): boolean {
  * are parsed as markdown; the current block remains lossless plain text until
  * it reaches a safe boundary.
  */
-export function MarkdownContent({
-  text,
-  role,
-  streaming,
-  colorScheme,
-  testID,
-}: MarkdownContentProps) {
+export function MarkdownContent({ text, role, streaming, testID }: MarkdownContentProps) {
+  const { scheme, colors } = useAppTheme();
   const projection = useMemo(() => projectMarkdown(text, streaming), [text, streaming]);
-  const styles = useMemo(() => getMarkdownStyles(role, colorScheme), [role, colorScheme]);
-  const textColor = role === "user" ? "#ffffff" : colorScheme === "dark" ? "#ededed" : "#18181b";
+  const styles = useMemo(() => getMarkdownStyles(role, colors), [role, colors]);
+  const textColor = role === "user" ? colors.primaryForeground : colors.text;
   const markdownSource = useMemo(
     () => (streaming ? projection.stable : sealIncompleteMarkdown(projection.stable)),
     [projection.stable, streaming],
@@ -64,7 +58,7 @@ export function MarkdownContent({
       {markdownSource ? (
         <Markdown
           allowedImageHandlers={disabledImageHandlers}
-          colorScheme={colorScheme}
+          colorScheme={scheme}
           defaultImageHandler={null}
           markdownit={markdownParser}
           onCopyCode={handleCopyCode}

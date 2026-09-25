@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
+import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
 
 export interface ComposerProps {
@@ -32,6 +33,7 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState("");
   const streaming = Boolean(onStop);
+  const { colors } = useAppTheme();
 
   async function handleSend() {
     const trimmed = text.trim();
@@ -68,7 +70,7 @@ export function Composer({
           value={text}
           onChangeText={setText}
           placeholder="Message"
-          placeholderTextColor="rgb(var(--oc-text-muted))"
+          placeholderTextColor={colors.textMuted}
           multiline
           accessibilityLabel="Message"
           className="max-h-32 flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-base text-text focus:border-primary"

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, Text, View } from "react-native";
 import { Link, Stack, useRouter } from "expo-router";
-import { useColorScheme } from "nativewind";
-import { themes } from "@/src/ui/theme";
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { formatTimestamp } from "@/src/lib/time";
 import { useChatsStore } from "@/src/stores/chats";
@@ -14,8 +12,6 @@ import { useMessagesStore } from "@/src/stores/messages";
  * transcript; long-press deletes (when the provider supports it).
  */
 export default function ChatListScreen() {
-  const { colorScheme } = useColorScheme();
-  const scheme = colorScheme ?? "light";
   const router = useRouter();
   const chats = useChatsStore((state) => state.chats);
   const refreshChats = useChatsStore((state) => state.refresh);
@@ -62,11 +58,10 @@ export default function ChatListScreen() {
   }
 
   return (
-    <View style={themes[scheme]} className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <Stack.Screen
         options={{
           title: "OpenChat",
-          headerTintColor: "rgb(var(--oc-text))",
           headerRight: () => (
             <Pressable
               onPress={() => router.push("/chat/new")}

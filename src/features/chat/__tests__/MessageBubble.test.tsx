@@ -26,7 +26,6 @@ describe("MessageBubble", () => {
   it("shows live status and only exposes reasoning when enabled", async () => {
     const hidden = await render(
       <MessageBubble
-        colorScheme="light"
         message={message({ status: "streaming", reasoning: "thinking" })}
         showReasoning={false}
       />,
@@ -36,7 +35,6 @@ describe("MessageBubble", () => {
 
     const shown = await render(
       <MessageBubble
-        colorScheme="light"
         message={message({ status: "streaming", reasoning: "thinking" })}
         showReasoning
       />,
@@ -47,7 +45,6 @@ describe("MessageBubble", () => {
   it("uses a terminal status after interruption", async () => {
     const tree = await render(
       <MessageBubble
-        colorScheme="dark"
         message={message({ status: "interrupted", text: "```ts\nconst x = 1;" })}
         showReasoning={false}
       />,
@@ -69,7 +66,6 @@ describe("MessageBubble attachments", () => {
   it("renders the files a user message carries", async () => {
     const tree = await render(
       <MessageBubble
-        colorScheme="light"
         showReasoning={false}
         message={message({ role: "user", text: "look", attachments: [attachment] })}
       />,
@@ -82,9 +78,7 @@ describe("MessageBubble attachments", () => {
   });
 
   it("shows no attachment strip for a plain message", async () => {
-    const tree = await render(
-      <MessageBubble colorScheme="light" showReasoning={false} message={message()} />,
-    );
+    const tree = await render(<MessageBubble showReasoning={false} message={message()} />);
     expect(tree.root.findAllByProps({ testID: /^attachment-chip-/ })).toHaveLength(0);
   });
 
@@ -93,7 +87,6 @@ describe("MessageBubble attachments", () => {
     // bytes, so there is no source for a thumbnail.
     const tree = await render(
       <MessageBubble
-        colorScheme="light"
         showReasoning={false}
         message={message({
           role: "user",
@@ -111,19 +104,12 @@ describe("MessageBubble attachments", () => {
 
 describe("MessageBubble regenerate", () => {
   it("offers the rerun only when the screen allows it", async () => {
-    const without = await render(
-      <MessageBubble colorScheme="light" showReasoning={false} message={message()} />,
-    );
+    const without = await render(<MessageBubble showReasoning={false} message={message()} />);
     expect(without.root.findAllByProps({ testID: "regenerate-button" })).toHaveLength(0);
 
     const onRegenerate = jest.fn();
     const with_ = await render(
-      <MessageBubble
-        colorScheme="light"
-        showReasoning={false}
-        message={message()}
-        onRegenerate={onRegenerate}
-      />,
+      <MessageBubble showReasoning={false} message={message()} onRegenerate={onRegenerate} />,
     );
     const button = with_.root.findByProps({ testID: "regenerate-button" });
     await act(async () => {
@@ -135,7 +121,6 @@ describe("MessageBubble regenerate", () => {
   it("hides the rerun while the reply is still streaming", async () => {
     const tree = await render(
       <MessageBubble
-        colorScheme="light"
         showReasoning={false}
         message={message({ status: "streaming" })}
         onRegenerate={jest.fn()}

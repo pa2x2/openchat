@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Message } from "@/src/domain";
-import type { ColorSchemeName } from "@/src/ui/theme";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { ReasoningDrawer } from "@/src/features/markdown/ReasoningDrawer";
 import { AttachmentStrip } from "./AttachmentChips";
@@ -9,7 +8,6 @@ import { Bubble } from "@/src/ui";
 
 export interface MessageBubbleProps {
   message: Message;
-  colorScheme: ColorSchemeName;
   showReasoning: boolean;
   /**
    * When set, the bubble offers a regenerate action. The screen passes it
@@ -36,7 +34,6 @@ function statusFor(message: Message): string | undefined {
 
 export const MessageBubble = memo(function MessageBubble({
   message,
-  colorScheme,
   showReasoning,
   onRegenerate,
 }: MessageBubbleProps) {
@@ -56,7 +53,6 @@ export const MessageBubble = memo(function MessageBubble({
         </View>
       ) : null}
       <MarkdownContent
-        colorScheme={colorScheme}
         role={message.role}
         streaming={streaming}
         text={message.text}

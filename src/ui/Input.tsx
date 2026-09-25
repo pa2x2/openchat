@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { TextInput, View, Text } from "react-native";
 import { cn } from "@/src/lib/cn";
+import { useAppTheme } from "./theme";
 
 export interface InputProps {
   value: string;
@@ -32,6 +33,8 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   },
   ref,
 ) {
+  const { colors } = useAppTheme();
+
   return (
     <View className={cn("w-full gap-1.5", className)}>
       {label ? <Text className="text-sm font-medium text-text-muted">{label}</Text> : null}
@@ -40,7 +43,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="rgb(var(--oc-text-muted))"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         autoCapitalize={autoCapitalize}

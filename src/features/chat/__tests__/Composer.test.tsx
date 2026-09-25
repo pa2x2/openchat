@@ -101,6 +101,15 @@ describe("Composer attachments", () => {
     expect(onRemoveAttachment).toHaveBeenCalledWith(attachment);
   });
 
+  it("gives the input a real placeholder colour, not a CSS variable", async () => {
+    // A `var(--oc-*)` string is dropped by RN, leaving the placeholder
+    // unreadable in dark mode.
+    const tree = await render(<Composer onSend={jest.fn()} />);
+    const input = tree.root.findByProps({ testID: "composer-input" });
+
+    expect(input.props.placeholderTextColor).toMatch(/^#[0-9a-f]{3,6}$/i);
+  });
+
   it("sends text and attachments together", async () => {
     const onSend = jest.fn();
     const tree = await render(

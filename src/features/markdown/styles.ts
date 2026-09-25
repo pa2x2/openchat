@@ -1,74 +1,29 @@
 import type { MarkdownStyleMap } from "@ronradtke/react-native-markdown-display";
-import type { ColorSchemeName } from "@/src/ui/theme";
-
-interface Palette {
-  background: string;
-  surface: string;
-  surfaceHover: string;
-  border: string;
-  text: string;
-  muted: string;
-  primary: string;
-  primaryForeground: string;
-  danger: string;
-  code: string;
-  codeText: string;
-  codeMuted: string;
-}
-
-const lightPalette: Palette = {
-  background: "#ffffff",
-  surface: "#f4f4f5",
-  surfaceHover: "#e4e4e7",
-  border: "#e4e4e7",
-  text: "#18181b",
-  muted: "#71717a",
-  primary: "#10a37f",
-  primaryForeground: "#ffffff",
-  danger: "#dc2626",
-  code: "#f4f4f5",
-  codeText: "#18181b",
-  codeMuted: "#52525b",
-};
-
-const darkPalette: Palette = {
-  background: "#212121",
-  surface: "#2a2a2c",
-  surfaceHover: "#3a3a3c",
-  border: "#404044",
-  text: "#ededed",
-  muted: "#9b9ba0",
-  primary: "#19c37d",
-  primaryForeground: "#ffffff",
-  danger: "#ef4444",
-  code: "#151517",
-  codeText: "#ededed",
-  codeMuted: "#a1a1aa",
-};
-
-function paletteFor(scheme: ColorSchemeName): Palette {
-  return scheme === "dark" ? darkPalette : lightPalette;
-}
+import type { ResolvedPalette } from "@/src/ui/theme";
 
 /**
- * Markdown uses real React Native styles rather than NativeWind classes. Keep
- * the maps stable and role-aware so a streaming update only reparses the
+ * Markdown renders with real React Native styles rather than NativeWind
+ * classes, so it reads the resolved palette instead of the CSS variables.
+ * Every colour below traces back to `src/ui/palette.ts` — there is no
+ * hand-maintained copy of the palette here.
+ *
+ * Keep the map stable and role-aware so a streaming update only reparses the
  * message that actually changed.
  */
 export function getMarkdownStyles(
   role: "user" | "assistant",
-  scheme: ColorSchemeName,
+  palette: ResolvedPalette,
 ): MarkdownStyleMap {
-  const palette = paletteFor(scheme);
-  const foreground = role === "user" ? palette.primaryForeground : palette.text;
-  const muted = role === "user" ? "#d1fae5" : palette.muted;
-  const quoteBackground = role === "user" ? "rgba(255,255,255,0.14)" : palette.surface;
-  const quoteBorder = role === "user" ? "rgba(255,255,255,0.55)" : palette.primary;
-  const inlineCodeBackground = role === "user" ? "rgba(0,0,0,0.18)" : palette.surfaceHover;
-  const codeBorder = role === "user" ? "rgba(255,255,255,0.25)" : palette.border;
-  const tableHeader = role === "user" ? "rgba(0,0,0,0.16)" : palette.surfaceHover;
-  const tableRow = role === "user" ? "rgba(255,255,255,0.08)" : palette.background;
-  const linkColor = role === "user" ? "#d1fae5" : palette.primary;
+  const isUser = role === "user";
+  const foreground = isUser ? palette.primaryForeground : palette.text;
+  const muted = isUser ? "#d1fae5" : palette.textMuted;
+  const quoteBackground = isUser ? "rgba(255,255,255,0.14)" : palette.surface;
+  const quoteBorder = isUser ? "rgba(255,255,255,0.55)" : palette.primary;
+  const inlineCodeBackground = isUser ? "rgba(0,0,0,0.18)" : palette.surfaceHover;
+  const codeBorder = isUser ? "rgba(255,255,255,0.25)" : palette.border;
+  const tableHeader = isUser ? "rgba(0,0,0,0.16)" : palette.surfaceHover;
+  const tableRow = isUser ? "rgba(255,255,255,0.08)" : palette.background;
+  const linkColor = isUser ? "#d1fae5" : palette.primary;
 
   return {
     body: {
@@ -176,7 +131,7 @@ export function getMarkdownStyles(
       color: muted,
     },
     code_inline: {
-      color: role === "user" ? palette.primaryForeground : palette.danger,
+      color: isUser ? palette.primaryForeground : palette.danger,
       backgroundColor: inlineCodeBackground,
       borderColor: codeBorder,
       borderWidth: 1,
@@ -197,7 +152,7 @@ export function getMarkdownStyles(
       overflow: "hidden",
     },
     fence_header: {
-      backgroundColor: role === "user" ? "rgba(0,0,0,0.28)" : palette.surface,
+      backgroundColor: isUser ? "rgba(0,0,0,0.28)" : palette.surface,
       borderBottomColor: palette.border,
     },
     fence_language_label: {

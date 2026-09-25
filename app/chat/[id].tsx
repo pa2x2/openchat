@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, FlatList, KeyboardAvoidingView, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { useColorScheme } from "nativewind";
-import { themes } from "@/src/ui/theme";
 import { MessageBubble } from "@/src/features/chat/MessageBubble";
 import { Composer } from "@/src/features/chat/Composer";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
@@ -39,8 +37,6 @@ export default function ChatScreen() {
   const chatId = id ?? NEW_CHAT;
   const isDraft = chatId === NEW_CHAT;
   const router = useRouter();
-  const { colorScheme } = useColorScheme();
-  const scheme = colorScheme ?? "light";
 
   const chat = useChatsStore((state) => state.chats.find((candidate) => candidate.id === chatId));
   // The empty-array fallback lives outside the selector: a fresh `[]` per
@@ -192,17 +188,16 @@ export default function ChatScreen() {
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
       <MessageBubble
-        colorScheme={scheme}
         message={item}
         showReasoning={showReasoning}
         onRegenerate={item.id === regenerableId ? () => void handleRegenerate() : undefined}
       />
     ),
-    [scheme, showReasoning, regenerableId, handleRegenerate],
+    [showReasoning, regenerableId, handleRegenerate],
   );
 
   return (
-    <View style={themes[scheme]} className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <Stack.Screen
         options={{
           title,
