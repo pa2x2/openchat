@@ -22,9 +22,28 @@ export interface V2EventShape {
       reasoning: number;
       cache: { read: number; write: number };
     };
-    error?: { name?: string; data?: { message?: string; [key: string]: unknown } } | null;
+    error?: {
+      name?: string;
+      type?: string;
+      message?: string;
+      status?: number;
+      data?: { message?: string; [key: string]: unknown } | null;
+    } | null;
     [key: string]: unknown;
   };
+}
+
+/**
+ * Extracts the human-readable reason from a server error payload. The wire
+ * shape puts the message directly on the error (`{ type, message, status }`);
+ * other variants nest it under `data.message`. The reason matters: it is the
+ * only place the user learns *why* a run failed.
+ */
+function errorMessage(error: V2EventShape["data"]["error"], fallback: string): string {
+  for (const candidate of [error?.message, error?.data?.message]) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+  }
+  return fallback;
 }
 
 export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
@@ -62,19 +81,31 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     case "session.execution.interrupted":
       return { type: "chat-idle" };
     case "session.execution.failed":
+      // A server-reported execution failure is terminal for this prompt. The
+      // transport layer emits its own retryable errors when a subscription
+      // actually drops; treating this event as retryable creates an endless
+      // reconnect loop for provider/auth failures.
       return {
         type: "error",
-        message: "The server failed to complete the reply.",
-        retryable: true,
+        message: errorMessage(event.data.error, "The server failed to complete the reply."),
+        retryable: false,
+      };
+    // The server reports a failed step immediately before the matching
+    // execution failure. Surfacing it directly means the reason reaches the
+    // user even if the execution-level event never arrives.
+    case "session.step.failed":
+      return {
+        type: "error",
+        message: errorMessage(event.data.error, "The reply step failed."),
+        retryable: false,
       };
     case "session.error": {
-      const name = event.data.error?.name;
-      const message = event.data.error?.data?.message ?? "The server reported an error.";
       return {
         type: "error",
-        message,
-        // User-initiated aborts and auth problems are not transient.
-        retryable: name !== "MessageAbortedError" && name !== "ProviderAuthError",
+        message: errorMessage(event.data.error, "The server reported an error."),
+        // Errors reported by the server are application/provider failures, not
+        // evidence that the live subscription should be retried indefinitely.
+        retryable: false,
       };
     }
     default:

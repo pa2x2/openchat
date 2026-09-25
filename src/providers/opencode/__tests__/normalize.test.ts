@@ -66,15 +66,61 @@ describe("normalizeV2Event", () => {
     ).toEqual({ type: "chat-idle" });
   });
 
-  it("maps execution failure to a retryable error", () => {
+  it("maps execution failure to a terminal error", () => {
     expect(normalizeV2Event(fixture("session.execution.failed", { sessionID: "ses_a" }))).toEqual({
       type: "error",
       message: "The server failed to complete the reply.",
-      retryable: true,
+      retryable: false,
     });
   });
 
-  it("maps server errors with retryability by error type", () => {
+  it("preserves a server execution error message", () => {
+    expect(
+      normalizeV2Event(
+        fixture("session.execution.failed", {
+          sessionID: "ses_a",
+          error: { name: "ProviderAuthError", data: { message: "bad key" } },
+        }),
+      ),
+    ).toEqual({ type: "error", message: "bad key", retryable: false });
+  });
+
+  it("reads the error message from the live wire shape", () => {
+    // Captured from a v2.0.16 server: the message sits directly on the error
+    // object alongside a machine-readable type and status.
+    const event = fixture("session.execution.failed", {
+      sessionID: "ses_a",
+      error: {
+        type: "provider.auth",
+        message: "OpenCode's free tier can only be used from within OpenCode",
+        status: 403,
+      },
+    });
+    expect(normalizeV2Event(event)).toEqual({
+      type: "error",
+      message: "OpenCode's free tier can only be used from within OpenCode",
+      retryable: false,
+    });
+    expect(normalizeV2Event(fixture("session.error", event.data))).toEqual({
+      type: "error",
+      message: "OpenCode's free tier can only be used from within OpenCode",
+      retryable: false,
+    });
+  });
+
+  it("falls back when a server error carries no readable message", () => {
+    expect(
+      normalizeV2Event(
+        fixture("session.execution.failed", { sessionID: "ses_a", error: { type: "unknown" } }),
+      ),
+    ).toEqual({
+      type: "error",
+      message: "The server failed to complete the reply.",
+      retryable: false,
+    });
+  });
+
+  it("maps server-reported errors to terminal errors", () => {
     const generic = normalizeV2Event(
       fixture("session.error", {
         sessionID: "ses_a",
@@ -84,24 +130,36 @@ describe("normalizeV2Event", () => {
     expect(generic).toEqual({
       type: "error",
       message: "upstream 500",
-      retryable: true,
+      retryable: false,
     });
-
-    const aborted = normalizeV2Event(
-      fixture("session.error", {
-        sessionID: "ses_a",
-        error: { name: "MessageAbortedError", data: { message: "aborted" } },
-      }),
-    );
-    expect(aborted).toMatchObject({ type: "error", retryable: false });
 
     const auth = normalizeV2Event(
       fixture("session.error", {
         sessionID: "ses_a",
-        error: { name: "ProviderAuthError", data: { providerID: "p", message: "bad key" } },
+        error: { type: "provider.auth", data: { message: "bad key" } },
       }),
     );
-    expect(auth).toMatchObject({ type: "error", retryable: false });
+    expect(auth).toEqual({ type: "error", message: "bad key", retryable: false });
+  });
+
+  it("maps a failed step to a terminal error", () => {
+    expect(
+      normalizeV2Event(
+        fixture("session.step.failed", {
+          sessionID: "ses_a",
+          assistantMessageID: "msg_a",
+          error: {
+            type: "provider.quota",
+            message: "Upstream request failed: Insufficient account funds",
+            status: 402,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "error",
+      message: "Upstream request failed: Insufficient account funds",
+      retryable: false,
+    });
   });
 
   it("drops every event the chat UI must not see", () => {

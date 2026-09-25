@@ -13,6 +13,13 @@
  * stalls: if nothing arrives for a while, the machine reconciles anyway;
  * two consecutive reconciles that see an unchanged, server-terminal
  * message end the turn (its closing events were lost to a gap).
+ *
+ * Reconnection is for *transport* loss only. Errors the server reports about
+ * the run itself (provider auth, rejected model, aborted message) are
+ * terminal: the same prompt will fail the same way, so retrying them in a
+ * loop would spin forever and hide the reason from the user. Every terminal
+ * path resolves the turn's completion signal, which keeps `sendMessage`
+ * responsive even when a provider iterator ignores its abort signal.
  */
 
 import type { ChatId, Message, StreamEvent, UserMessage } from "@/src/domain";
@@ -46,9 +53,24 @@ interface LiveTurn {
   queue: StreamEvent[];
   /** Text at the previous reconcile snapshot; equal twice = turn over. */
   lastSnapshotText: string | null;
+  /** Resolves when the local turn lifecycle ends, even if a provider iterator is slow to abort. */
+  completion: Promise<void>;
+  resolveCompletion: () => void;
+  /** Prevents a stale event stream from mutating a turn after it is settled. */
+  finished: boolean;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
+
+function isCurrentTurn(turn: LiveTurn): boolean {
+  return !turn.finished && liveTurns.get(turn.chatId) === turn;
+}
+
+function settleTurn(turn: LiveTurn): void {
+  if (turn.finished) return;
+  turn.finished = true;
+  turn.resolveCompletion();
+}
 
 /**
  * Sends a user message into a chat and streams the reply.
@@ -67,14 +89,20 @@ export async function sendMessage(chatId: ChatId, text: string): Promise<void> {
   // Subscribe first so early deltas are not missed, then deliver the prompt.
   const consuming = consumeEvents(turn);
   try {
-    const provider = await getProvider();
-    if (!provider) throw new Error("Not connected. Open Settings to connect.");
-    await provider.send(chatId, userMessage);
+    const delivery = getProvider().then((provider) => {
+      if (!provider) throw new Error("Not connected. Open Settings to connect.");
+      return provider.send(chatId, userMessage);
+    });
+    // Some provider event iterators do not promptly close when their signal is
+    // aborted. The local completion signal keeps Stop responsive even when the
+    // underlying iterator is still winding down.
+    await Promise.race([delivery, turn.completion]);
+    if (!isCurrentTurn(turn)) return;
   } catch (error) {
-    failTurn(turn, error);
+    if (!turn.finished) failTurn(turn, error);
     return;
   }
-  await consuming;
+  await Promise.race([consuming, turn.completion]);
 }
 
 function beginTurn(chatId: ChatId, userMessage: UserMessage): void {
@@ -98,6 +126,10 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage): void {
   messages.setTurnActive(chatId, true);
   messages.appendMessage(chatId, user);
   messages.appendMessage(chatId, assistant);
+  let resolveCompletion!: () => void;
+  const completion = new Promise<void>((resolve) => {
+    resolveCompletion = resolve;
+  });
   liveTurns.set(chatId, {
     chatId,
     draft: assistant,
@@ -105,8 +137,61 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage): void {
     paused: false,
     queue: [],
     lastSnapshotText: null,
+    completion,
+    resolveCompletion,
+    finished: false,
   });
   useChatsStore.getState().touch(chatId);
+}
+
+function nextEvent(
+  iterator: AsyncIterator<StreamEvent>,
+  signal: AbortSignal,
+): Promise<IteratorResult<StreamEvent>> {
+  if (signal.aborted) {
+    return Promise.resolve({ done: true, value: undefined as never });
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({ done: true, value: undefined as never });
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    iterator.next().then(
+      (result) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(result);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+function closeEventIterator(iterator?: AsyncIterator<StreamEvent>): void {
+  if (!iterator?.return) return;
+  try {
+    const result = iterator.return();
+    if (result && typeof result.then === "function") {
+      void result.catch(() => undefined);
+    }
+  } catch {
+    // The turn has already been settled locally; iterator cleanup is best effort.
+  }
 }
 
 /** Consumes the event stream until the turn ends. */
@@ -114,10 +199,10 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
   const { controller, chatId } = turn;
   let backoffMs = INITIAL_BACKOFF_MS;
   try {
-    while (!controller.signal.aborted) {
+    while (!controller.signal.aborted && !turn.finished) {
       const provider = await getProvider();
       if (!provider) {
-        failTurn(turn, new Error("Disconnected. Reconnect in Settings to continue."));
+        failTurn(turn, new Error("Not connected. Open Settings to connect."));
         return;
       }
       let lastActivity = Date.now();
@@ -130,8 +215,13 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
         if (Date.now() - lastActivity >= STALL_MS) subscription.abort();
       }, WATCHDOG_TICK_MS);
       let streamDied = false;
+      let iterator: AsyncIterator<StreamEvent> | undefined;
       try {
-        for await (const event of provider.events(chatId, subscription.signal)) {
+        iterator = provider.events(chatId, subscription.signal)[Symbol.asyncIterator]();
+        while (!turn.finished) {
+          const next = await nextEvent(iterator, subscription.signal);
+          if (next.done) break;
+          const event = next.value;
           lastActivity = Date.now();
           applyEvent(turn, event);
           if (isRetryableError(event)) {
@@ -147,6 +237,7 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
       } finally {
         clearInterval(watchdog);
         controller.signal.removeEventListener("abort", onTurnAbort);
+        closeEventIterator(iterator);
       }
       if (controller.signal.aborted) return;
       if (turnEnded(turn)) {
@@ -182,8 +273,12 @@ function turnEnded(turn: LiveTurn): boolean {
 
 /** Natural completion (the stream itself ended the turn). */
 function endTurn(turn: LiveTurn): void {
-  liveTurns.delete(turn.chatId);
-  useMessagesStore.getState().setTurnActive(turn.chatId, false);
+  if (turn.finished) return;
+  if (liveTurns.get(turn.chatId) === turn) {
+    liveTurns.delete(turn.chatId);
+    useMessagesStore.getState().setTurnActive(turn.chatId, false);
+  }
+  settleTurn(turn);
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -202,6 +297,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Applies one normalized event to the live turn. */
 function applyEvent(turn: LiveTurn, event: StreamEvent): void {
+  if (turn.finished) return;
   if (turn.paused) {
     turn.queue.push(event);
     return;
@@ -239,10 +335,17 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       break;
     case "chat-idle": {
       // The whole prompt run finished. An assistant message that never
-      // produced visible text failed silently — show it as an error.
+      // produced visible text failed silently — surface it as an error with a
+      // reason instead of leaving the user on a blank, unexplained bubble.
       const produced = turn.draft.text.length > 0 || Boolean(turn.draft.reasoning);
       turn.draft = { ...turn.draft, status: produced ? "complete" : "error" };
       messages.patchMessage(turn.chatId, turn.draft.id, { status: turn.draft.status });
+      if (!produced) {
+        messages.setTurnError(
+          turn.chatId,
+          "The server finished the run without returning a reply. It may have rejected the model or provider request.",
+        );
+      }
       break;
     }
     case "error":
@@ -272,7 +375,7 @@ async function reconcile(turn: LiveTurn): Promise<void> {
     const provider = await getProvider();
     if (!provider) return;
     const fetched = await provider.fetchMessages(turn.chatId);
-    if (turn.controller.signal.aborted) return;
+    if (turn.finished || turn.controller.signal.aborted) return;
     const messages = useMessagesStore.getState();
     const lastAssistant = [...fetched].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) {
@@ -281,6 +384,17 @@ async function reconcile(turn: LiveTurn): Promise<void> {
     }
     const previousSnapshot = turn.lastSnapshotText;
     turn.lastSnapshotText = lastAssistant.text;
+    if (lastAssistant.status === "error") {
+      // The server already failed this run while we were disconnected. Adopt
+      // it as terminal — retrying here would loop on the same failure.
+      turn.draft = lastAssistant;
+      messages.setMessages(turn.chatId, fetched);
+      if (!messages.turnErrors[turn.chatId]) {
+        messages.setTurnError(turn.chatId, "The server reported an error.");
+      }
+      endTurn(turn);
+      return;
+    }
     if (previousSnapshot !== null && lastAssistant.text === previousSnapshot) {
       // Two consecutive snapshots agree and the server copy is terminal:
       // the turn ended while the stream was down. Adopt its ending.
@@ -301,7 +415,10 @@ async function reconcile(turn: LiveTurn): Promise<void> {
     turn.paused = false;
     const queued = turn.queue;
     turn.queue = [];
-    for (const event of queued) applyEvent(turn, event);
+    for (const event of queued) {
+      if (turn.finished) break;
+      applyEvent(turn, event);
+    }
   }
 }
 
@@ -314,7 +431,7 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
   const turn = liveTurns.get(chatId);
   if (!turn) return;
   turn.controller.abort();
-  liveTurns.delete(chatId);
+  if (liveTurns.get(chatId) === turn) liveTurns.delete(chatId);
   const messages = useMessagesStore.getState();
   if (turn.draft.status === "pending" && turn.draft.text.length === 0) {
     // Nothing streamed yet — remove the empty placeholder entirely.
@@ -322,9 +439,10 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
   } else {
     messages.patchMessage(chatId, turn.draft.id, { status: "interrupted" });
   }
-  messages.setTurnActive(chatId, false);
-  const provider = await getProvider();
+  if (!isTurnLive(chatId)) messages.setTurnActive(chatId, false);
+  settleTurn(turn);
   try {
+    const provider = await getProvider();
     await provider?.interrupt(chatId);
   } catch {
     // Surface on the next turn if the server truly missed it.
@@ -333,14 +451,19 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
 
 /** Marks a turn failed: the optimistic assistant message shows the error. */
 function failTurn(turn: LiveTurn, error: unknown): void {
+  if (turn.finished) return;
   turn.controller.abort(); // stop the consume loop, if still running
-  liveTurns.delete(turn.chatId);
+  const isCurrent = liveTurns.get(turn.chatId) === turn;
+  if (isCurrent) liveTurns.delete(turn.chatId);
   const messages = useMessagesStore.getState();
   const message = error instanceof Error && error.message ? error.message : "The reply failed.";
-  messages.patchMessage(turn.chatId, turn.draft.id, { status: "error" });
-  messages.setTurnError(turn.chatId, message);
-  messages.setTurnActive(turn.chatId, false);
-  useChatsStore.getState().touch(turn.chatId);
+  if (isCurrent) {
+    messages.patchMessage(turn.chatId, turn.draft.id, { status: "error" });
+    messages.setTurnError(turn.chatId, message);
+    messages.setTurnActive(turn.chatId, false);
+    useChatsStore.getState().touch(turn.chatId);
+  }
+  settleTurn(turn);
 }
 
 /** True while a turn is streaming for the chat (drives the interrupt UI). */

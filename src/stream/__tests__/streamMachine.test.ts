@@ -179,6 +179,36 @@ describe("sendMessage", () => {
     expect(useMessagesStore.getState().turnErrors.c3).toBe("Model X is not available");
   });
 
+  it("explains a run that went idle without producing a reply", async () => {
+    const provider = makeProvider({
+      events: scriptedEvents([{ events: [chatIdle()], drop: true }]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    await sendMessage("c3c", "hi");
+
+    expect(useMessagesStore.getState().byChat.c3c[1]).toMatchObject({ status: "error" });
+    expect(useMessagesStore.getState().turnErrors.c3c).toContain("without returning a reply");
+    expect(useMessagesStore.getState().activeTurns.c3c).toBe(false);
+  });
+
+  it("ends immediately on a terminal server error without reconciling", async () => {
+    const provider = makeProvider({
+      events: scriptedEvents([
+        { events: [streamError("Provider authentication failed", false)], drop: true },
+      ]),
+      fetchMessages: jest.fn(),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    await sendMessage("c3b", "hi");
+
+    expect(useMessagesStore.getState().byChat.c3b[1]).toMatchObject({ status: "error" });
+    expect(useMessagesStore.getState().turnErrors.c3b).toBe("Provider authentication failed");
+    expect(provider.fetchMessages).not.toHaveBeenCalled();
+    expect(useMessagesStore.getState().activeTurns.c3b).toBe(false);
+  });
+
   it("fails the turn when no provider is available", async () => {
     getProviderMock.mockResolvedValue(null);
 
@@ -211,6 +241,29 @@ describe("interruptTurn", () => {
     expect(useMessagesStore.getState().activeTurns.c5).toBe(false);
     expect(isTurnLive("c5")).toBe(false);
   }, 10_000);
+
+  it("settles the send promise when a provider iterator ignores abort", async () => {
+    const provider = makeProvider({
+      events: jest.fn(() =>
+        (async function* () {
+          yield textDelta("partial");
+          await new Promise<void>(() => undefined);
+        })(),
+      ),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    const done = sendMessage("c5b", "hi");
+    await flush();
+    await interruptTurn("c5b");
+    await done;
+
+    expect(useMessagesStore.getState().byChat.c5b[1]).toMatchObject({
+      text: "partial",
+      status: "interrupted",
+    });
+    expect(useMessagesStore.getState().activeTurns.c5b).toBe(false);
+  });
 
   it("removes the empty placeholder when nothing streamed yet", async () => {
     const provider = makeProvider({
@@ -261,6 +314,21 @@ describe("mid-turn reconnection", () => {
       status: "complete",
     });
     expect(useMessagesStore.getState().activeTurns.c7).toBe(false);
+  });
+
+  it("adopts an error snapshot as terminal without retrying", async () => {
+    const provider = makeProvider({
+      events: scriptedEvents([{ events: [streamError("connection lost", true)], drop: true }]),
+      fetchMessages: jest.fn().mockResolvedValue([assistantMessage({ text: "", status: "error" })]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    await sendMessage("c8b", "hi");
+
+    expect(provider.fetchMessages).toHaveBeenCalledTimes(1);
+    expect(useMessagesStore.getState().byChat.c8b[0]).toMatchObject({ status: "error" });
+    expect(useMessagesStore.getState().turnErrors.c8b).toBe("The server reported an error.");
+    expect(useMessagesStore.getState().activeTurns.c8b).toBe(false);
   });
 
   it("ends a turn whose closing events were lost, via agreeing snapshots", async () => {
