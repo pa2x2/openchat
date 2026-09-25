@@ -87,4 +87,61 @@ describe("toMessage", () => {
       toMessage({ type: "agent-switched", id: "msg_y" } as unknown as SessionMessageInfo),
     ).toBeNull();
   });
+
+  it("carries the stored attachment payload back into the transcript", () => {
+    const wire = {
+      type: "user",
+      id: "msg_u",
+      time: { created: 1 },
+      text: "look",
+      files: [
+        {
+          // "ABC" — a one-shot base64 payload the server keeps for us.
+          data: "QUJD",
+          mime: "image/png",
+          source: { type: "inline" },
+          name: "photo.png",
+        },
+      ],
+    } as unknown as SessionMessageInfo;
+
+    expect(toMessage(wire)).toMatchObject({
+      attachments: [{ uri: "", mimeType: "image/png", name: "photo.png", bytes: "QUJD", size: 3 }],
+    });
+  });
+
+  it("names and types an attachment the server sent without them", () => {
+    const wire = {
+      type: "user",
+      id: "msg_u",
+      time: { created: 1 },
+      text: "",
+      files: [{ data: "", mime: "", source: { type: "uri", uri: "https://x/a.bin" } }],
+    } as unknown as SessionMessageInfo;
+
+    expect(toMessage(wire)).toMatchObject({
+      attachments: [{ uri: "", mimeType: "application/octet-stream", name: "attachment" }],
+    });
+  });
+
+  it("drops a finished assistant entry that carries no text or reasoning", () => {
+    // A message steered into a still-busy session leaves one of these behind.
+    const wire = {
+      type: "assistant",
+      id: "msg_a",
+      time: { created: 1, completed: 2 },
+      content: [],
+    } as unknown as SessionMessageInfo;
+    expect(toMessage(wire)).toBeNull();
+  });
+
+  it("keeps an unfinished assistant entry that carries no text yet", () => {
+    const wire = {
+      type: "assistant",
+      id: "msg_a",
+      time: { created: 1 },
+      content: [],
+    } as unknown as SessionMessageInfo;
+    expect(toMessage(wire)).toMatchObject({ status: "interrupted", text: "" });
+  });
 });

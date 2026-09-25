@@ -22,8 +22,10 @@
  * responsive even when a provider iterator ignores its abort signal.
  */
 
-import type { ChatId, Message, StreamEvent, UserMessage } from "@/src/domain";
+import type { Attachment, ChatId, Message, StreamEvent, UserMessage } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
+import { canResendAttachments } from "@/src/lib/attachments";
+import type { ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
 
@@ -36,6 +38,13 @@ const WATCHDOG_TICK_MS = 5_000;
 /** Local id for optimistic messages; server-assigned ids arrive later. */
 function localId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** How a rerun ended, as the screen shows it. */
+export interface RegenerateOutcome {
+  ok: boolean;
+  /** Why the rerun could not start; absent on success. */
+  error?: string;
 }
 
 /**
@@ -80,9 +89,67 @@ function settleTurn(turn: LiveTurn): void {
  * failed immediately — the optimistic messages stay on screen with error
  * status so nothing the user typed is lost.
  */
-export async function sendMessage(chatId: ChatId, text: string): Promise<void> {
-  const userMessage: UserMessage = { id: localId("user"), text };
-  beginTurn(chatId, userMessage);
+export async function sendMessage(
+  chatId: ChatId,
+  text: string,
+  attachments?: Attachment[],
+): Promise<void> {
+  await runTurn(
+    chatId,
+    { id: localId("user"), text, ...(attachments ? { attachments } : {}) },
+    {
+      deliver: (provider, message) => provider.send(chatId, message),
+    },
+  );
+}
+
+/** How a turn reaches the backend once its events are subscribed. */
+type Deliver = (provider: ChatProvider, message: UserMessage) => Promise<void>;
+
+interface RunTurnOptions {
+  deliver: Deliver;
+  /**
+   * Runs before the event subscription opens. A rerun uses it to ask the
+   * backend to roll the old turn back first: the events the backend emits
+   * while doing that bookkeeping must not be read as this turn's own.
+   */
+  prepare?: Deliver;
+  /** Messages this turn replaces on screen (the previous user message + reply). */
+  replaceIds?: string[];
+  /**
+   * Set while the backend holds a rollback for this turn that has not been
+   * delivered yet. The marker is persisted so a crash in between cannot leave
+   * a rollback armed for the user's next message.
+   */
+  markRegeneratePending?: boolean;
+  /** Undoes `prepare` when the turn never starts. */
+  discardPrepared?: (provider: ChatProvider) => Promise<void>;
+}
+
+async function runTurn(
+  chatId: ChatId,
+  userMessage: UserMessage,
+  options: RunTurnOptions,
+): Promise<void> {
+  if (options.prepare) {
+    const provider = await getProvider();
+    if (!provider) return;
+    if (options.markRegeneratePending) {
+      useChatsStore.getState().markPendingRegenerate(chatId, userMessage.id);
+    }
+    try {
+      await options.prepare(provider, userMessage);
+    } catch (error) {
+      await options.discardPrepared?.(provider).catch(() => undefined);
+      if (options.markRegeneratePending) {
+        useChatsStore.getState().clearPendingRegenerate(chatId);
+      }
+      useMessagesStore.getState().setTurnError(chatId, describe(error));
+      return;
+    }
+  }
+
+  beginTurn(chatId, userMessage, options.replaceIds);
   const turn = liveTurns.get(chatId);
   if (!turn) return;
 
@@ -91,21 +158,136 @@ export async function sendMessage(chatId: ChatId, text: string): Promise<void> {
   try {
     const delivery = getProvider().then((provider) => {
       if (!provider) throw new Error("Not connected. Open Settings to connect.");
-      return provider.send(chatId, userMessage);
+      return options.deliver(provider, userMessage);
     });
     // Some provider event iterators do not promptly close when their signal is
     // aborted. The local completion signal keeps Stop responsive even when the
     // underlying iterator is still winding down.
     await Promise.race([delivery, turn.completion]);
+    if (options.markRegeneratePending) {
+      // The rerun reached the server: the rollback it carried is committed, so
+      // nothing is left armed.
+      useChatsStore.getState().clearPendingRegenerate(chatId);
+    }
     if (!isCurrentTurn(turn)) return;
   } catch (error) {
+    if (options.markRegeneratePending) {
+      useChatsStore.getState().clearPendingRegenerate(chatId);
+    }
     if (!turn.finished) failTurn(turn, error);
     return;
   }
   await Promise.race([consuming, turn.completion]);
 }
 
-function beginTurn(chatId: ChatId, userMessage: UserMessage): void {
+function describe(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "The reply failed.";
+}
+
+/**
+ * Re-runs the last turn of a chat: the user's last message is sent again and
+ * its reply is replaced instead of stacked underneath.
+ *
+ * The screen only offers this for the newest reply, so the target is the last
+ * user message in the transcript. When the backend can rerun a turn natively
+ * it is asked to drop the old turn first, which keeps the transcript (and the
+ * model's context) free of duplicates; otherwise the message is simply
+ * re-sent and the previous reply stays where it is.
+ */
+export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome> {
+  if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
+  const provider = await getProvider();
+  if (!provider) return { ok: false, error: "Not connected. Open Settings to connect." };
+
+  // The transcript has to come from the server first: a native rerun
+  // addresses the turn by its backend message id, and the ids of a message
+  // sent in this session are still local ones.
+  const store = useMessagesStore.getState();
+  await store.fetchMessages(chatId);
+  if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
+
+  const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
+  if (!target) return { ok: false, error: "There is nothing to regenerate yet." };
+  if (!canResendAttachments(target.user.attachments)) {
+    return {
+      ok: false,
+      error: "The attached file is no longer available. Re-attach it and try again.",
+    };
+  }
+
+  const native = provider.capabilities.regenerate && typeof provider.regenerate === "function";
+  if (native && !target.user.id.startsWith(MESSAGE_ID_PREFIX)) {
+    return { ok: false, error: "The server transcript is not available yet. Try again." };
+  }
+
+  const carried: Pick<UserMessage, "text" | "attachments"> = {
+    text: target.user.text,
+    ...(target.user.attachments ? { attachments: target.user.attachments } : {}),
+  };
+  if (native) {
+    // The backend drops the old turn, so the rerun takes its place on screen
+    // and keeps the message id it is addressed by.
+    await runTurn(
+      chatId,
+      { id: target.user.id, ...carried },
+      {
+        prepare: provider.prepareRegenerate
+          ? (active, outgoing) => active.prepareRegenerate!(chatId, outgoing)
+          : undefined,
+        deliver: (active, outgoing) => active.regenerate!(chatId, outgoing),
+        discardPrepared: (active) => active.discardRegenerate!(chatId),
+        replaceIds: target.replaceIds,
+        markRegeneratePending: true,
+      },
+    );
+  } else {
+    // Nothing is rolled back, so the previous turn stays where it is and the
+    // rerun is a new one below it.
+    await runTurn(
+      chatId,
+      { id: localId("user"), ...carried },
+      {
+        deliver: (active, outgoing) => active.send(chatId, outgoing),
+      },
+    );
+  }
+  return { ok: true };
+}
+
+/** Backend message ids are prefixed; locally generated ones are not. */
+const MESSAGE_ID_PREFIX = "msg_";
+
+interface TurnTarget {
+  user: Message;
+  /** Ids of the messages this rerun replaces on screen. */
+  replaceIds: string[];
+}
+
+function lastTurn(messages: Message[]): TurnTarget | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "user") {
+      // Everything from the prompt onwards is the turn being replaced.
+      return {
+        user: message,
+        replaceIds: messages.slice(index).map((candidate) => candidate.id),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Abandons a rerun that was staged on the server but never delivered (the app
+ * was killed in between). Best effort: the marker is cleared either way.
+ */
+export async function discardPendingRegenerate(chatId: ChatId): Promise<void> {
+  const provider = await getProvider().catch(() => null);
+  await provider?.discardRegenerate?.(chatId).catch(() => undefined);
+  useChatsStore.getState().clearPendingRegenerate(chatId);
+}
+
+function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[] = []): void {
   const messages = useMessagesStore.getState();
   const user: Message = {
     id: userMessage.id,
@@ -124,6 +306,9 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage): void {
   };
   messages.setTurnError(chatId, null);
   messages.setTurnActive(chatId, true);
+  // A rerun takes the place of the turn it replaces, so the old turn leaves
+  // the screen before the new one lands in it.
+  if (replaceIds.length > 0) messages.removeMessages(chatId, replaceIds);
   messages.appendMessage(chatId, user);
   messages.appendMessage(chatId, assistant);
   let resolveCompletion!: () => void;

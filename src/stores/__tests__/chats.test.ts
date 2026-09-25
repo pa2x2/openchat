@@ -118,4 +118,17 @@ describe("chats store", () => {
     // Loading state is live-only and not persisted.
     expect(second.getState().loading).toBe(false);
   });
+
+  it("persists a staged-rerun marker so a crash cannot leave a rollback armed", async () => {
+    const storage = createMemoryStorage();
+    const first = createChatsStore(storage);
+    first.getState().markPendingRegenerate("a", "msg_42");
+
+    const second = createChatsStore(storage);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(second.getState().pendingRegenerate).toEqual({ a: "msg_42" });
+
+    second.getState().clearPendingRegenerate("a");
+    expect(second.getState().pendingRegenerate).toEqual({});
+  });
 });

@@ -56,3 +56,91 @@ describe("MessageBubble", () => {
     expect(tree.root.findByProps({ children: "Stopped" })).toBeTruthy();
   });
 });
+
+describe("MessageBubble attachments", () => {
+  const attachment = {
+    uri: "",
+    mimeType: "image/png",
+    name: "photo.png",
+    bytes: "QUJD",
+    size: 3,
+  };
+
+  it("renders the files a user message carries", async () => {
+    const tree = await render(
+      <MessageBubble
+        colorScheme="light"
+        showReasoning={false}
+        message={message({ role: "user", text: "look", attachments: [attachment] })}
+      />,
+    );
+
+    expect(tree.root.findByProps({ testID: "attachment-chip-photo.png" })).toBeTruthy();
+    expect(tree.root.findByProps({ testID: "attachment-image-photo.png" }).props.source).toEqual({
+      uri: "data:image/png;base64,QUJD",
+    });
+  });
+
+  it("shows no attachment strip for a plain message", async () => {
+    const tree = await render(
+      <MessageBubble colorScheme="light" showReasoning={false} message={message()} />,
+    );
+    expect(tree.root.findAllByProps({ testID: /^attachment-chip-/ })).toHaveLength(0);
+  });
+
+  it("falls back to the file type when the payload is not loaded yet", async () => {
+    // A transcript restored from the cache knows the file's name but not its
+    // bytes, so there is no source for a thumbnail.
+    const tree = await render(
+      <MessageBubble
+        colorScheme="light"
+        showReasoning={false}
+        message={message({
+          role: "user",
+          text: "look",
+          attachments: [{ uri: "", mimeType: "image/png", name: "photo.png", size: 3 }],
+        })}
+      />,
+    );
+
+    expect(tree.root.findByProps({ testID: "attachment-chip-photo.png" })).toBeTruthy();
+    expect(tree.root.findAllByProps({ testID: "attachment-image-photo.png" })).toHaveLength(0);
+    expect(tree.root.findByProps({ children: "PNG" })).toBeTruthy();
+  });
+});
+
+describe("MessageBubble regenerate", () => {
+  it("offers the rerun only when the screen allows it", async () => {
+    const without = await render(
+      <MessageBubble colorScheme="light" showReasoning={false} message={message()} />,
+    );
+    expect(without.root.findAllByProps({ testID: "regenerate-button" })).toHaveLength(0);
+
+    const onRegenerate = jest.fn();
+    const with_ = await render(
+      <MessageBubble
+        colorScheme="light"
+        showReasoning={false}
+        message={message()}
+        onRegenerate={onRegenerate}
+      />,
+    );
+    const button = with_.root.findByProps({ testID: "regenerate-button" });
+    await act(async () => {
+      button.props.onPress();
+    });
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the rerun while the reply is still streaming", async () => {
+    const tree = await render(
+      <MessageBubble
+        colorScheme="light"
+        showReasoning={false}
+        message={message({ status: "streaming" })}
+        onRegenerate={jest.fn()}
+      />,
+    );
+    expect(tree.root.findAllByProps({ testID: "regenerate-button" })).toHaveLength(0);
+  });
+});

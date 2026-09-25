@@ -29,9 +29,18 @@ export interface ModelInfo {
 
 /** A file attached to a message. */
 export interface Attachment {
+  /** Where the file can be displayed from: a local file uri, or empty when only `bytes` is set. */
   uri: string;
   mimeType: string;
   name: string;
+  /**
+   * Base64 payload without a data-uri prefix. Backends receive attachments
+   * inline, so freshly picked files carry their bytes here; transcripts read
+   * back from a backend carry the bytes the backend stored.
+   */
+  bytes?: string;
+  /** File size in bytes, when known. */
+  size?: number;
 }
 
 export interface UserMessage {

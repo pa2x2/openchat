@@ -7,8 +7,10 @@ import type { ChatId, Message, StreamEvent } from "@/src/domain";
 import type { ChatProvider } from "@/src/providers/types";
 import { getProvider } from "@/src/lib/providerFactory";
 import {
+  discardPendingRegenerate,
   interruptTurn,
   isTurnLive,
+  regenerateReply,
   sendMessage,
   settleOrphanedStreams,
 } from "@/src/stream/streamMachine";
@@ -98,7 +100,7 @@ function assistantMessage(patch: Partial<Message> = {}): Message {
 
 function resetStores() {
   useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {} });
-  useChatsStore.setState({ chats: [], loading: false, error: null });
+  useChatsStore.setState({ chats: [], loading: false, error: null, pendingRegenerate: {} });
 }
 
 async function flush(times = 8) {
@@ -401,4 +403,291 @@ describe("settleOrphanedStreams", () => {
     await interruptTurn("c11");
     await done;
   }, 10_000);
+});
+
+describe("regenerateReply", () => {
+  const serverTurn = (): Message[] => [
+    { id: "msg_u1", role: "user", text: "older", status: "complete", createdAt: 1 },
+    { id: "msg_a1", role: "assistant", text: "old reply", status: "complete", createdAt: 2 },
+    { id: "msg_u2", role: "user", text: "again", status: "complete", createdAt: 3 },
+    { id: "msg_a2", role: "assistant", text: "first reply", status: "complete", createdAt: 4 },
+  ];
+
+  it("asks a native backend to replace the turn and streams the new reply", async () => {
+    const order: string[] = [];
+    const prepareRegenerate = jest.fn().mockImplementation(async () => {
+      order.push("prepare");
+    });
+    const regenerate = jest.fn().mockImplementation(async () => {
+      order.push("deliver");
+    });
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      prepareRegenerate,
+      regenerate,
+      send: jest.fn(),
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: jest.fn().mockImplementation((chatId: ChatId, signal?: AbortSignal) => {
+        order.push("subscribe");
+        return scriptedEvents([{ events: [textDelta("second reply"), chatIdle()] }])(
+          chatId,
+          signal,
+        );
+      }),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c20", serverTurn());
+
+    const outcome = await regenerateReply("c20");
+
+    expect(outcome).toEqual({ ok: true });
+    expect(prepareRegenerate).toHaveBeenCalledWith(
+      "c20",
+      expect.objectContaining({ id: "msg_u2", text: "again" }),
+    );
+    expect(regenerate).toHaveBeenCalledWith(
+      "c20",
+      expect.objectContaining({ id: "msg_u2", text: "again" }),
+    );
+    expect(provider.send).not.toHaveBeenCalled();
+    // The rollback is prepared before the rerun's events are subscribed, so
+    // the bookkeeping events it causes cannot end the new turn.
+    expect(order).toEqual(["prepare", "subscribe", "deliver"]);
+    // The replaced turn is gone; the rerun leaves one user message and one reply.
+    const transcript = useMessagesStore.getState().byChat.c20;
+    expect(transcript.filter((message) => message.role === "user")).toHaveLength(2);
+    expect(transcript[transcript.length - 1]).toMatchObject({
+      role: "assistant",
+      text: "second reply",
+      status: "complete",
+    });
+    expect(transcript.some((message) => message.text === "first reply")).toBe(false);
+  });
+
+  it("abandons the prepared rollback and starts no turn when preparation fails", async () => {
+    const discardRegenerate = jest.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      prepareRegenerate: jest.fn().mockRejectedValue(new Error("Session is busy")),
+      regenerate: jest.fn(),
+      discardRegenerate,
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: jest.fn(),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c32", serverTurn());
+
+    await regenerateReply("c32");
+
+    expect(discardRegenerate).toHaveBeenCalledWith("c32");
+    expect(provider.regenerate).not.toHaveBeenCalled();
+    expect(provider.events).not.toHaveBeenCalled();
+    expect(useMessagesStore.getState().turnErrors.c32).toBe("Session is busy");
+    // Nothing was taken off the transcript.
+    expect(useMessagesStore.getState().byChat.c32).toHaveLength(4);
+    expect(useChatsStore.getState().pendingRegenerate.c32).toBeUndefined();
+  });
+
+  it("re-sends app-side when the backend cannot rerun natively", async () => {
+    const send = jest.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({
+      send,
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: scriptedEvents([{ events: [chatIdle()] }]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c21", serverTurn());
+
+    await regenerateReply("c21");
+
+    expect(send).toHaveBeenCalledWith("c21", expect.objectContaining({ text: "again" }));
+    // Nothing was rolled back server-side, so the previous turn keeps its
+    // place and the rerun lands underneath it.
+    const transcript = useMessagesStore.getState().byChat.c21;
+    expect(transcript.filter((message) => message.role === "user")).toHaveLength(3);
+    expect(transcript.some((message) => message.text === "first reply")).toBe(true);
+  });
+
+  it("keeps the staged-rerun marker only while the rerun is undelivered", async () => {
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      regenerate: jest.fn().mockRejectedValue(new Error("Session is busy")),
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: scriptedEvents([{ events: [], drop: true }]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c22", serverTurn());
+
+    await regenerateReply("c22");
+
+    expect(useChatsStore.getState().pendingRegenerate.c22).toBeUndefined();
+    expect(useMessagesStore.getState().turnErrors.c22).toBe("Session is busy");
+  });
+
+  it("records the marker while the rollback is armed, so a crash leaves it behind", async () => {
+    let duringPrepare: string | undefined;
+    let duringDeliver: string | undefined;
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      prepareRegenerate: jest.fn().mockImplementation(async () => {
+        duringPrepare = useChatsStore.getState().pendingRegenerate.c23;
+      }),
+      regenerate: jest.fn().mockImplementation(async () => {
+        duringDeliver = useChatsStore.getState().pendingRegenerate.c23;
+      }),
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: scriptedEvents([{ events: [chatIdle()] }]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c23", serverTurn());
+
+    await regenerateReply("c23");
+
+    expect(duringPrepare).toBe("msg_u2");
+    expect(duringDeliver).toBe("msg_u2");
+    // Delivered: the rollback was committed with the prompt, nothing left armed.
+    expect(useChatsStore.getState().pendingRegenerate.c23).toBeUndefined();
+  });
+
+  it("refuses while a turn is live", async () => {
+    const provider = makeProvider({
+      events: scriptedEvents([{ events: [textDelta("Hel")] }]), // parks
+    });
+    getProviderMock.mockResolvedValue(provider);
+    const done = sendMessage("c24", "hi");
+    await flush();
+
+    await expect(regenerateReply("c24")).resolves.toEqual({
+      ok: false,
+      error: "Wait for the current reply to finish.",
+    });
+
+    await interruptTurn("c24");
+    await done;
+  }, 10_000);
+
+  it("refuses when the chat has no user message to re-run", async () => {
+    const provider = makeProvider({ fetchMessages: jest.fn().mockResolvedValue([]) });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore.getState().setMessages("c25", []);
+
+    await expect(regenerateReply("c25")).resolves.toMatchObject({ ok: false });
+  });
+
+  it("refuses when the transcript still holds a locally sent message", async () => {
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      regenerate: jest.fn(),
+      // The server has nothing yet: the turn is still only on this device.
+      fetchMessages: jest.fn().mockResolvedValue([]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useMessagesStore
+      .getState()
+      .setMessages("c26", [
+        { id: "user-local-1", role: "user", text: "hi", status: "complete", createdAt: 1 },
+      ]);
+
+    await expect(regenerateReply("c26")).resolves.toEqual({
+      ok: false,
+      error: "There is nothing to regenerate yet.",
+    });
+    expect(provider.regenerate).not.toHaveBeenCalled();
+  });
+
+  it("refuses when an attachment lost its payload", async () => {
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      regenerate: jest.fn(),
+      fetchMessages: jest.fn().mockResolvedValue([
+        {
+          id: "msg_u",
+          role: "user",
+          text: "see",
+          status: "complete",
+          createdAt: 1,
+          attachments: [{ uri: "", mimeType: "image/png", name: "photo.png", size: 3 }],
+        },
+        { id: "msg_a", role: "assistant", text: "ok", status: "complete", createdAt: 2 },
+      ]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    await expect(regenerateReply("c27")).resolves.toEqual({
+      ok: false,
+      error: "The attached file is no longer available. Re-attach it and try again.",
+    });
+    expect(provider.regenerate).not.toHaveBeenCalled();
+  });
+
+  it("re-runs a turn that carries attachments", async () => {
+    const attachment = {
+      uri: "",
+      mimeType: "image/png",
+      name: "photo.png",
+      bytes: "QUJD",
+      size: 3,
+    };
+    const regenerate = jest.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({
+      capabilities: { ...makeProvider().capabilities, regenerate: true },
+      regenerate,
+      fetchMessages: jest.fn().mockResolvedValue([
+        {
+          id: "msg_u",
+          role: "user",
+          text: "look",
+          status: "complete",
+          createdAt: 1,
+          attachments: [attachment],
+        },
+        { id: "msg_a", role: "assistant", text: "red", status: "complete", createdAt: 2 },
+      ]),
+      events: scriptedEvents([{ events: [chatIdle()] }]),
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    await regenerateReply("c28");
+
+    expect(regenerate).toHaveBeenCalledWith(
+      "c28",
+      expect.objectContaining({ id: "msg_u", attachments: [attachment] }),
+    );
+  });
+
+  it("reports not connected without touching the transcript", async () => {
+    getProviderMock.mockResolvedValue(null);
+    useMessagesStore.getState().setMessages("c29", serverTurn());
+
+    await expect(regenerateReply("c29")).resolves.toEqual({
+      ok: false,
+      error: "Not connected. Open Settings to connect.",
+    });
+    expect(useMessagesStore.getState().byChat.c29).toHaveLength(4);
+  });
+});
+
+describe("discardPendingRegenerate", () => {
+  it("drops a staged rerun on the server and clears the marker", async () => {
+    const discardRegenerate = jest.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({ discardRegenerate });
+    getProviderMock.mockResolvedValue(provider);
+    useChatsStore.getState().markPendingRegenerate("c30", "msg_9");
+
+    await discardPendingRegenerate("c30");
+
+    expect(discardRegenerate).toHaveBeenCalledWith("c30");
+    expect(useChatsStore.getState().pendingRegenerate.c30).toBeUndefined();
+  });
+
+  it("clears the marker even when the backend cannot be reached", async () => {
+    const provider = makeProvider({
+      discardRegenerate: jest.fn().mockRejectedValue(new Error("offline")),
+    });
+    getProviderMock.mockResolvedValue(provider);
+    useChatsStore.getState().markPendingRegenerate("c31", "msg_9");
+
+    await expect(discardPendingRegenerate("c31")).resolves.toBeUndefined();
+    expect(useChatsStore.getState().pendingRegenerate.c31).toBeUndefined();
+  });
 });

@@ -23,15 +23,16 @@ import {
 import { chatEvents } from "./events";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
-import { interrupt, send } from "./prompt";
+import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
 import { createChat, deleteChat, listChats, switchModel } from "./sessions";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
   attachments: true,
   interrupt: true,
-  // No native regenerate on the server; the app re-sends instead.
-  regenerate: false,
+  // The server can roll a turn back and re-run it, so the app asks the server
+  // to replace the reply instead of re-sending and leaving a duplicate behind.
+  regenerate: true,
   modelSelection: true,
   deleteChat: true,
 };
@@ -87,6 +88,18 @@ export class OpenCodeProvider implements ChatProvider {
 
   send(chatId: ChatId, msg: UserMessage): Promise<void> {
     return send(this.client(), chatId, msg);
+  }
+
+  regenerate(chatId: ChatId, msg: UserMessage): Promise<void> {
+    return regenerate(this.client(), chatId, msg);
+  }
+
+  prepareRegenerate(chatId: ChatId, msg: UserMessage): Promise<void> {
+    return prepareRegenerate(this.client(), chatId, msg);
+  }
+
+  discardRegenerate(chatId: ChatId): Promise<void> {
+    return discardRegenerate(this.client(), chatId);
   }
 
   interrupt(chatId: ChatId): Promise<void> {

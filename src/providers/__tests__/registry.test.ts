@@ -24,7 +24,7 @@ describe("provider registry", () => {
       reasoning: true,
       attachments: true,
       interrupt: true,
-      regenerate: false,
+      regenerate: true,
       modelSelection: true,
       deleteChat: true,
     });

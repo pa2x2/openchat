@@ -72,6 +72,28 @@ export interface ChatProvider {
   /** Switches the model of an existing chat. No variant support in v1. */
   setChatModel(chatId: ChatId, model: ModelRef): Promise<void>;
 
+  /**
+   * Re-runs a turn natively: the backend drops the turn identified by
+   * `msg.id` (a backend-native message id) together with everything after it,
+   * then runs `msg` again. Only present when `capabilities.regenerate` is
+   * true; otherwise the app re-sends through `send()` and keeps the old turn.
+   *
+   * Backends that need two requests express them as `prepareRegenerate()` +
+   * `regenerate()`: the app runs the first one before it subscribes to the
+   * rerun's events, so bookkeeping events the backend emits while preparing
+   * are not mistaken for the rerun's own. A backend that does it in one
+   * request implements `regenerate()` alone.
+   */
+  regenerate?(chatId: ChatId, msg: UserMessage): Promise<void>;
+  /** First half of a two-request rerun; see `regenerate`. */
+  prepareRegenerate?(chatId: ChatId, msg: UserMessage): Promise<void>;
+  /**
+   * Abandons a rerun that never reached the backend (e.g. the app was killed
+   * between preparing and delivering it), so a later message cannot silently
+   * discard older turns.
+   */
+  discardRegenerate?(chatId: ChatId): Promise<void>;
+
   /** Normalized event stream for one chat. Pass a signal to stop it. */
   events(chatId: ChatId, signal?: AbortSignal): AsyncIterable<StreamEvent>;
   /** Reconciliation / cold open source of truth. */

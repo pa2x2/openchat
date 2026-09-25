@@ -94,6 +94,17 @@ describe("messages store", () => {
     expect(store.getState().byChat.c1).toBeUndefined();
   });
 
+  it("removeMessages drops a whole turn at once", () => {
+    const store = createMessagesStore(createMemoryStorage());
+    store.getState().appendMessage("c1", msg({ id: "keep", createdAt: 1 }));
+    store.getState().appendMessage("c1", msg({ id: "u2", createdAt: 2 }));
+    store.getState().appendMessage("c1", msg({ id: "a2", createdAt: 3, role: "assistant" }));
+
+    store.getState().removeMessages("c1", ["u2", "a2"]);
+
+    expect(store.getState().byChat.c1.map((m) => m.id)).toEqual(["keep"]);
+  });
+
   it("setTurnActive/setTurnError track runtime state", () => {
     const store = createMessagesStore(createMemoryStorage());
     store.getState().setTurnActive("c1", true);
@@ -158,5 +169,29 @@ describe("messages store", () => {
     expect(second.getState().byChat.c1.map((m) => m.id)).toEqual(["m1"]);
     expect(second.getState().activeTurns.c1).toBeUndefined();
     expect(second.getState().turnErrors.c1).toBeUndefined();
+  });
+
+  it("keeps attachment bytes in memory but not in the persisted transcript", async () => {
+    const storage = createMemoryStorage();
+    const first = createMessagesStore(storage);
+    first.getState().appendMessage(
+      "c1",
+      msg({
+        id: "m1",
+        attachments: [
+          { uri: "", mimeType: "image/png", name: "photo.png", bytes: "QUJD", size: 3 },
+        ],
+      }),
+    );
+
+    const second = createMessagesStore(storage);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(second.getState().byChat.c1[0]?.attachments).toEqual([
+      { uri: "", mimeType: "image/png", name: "photo.png", size: 3 },
+    ]);
+    // Still in memory for rendering: the live transcript keeps the payload.
+    expect(first.getState().byChat.c1[0]?.attachments?.[0]?.bytes).toBe("QUJD");
+    expect(JSON.stringify(storage.getItem("messages"))).not.toContain("QUJD");
   });
 });

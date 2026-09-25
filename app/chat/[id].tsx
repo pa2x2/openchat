@@ -6,9 +6,13 @@ import { themes } from "@/src/ui/theme";
 import { MessageBubble } from "@/src/features/chat/MessageBubble";
 import { Composer } from "@/src/features/chat/Composer";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
+import { AttachSheet } from "@/src/features/chat/AttachSheet";
+import { AttachmentSource, pickFiles, pickImages } from "@/src/features/chat/pickAttachments";
 import {
+  discardPendingRegenerate,
   interruptTurn,
   isTurnLive,
+  regenerateReply,
   sendMessage,
   settleOrphanedStreams,
 } from "@/src/stream/streamMachine";
@@ -18,7 +22,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
-import type { Message, ModelInfo } from "@/src/domain";
+import type { Attachment, Message, ModelInfo } from "@/src/domain";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
 const NEW_CHAT = "new";
@@ -49,10 +53,14 @@ export default function ChatScreen() {
 
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [draftModel, setDraftModel] = useState<ModelInfo["ref"] | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
+  const canAttach = capabilities?.attachments === true;
+  const canRegenerate = capabilities?.regenerate === true;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const defaultModel = useSettingsStore((state) =>
     providerId ? state.defaultModels[providerId] : undefined,
@@ -87,13 +95,25 @@ export default function ChatScreen() {
     };
   }, [chatId, isDraft]);
 
-  async function handleSend(text: string) {
+  // A rerun that was staged on the server but never delivered would make the
+  // next message discard older turns; drop it when the chat is opened. The
+  // marker is read imperatively, not watched: a rerun started from this screen
+  // sets it too, and reacting to that would abandon the rerun's own rollback.
+  useEffect(() => {
+    if (isDraft || isTurnLive(chatId)) return;
+    if (!useChatsStore.getState().pendingRegenerate[chatId]) return;
+    void discardPendingRegenerate(chatId);
+  }, [chatId, isDraft]);
+
+  async function handleSend(text: string, files: Attachment[]) {
     if (busy.current) return;
     busy.current = true;
     setBanner(null);
+    setAttachments([]);
     try {
       const provider = await getProvider();
       if (!provider) {
+        setAttachments(files);
         setBanner("Not connected. Open Settings to connect to a server.");
         return;
       }
@@ -103,13 +123,14 @@ export default function ChatScreen() {
           currentModel ? { model: currentModel } : undefined,
         );
         useChatsStore.getState().upsert(created);
-        const streaming = sendMessage(created.id, text);
+        const streaming = sendMessage(created.id, text, files);
         router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
         await streaming;
       } else {
-        await sendMessage(chatId, text);
+        await sendMessage(chatId, text, files);
       }
     } catch (error) {
+      setAttachments(files);
       setBanner(error instanceof Error && error.message ? error.message : "Could not send.");
     } finally {
       busy.current = false;
@@ -119,6 +140,25 @@ export default function ChatScreen() {
   function handleInterrupt() {
     void interruptTurn(chatId);
   }
+
+  async function handleAddAttachment(source: AttachmentSource) {
+    setAttachSheetOpen(false);
+    setBanner(null);
+    try {
+      const picked =
+        source === "image" ? await pickImages(attachments) : await pickFiles(attachments);
+      if (picked.length === 0) return;
+      setAttachments((current) => [...current, ...picked]);
+    } catch (error) {
+      setBanner(error instanceof Error && error.message ? error.message : "Could not attach.");
+    }
+  }
+
+  const handleRegenerate = useCallback(async () => {
+    setBanner(null);
+    const outcome = await regenerateReply(chatId);
+    if (!outcome.ok && outcome.error) setBanner(outcome.error);
+  }, [chatId]);
 
   async function handleSelectModel(model: ModelInfo) {
     if (isDraft) {
@@ -141,14 +181,25 @@ export default function ChatScreen() {
     }
   }
 
+  const title = isDraft ? "New chat" : chat?.title || "Chat";
+  // A rerun always targets the newest turn, so the action belongs on the last
+  // reply only — and only while no turn is live (the server refuses to roll a
+  // running session back).
+  const lastMessage = messages[messages.length - 1];
+  const regenerableId =
+    canRegenerate && !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
-      <MessageBubble colorScheme={scheme} message={item} showReasoning={showReasoning} />
+      <MessageBubble
+        colorScheme={scheme}
+        message={item}
+        showReasoning={showReasoning}
+        onRegenerate={item.id === regenerableId ? () => void handleRegenerate() : undefined}
+      />
     ),
-    [scheme, showReasoning],
+    [scheme, showReasoning, regenerableId, handleRegenerate],
   );
-
-  const title = isDraft ? "New chat" : chat?.title || "Chat";
 
   return (
     <View style={themes[scheme]} className="flex-1 bg-background">
@@ -206,7 +257,19 @@ export default function ChatScreen() {
         <Composer
           onSend={handleSend}
           onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
+          onAttach={canAttach ? () => setAttachSheetOpen(true) : undefined}
+          attachments={attachments}
+          onRemoveAttachment={(attachment) =>
+            setAttachments((current) => current.filter((file) => file !== attachment))
+          }
         />
+        {canAttach ? (
+          <AttachSheet
+            visible={attachSheetOpen}
+            onClose={() => setAttachSheetOpen(false)}
+            onPick={handleAddAttachment}
+          />
+        ) : null}
         {capabilities?.modelSelection === true ? (
           <ModelSheet
             visible={sheetOpen}

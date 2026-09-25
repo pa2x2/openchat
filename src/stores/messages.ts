@@ -29,6 +29,8 @@ interface MessagesStoreState {
   patchMessage: (chatId: ChatId, messageId: string, patch: Partial<Message>) => void;
   /** Drops one message (e.g. an empty optimistic placeholder). */
   removeMessage: (chatId: ChatId, messageId: string) => void;
+  /** Drops several messages at once (a turn being replaced by a rerun). */
+  removeMessages: (chatId: ChatId, messageIds: string[]) => void;
   removeChat: (chatId: ChatId) => void;
   setTurnActive: (chatId: ChatId, active: boolean) => void;
   setTurnError: (chatId: ChatId, error: string | null) => void;
@@ -50,6 +52,26 @@ function normalizeTranscript(messages: Message[]): Message[] {
       return true;
     }),
   );
+}
+
+/** Attachment metadata without the base64 payload, for the persisted cache. */
+function stripAttachmentBytes(byChat: Record<ChatId, Message[]>): Record<ChatId, Message[]> {
+  const stripped: Record<ChatId, Message[]> = {};
+  for (const [chatId, messages] of Object.entries(byChat)) {
+    stripped[chatId] = messages.map((message) => {
+      if (!message.attachments) return message;
+      return {
+        ...message,
+        attachments: message.attachments.map((attachment) => ({
+          uri: attachment.uri,
+          mimeType: attachment.mimeType,
+          name: attachment.name,
+          ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+        })),
+      };
+    });
+  }
+  return stripped;
 }
 
 export function createMessagesStore(storage = mmkvStorage) {
@@ -101,6 +123,18 @@ export function createMessagesStore(storage = mmkvStorage) {
               },
             };
           }),
+        removeMessages: (chatId, messageIds) =>
+          set((state) => {
+            const existing = state.byChat[chatId];
+            if (!existing) return state;
+            const drop = new Set(messageIds);
+            return {
+              byChat: {
+                ...state.byChat,
+                [chatId]: existing.filter((message) => !drop.has(message.id)),
+              },
+            };
+          }),
         removeChat: (chatId) =>
           set((state) => {
             const byChat = { ...state.byChat };
@@ -131,7 +165,12 @@ export function createMessagesStore(storage = mmkvStorage) {
       {
         name: "messages",
         storage: createJSONStorage(() => storage),
-        partialize: (state) => ({ byChat: state.byChat }),
+        // Only the transcript persists. Attachment payloads are left out: they
+        // are megabytes of base64 and this store is written on every streaming
+        // delta. The bytes come back with the next transcript read from the
+        // server, so a cached transcript shows attachment names without
+        // previews until then.
+        partialize: (state) => ({ byChat: stripAttachmentBytes(state.byChat) }),
       },
     ),
   );

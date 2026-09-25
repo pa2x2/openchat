@@ -43,6 +43,14 @@ For local development:
    primary chat agent in that directory's `opencode.json` — see the OpenCode
    agents documentation for the permission model.
 
+   **Attachments:** photos and other files you attach in the app are sent to
+   the server inline, and the server hands the payload back when the app reads
+   a chat's history. Images reach the model directly. Other file types are
+   stored with the message but the model only sees them as a named file in the
+   session's working directory — so a locked-down chat agent (one without
+   file-read permission) will answer that it cannot find the file. Grant the
+   agent permission to read files if you want documents to be readable.
+
 3. Reachability depends on where the app runs (see the next two sections):
    - Android emulator → use `http://10.0.2.2:4096` (the emulator's alias for
      your host machine).
