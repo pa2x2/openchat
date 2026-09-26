@@ -234,14 +234,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   const modelSelection = capabilities?.modelSelection === true;
   const menuItems: HeaderMenuItem[] = [];
-  if (modelSelection) {
-    menuItems.push({
-      label: "Change model",
-      icon: "cube-outline",
-      onPress: () => setSheetOpen(true),
-      testID: "menu-change-model",
-    });
-  }
   if (!isDraft && capabilities?.deleteChat) {
     menuItems.push({
       label: "Delete",
