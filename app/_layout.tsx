@@ -3,6 +3,7 @@ import "../global.css";
 import { useEffect } from "react";
 import { View } from "react-native";
 import { Stack, ThemeProvider } from "expo-router";
+import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colorScheme } from "nativewind";
@@ -38,8 +39,11 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <View style={vars} className="flex-1 bg-background">
           {/* Only the icon tint is ours to set: the app draws edge-to-edge, so
-              the bar's background is whatever screen is behind it. */}
+              the bars' background is whatever screen is behind them (the nav
+              bar's contrast scrim is off in app.json). Both need setting here:
+              natively they follow the system scheme, not the in-app one. */}
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+          <NavigationBar style={scheme === "dark" ? "light" : "dark"} />
           <Stack screenOptions={{ headerShadowVisible: false }}>
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
