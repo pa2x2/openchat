@@ -26,12 +26,21 @@ interface ChatsStoreState {
    * rerun when it opens.
    */
   pendingRegenerate: Record<ChatId, string>;
+  /**
+   * Temporary chats: real sessions on the server, kept out of the sidebar and
+   * deleted once the user leaves them. Persisted so a chat left behind by a
+   * killed app stays hidden and is deleted on the next launch.
+   */
+  temporary: Record<ChatId, true>;
   upsert: (chat: ChatSummary) => void;
   /** Moves a chat to the top of the list with a fresh timestamp. */
   touch: (id: ChatId, updatedAt?: number) => void;
   remove: (id: ChatId) => void;
   markPendingRegenerate: (id: ChatId, messageId: string) => void;
   clearPendingRegenerate: (id: ChatId) => void;
+  markTemporary: (id: ChatId) => void;
+  /** Also drops the chat from the list. */
+  forgetTemporary: (id: ChatId) => void;
   /** Re-reads the chat list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
   clear: () => void;
@@ -49,6 +58,7 @@ export function createChatsStore(storage = mmkvStorage) {
         loading: false,
         error: null,
         pendingRegenerate: {},
+        temporary: {},
         upsert: (chat) =>
           set((state) => ({
             chats: sortChats([...state.chats.filter((existing) => existing.id !== chat.id), chat]),
@@ -69,6 +79,13 @@ export function createChatsStore(storage = mmkvStorage) {
             delete pendingRegenerate[id];
             return { pendingRegenerate };
           }),
+        markTemporary: (id) => set((state) => ({ temporary: { ...state.temporary, [id]: true } })),
+        forgetTemporary: (id) =>
+          set((state) => {
+            const temporary = { ...state.temporary };
+            delete temporary[id];
+            return { temporary, chats: state.chats.filter((chat) => chat.id !== id) };
+          }),
         refresh: async () => {
           if (get().loading) return;
           set({ loading: true, error: null });
@@ -88,7 +105,8 @@ export function createChatsStore(storage = mmkvStorage) {
             });
           }
         },
-        clear: () => set({ chats: [], loading: false, error: null, pendingRegenerate: {} }),
+        clear: () =>
+          set({ chats: [], loading: false, error: null, pendingRegenerate: {}, temporary: {} }),
       }),
       {
         name: "chats",
@@ -96,6 +114,7 @@ export function createChatsStore(storage = mmkvStorage) {
         partialize: (state) => ({
           chats: state.chats,
           pendingRegenerate: state.pendingRegenerate,
+          temporary: state.temporary,
         }),
       },
     ),

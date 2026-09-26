@@ -1,14 +1,15 @@
 /**
  * Floating chat header: no bar, just raised buttons over a fade, so the
  * transcript scrolls underneath. Sidebar on the left, the model picker in
- * the middle, and new chat + the overflow menu grouped on the right.
+ * the middle, and new chat + the overflow menu grouped on the right. On a
+ * chat not yet started, the temporary-chat toggle takes new chat's place.
  */
 
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
-import { Icon, MenuGlyph, type IconName } from "@/src/ui/Icon";
+import { Icon, MenuGlyph, TemporaryChatGlyph, type IconName } from "@/src/ui/Icon";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Height of the header below the status bar; the transcript pads by this. */
@@ -29,6 +30,8 @@ export interface ChatHeaderProps {
   title: string;
   onPressTitle?: () => void;
   menuItems: HeaderMenuItem[];
+  /** Present on a chat not yet started; replaces the new chat button. */
+  temporary?: { on: boolean; onToggle: () => void };
 }
 
 export function ChatHeader({
@@ -37,6 +40,7 @@ export function ChatHeader({
   title,
   onPressTitle,
   menuItems,
+  temporary,
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
@@ -84,15 +88,28 @@ export function ChatHeader({
         className="h-11 flex-row items-center rounded-full bg-elevated px-1"
         style={{ boxShadow: floatingShadow }}
       >
-        <Pressable
-          accessibilityLabel="New chat"
-          accessibilityRole="button"
-          className="h-11 w-10 items-center justify-center rounded-full active:opacity-60"
-          onPress={onNewChat}
-          testID="new-chat"
-        >
-          <Icon name="square-edit-outline" size={21} />
-        </Pressable>
+        {temporary ? (
+          <Pressable
+            accessibilityLabel="Temporary chat"
+            accessibilityRole="switch"
+            accessibilityState={{ checked: temporary.on }}
+            className="h-11 w-10 items-center justify-center rounded-full active:opacity-60"
+            onPress={temporary.onToggle}
+            testID="temporary-chat"
+          >
+            <TemporaryChatGlyph on={temporary.on} />
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityLabel="New chat"
+            accessibilityRole="button"
+            className="h-11 w-10 items-center justify-center rounded-full active:opacity-60"
+            onPress={onNewChat}
+            testID="new-chat"
+          >
+            <Icon name="square-edit-outline" size={21} />
+          </Pressable>
+        )}
         {menuItems.length > 0 ? (
           <Pressable
             accessibilityLabel="More options"

@@ -30,6 +30,7 @@ export interface ComposerProps {
   /** Present when the model offers variants: the current level and a way to change it. */
   reasoning?: { label: string; onPress: () => void };
   autoFocus?: boolean;
+  placeholder?: string;
 }
 
 const NO_ATTACHMENTS: Attachment[] = [];
@@ -48,6 +49,7 @@ export function Composer({
   onRemoveAttachment,
   reasoning,
   autoFocus,
+  placeholder = "Ask anything",
 }: ComposerProps) {
   const [text, setText] = useState("");
   const input = useRef<TextInput>(null);
@@ -93,7 +95,7 @@ export function Composer({
         autoFocus={autoFocus}
         value={text}
         onChangeText={setText}
-        placeholder="Ask anything"
+        placeholder={placeholder}
         placeholderTextColor={colors.textFaint}
         multiline
         accessibilityLabel="Message"

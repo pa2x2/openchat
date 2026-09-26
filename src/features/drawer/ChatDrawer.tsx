@@ -1,7 +1,7 @@
 /**
  * Sidebar: search, new chat, every conversation the server knows about
- * (newest first, cached locally for instant launch), and the connected
- * server at the bottom, which leads to Settings.
+ * except temporary ones (newest first, cached locally for instant launch),
+ * and the connected server at the bottom, which leads to Settings.
  */
 
 import { memo, useCallback, useMemo, useState } from "react";
@@ -68,7 +68,8 @@ export function ChatDrawer({
 }: ChatDrawerProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
-  const chats = useChatsStore((state) => state.chats);
+  const allChats = useChatsStore((state) => state.chats);
+  const temporary = useChatsStore((state) => state.temporary);
   const refreshChats = useChatsStore((state) => state.refresh);
   const capabilities = useProviderCapabilities();
   const profile = useConnectionStore((state) => state.profile);
@@ -78,9 +79,12 @@ export function ChatDrawer({
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return chats;
-    return chats.filter((chat) => (chat.title || "Untitled").toLowerCase().includes(needle));
-  }, [chats, query]);
+    return allChats.filter(
+      (chat) =>
+        !temporary[chat.id] &&
+        (!needle || (chat.title || "Untitled").toLowerCase().includes(needle)),
+    );
+  }, [allChats, temporary, query]);
 
   const canDelete = capabilities?.deleteChat === true;
   const renderChat = useCallback(

@@ -5,6 +5,7 @@ import { Drawer } from "react-native-drawer-layout";
 import type { LegacyPanGesture, PanGesture } from "react-native-gesture-handler";
 import { ChatDrawer } from "@/src/features/drawer/ChatDrawer";
 import { DrawerContext } from "@/src/features/drawer/DrawerContext";
+import { purgeTemporaryChats } from "@/src/features/chat/temporaryChats";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useModelsStore } from "@/src/stores/models";
@@ -31,6 +32,7 @@ export default function MainLayout() {
   // reasoning chip reads the catalog, so it must not wait for the model
   // picker to be opened.
   useEffect(() => {
+    void purgeTemporaryChats();
     void (async () => {
       await getProvider();
       await Promise.all([refreshChats(), refreshModels()]);

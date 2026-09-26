@@ -9,6 +9,7 @@ import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { Transcript } from "./Transcript";
+import { discardTemporaryChat } from "./temporaryChats";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
@@ -66,11 +67,16 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [draftModel, setDraftModel] = useState<ModelRef | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [draftTemporary, setDraftTemporary] = useState(false);
+  const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
+  const temporary = isDraft ? draftTemporary : markedTemporary;
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
   const canAttach = capabilities?.attachments === true;
   const canRegenerate = capabilities?.regenerate === true;
+  // A temporary chat is only temporary if the app can delete it afterwards.
+  const canTemporary = capabilities?.deleteChat === true;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const defaultModel = useSettingsStore((state) =>
     providerId ? state.defaultModels[providerId] : undefined,
@@ -118,6 +124,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void discardPendingRegenerate(chatId);
   }, [chatId, isDraft]);
 
+  // Leaving a temporary chat deletes it. Read at unmount rather than render,
+  // so a chat deleted some other way meanwhile is not deleted twice.
+  useEffect(() => {
+    if (isDraft) return;
+    return () => {
+      if (useChatsStore.getState().temporary[chatId]) void discardTemporaryChat(chatId);
+    };
+  }, [chatId, isDraft]);
+
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
     if (busy.current) return false;
@@ -138,6 +153,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         const created = await provider.createChat(
           currentModel ? { model: currentModel } : undefined,
         );
+        if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
         useChatsStore.getState().upsert(created);
         const streaming = sendMessage(created.id, text, files);
         router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
@@ -211,7 +227,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   const modelSelection = capabilities?.modelSelection === true;
   const menuItems: HeaderMenuItem[] = [];
-  if (!isDraft && capabilities?.deleteChat) {
+  if (!isDraft && !temporary && capabilities?.deleteChat) {
     menuItems.push({
       label: "Delete",
       icon: "trash-can-outline",
@@ -238,7 +254,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         <View className="flex-1">
           {empty ? (
             <View className="flex-1" style={{ paddingTop: insets.top + HEADER_HEIGHT }}>
-              <EmptyChat connected={connected} onOpenSettings={() => router.push("/settings")} />
+              <EmptyChat
+                connected={connected}
+                temporary={temporary}
+                onOpenSettings={() => router.push("/settings")}
+              />
             </View>
           ) : (
             <Transcript
@@ -259,6 +279,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             title={modelSelection ? (currentLabel ?? "Choose model") : "OpenChat"}
             onPressTitle={modelSelection ? () => setSheetOpen(true) : undefined}
             menuItems={menuItems}
+            temporary={
+              isDraft && canTemporary
+                ? { on: draftTemporary, onToggle: () => setDraftTemporary((on) => !on) }
+                : undefined
+            }
           />
         </View>
 
@@ -279,6 +304,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           <Composer
             ref={composer}
             autoFocus={focusOnMount}
+            placeholder={temporary ? "Temporary chat" : undefined}
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
             onAttach={canAttach ? () => setAttachSheetOpen(true) : undefined}
