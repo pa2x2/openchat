@@ -116,5 +116,7 @@ export interface ProviderDescriptor {
   id: ProviderId;
   label: string;
   fields: ConfigField[];
+  /** The same as every instance's `capabilities`; the UI reads them from here. */
+  capabilities: Capabilities;
   create(cfg: ConnectionConfig): ChatProvider;
 }

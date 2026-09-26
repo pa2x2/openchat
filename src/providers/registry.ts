@@ -7,7 +7,7 @@
  */
 
 import type { ConnectionConfig, ProviderDescriptor } from "./types";
-import { OpenCodeProvider } from "./opencode/provider";
+import { OpenCodeProvider, openCodeCapabilities } from "./opencode/provider";
 
 export const openCodeDescriptor: ProviderDescriptor = {
   id: "opencode",
@@ -30,6 +30,7 @@ export const openCodeDescriptor: ProviderDescriptor = {
       placeholder: "Server password",
     },
   ],
+  capabilities: openCodeCapabilities,
   create(cfg: ConnectionConfig) {
     return new OpenCodeProvider(cfg);
   },

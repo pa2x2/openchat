@@ -8,7 +8,6 @@
  */
 
 import type { Capabilities } from "@/src/domain";
-import { useMemo } from "react";
 import type { ChatProvider, ConnectionConfig } from "@/src/providers/types";
 import { getProviderDescriptor } from "@/src/providers/registry";
 import { useConnectionStore, type ConnectionProfile } from "@/src/stores/connection";
@@ -46,25 +45,8 @@ export function resetProviderCache(): void {
   cached = null;
 }
 
-/**
- * The capabilities of the active provider, for capabilities-driven UI.
- * Capabilities are static per adapter, so this derives them from the
- * descriptor without touching the network.
- */
-export function getProviderCapabilities(): Capabilities | null {
-  const profile = useConnectionStore.getState().profile;
-  if (!profile) return null;
-  const descriptor = getProviderDescriptor(profile.providerId);
-  if (!descriptor) return null;
-  return descriptor.create({ baseUrl: profile.baseUrl }).capabilities;
-}
-
-/** Reactive variant for screens: recomputed when the profile changes. */
+/** The capabilities of the active provider, for capabilities-driven UI. */
 export function useProviderCapabilities(): Capabilities | null {
-  const profile = useConnectionStore((state) => state.profile);
-  return useMemo(() => {
-    if (!profile) return null;
-    const descriptor = getProviderDescriptor(profile.providerId);
-    return descriptor ? descriptor.create({ baseUrl: profile.baseUrl }).capabilities : null;
-  }, [profile]);
+  const providerId = useConnectionStore((state) => state.profile?.providerId);
+  return providerId ? (getProviderDescriptor(providerId)?.capabilities ?? null) : null;
 }
