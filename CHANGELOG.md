@@ -2,6 +2,38 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha03] - 2026-09-26
+
+### ✨ Added
+
+- Temporary chats. Flip the switch on the new chat screen to start one. It stays out of the sidebar and the app deletes it when you leave. It appears only where the server allows deleting chats.
+- Answer questions from the server without leaving the chat. When a run pauses to ask something, a card appears above the composer with text, number, yes or no, choice and multi-select fields plus links. Submit stays disabled until the answers check out, and Dismiss skips it.
+- Take a photo to attach from the attachment sheet, and tap any image thumbnail to see it full screen. Tap again or press back to close it.
+- Copy a finished reply again with the copy button under it. It shows a check mark for a moment after copying. Code blocks keep their own copy button.
+
+### 🔄 Changed
+
+- Settings no longer has a default model. New chats start with whatever model you picked last, for each provider. Your old default carries over as that starting point.
+- The composer is now a two-row card with the field on top and attach, reasoning and send below. The keyboard drops after you send. Sheets sit above the keyboard, drag down to dismiss, and closing one drops the keyboard too.
+- Delete confirmation and delete errors now use a themed in-app dialog that matches light and dark mode.
+
+### 🧩 Improved
+
+- The model picker is now a small browser. Pick a provider from the rail on the left or open Favorites, star models to keep them there, search across every provider at once, and it opens on the model you already use. Context sizes still show under each name.
+- Streaming replies render as formatted markdown while they arrive. There is no plain text tail, so nothing shifts when the reply finishes.
+
+### 🐛 Fixed
+
+- A message that fails to send puts your text back in the composer instead of losing it.
+- Reading older messages while a reply streams no longer drags the list. Stay at the bottom and it still follows the reply.
+- A sideways swipe inside a long code block now scrolls the code instead of opening the sidebar. Attachment rows behave the same way.
+- A chat that the server fails to delete stays in the sidebar with an error instead of vanishing.
+- Launching with light or dark forced no longer flashes the first frame in the system theme. On Android the navigation bar icons follow the app theme and the bar blends with the screen.
+
+### ⚡️ Performance
+
+- Streaming writes the transcript once per frame, saves it at most once a second, and re-renders only the message list. Long replies stay smooth.
+
 ## [1.0.0-alpha02] - 2026-09-26
 
 ### ✨ Added
@@ -42,5 +74,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.0.0-alpha03]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha03
 [1.0.0-alpha02]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha02
 [1.0.0-alpha01]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha01
