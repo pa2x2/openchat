@@ -12,7 +12,13 @@ import type { ChatId, Message } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
-import { mmkvStorage } from "./storage";
+import { createThrottledJSONStorage, mmkvStorage } from "./storage";
+
+/**
+ * Streaming patches the transcript once per delta; persisting is throttled
+ * to this, so the store is written about once a second instead.
+ */
+const PERSIST_INTERVAL_MS = 1_000;
 
 interface MessagesStoreState {
   byChat: Record<ChatId, Message[]>;
@@ -49,9 +55,18 @@ function normalizeTranscript(messages: Message[]): Message[] {
   );
 }
 
+// Persist partializes on every change. Transcripts are immutable, so caching
+// by array keeps that to the one chat that changed rather than all of them.
+const strippedTranscripts = new WeakMap<Message[], Message[]>();
+
 function stripAttachmentBytes(byChat: Record<ChatId, Message[]>): Record<ChatId, Message[]> {
   const stripped: Record<ChatId, Message[]> = {};
   for (const [chatId, messages] of Object.entries(byChat)) {
+    const cached = strippedTranscripts.get(messages);
+    if (cached) {
+      stripped[chatId] = cached;
+      continue;
+    }
     stripped[chatId] = messages.map((message) => {
       if (!message.attachments) return message;
       return {
@@ -64,11 +79,16 @@ function stripAttachmentBytes(byChat: Record<ChatId, Message[]>): Record<ChatId,
         })),
       };
     });
+    strippedTranscripts.set(messages, stripped[chatId]);
   }
   return stripped;
 }
 
-export function createMessagesStore(storage = mmkvStorage) {
+/** `persistIntervalMs` of 0 writes every change immediately. */
+export function createMessagesStore(
+  storage = mmkvStorage,
+  persistIntervalMs = PERSIST_INTERVAL_MS,
+) {
   return create<MessagesStoreState>()(
     persist(
       (set) => ({
@@ -158,10 +178,13 @@ export function createMessagesStore(storage = mmkvStorage) {
       }),
       {
         name: "messages",
-        storage: createJSONStorage(() => storage),
+        storage:
+          persistIntervalMs > 0
+            ? createThrottledJSONStorage(() => storage, persistIntervalMs)
+            : createJSONStorage(() => storage),
         // Only the transcript persists. Attachment payloads are left out: they
-        // are megabytes of base64 and this store is written on every streaming
-        // delta. The bytes come back with the next transcript read from the
+        // are megabytes of base64 that would be rewritten throughout every
+        // streamed reply. The bytes come back with the next transcript read from the
         // server, so a cached transcript shows attachment names without
         // previews until then.
         partialize: (state) => ({ byChat: stripAttachmentBytes(state.byChat) }),

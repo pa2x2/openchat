@@ -49,7 +49,7 @@ beforeEach(() => {
 
 describe("messages store", () => {
   it("appendMessage adds messages without duplicates", () => {
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "m1" }));
     store.getState().appendMessage("c1", msg({ id: "m1" }));
     store.getState().appendMessage("c1", msg({ id: "m2", createdAt: 2 }));
@@ -57,7 +57,7 @@ describe("messages store", () => {
   });
 
   it("setMessages sorts by createdAt and dedupes", () => {
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store
       .getState()
       .setMessages("c1", [
@@ -69,7 +69,7 @@ describe("messages store", () => {
   });
 
   it("patchMessage updates only the target message", () => {
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "m1" }));
     store.getState().appendMessage("c1", msg({ id: "m2", createdAt: 2 }));
     store.getState().patchMessage("c1", "m2", { status: "streaming", text: "partial" });
@@ -81,7 +81,7 @@ describe("messages store", () => {
   });
 
   it("removeMessage drops one message; removeChat drops the transcript", () => {
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "m1" }));
     store.getState().appendMessage("c1", msg({ id: "m2", createdAt: 2 }));
     store.getState().removeMessage("c1", "m1");
@@ -91,7 +91,7 @@ describe("messages store", () => {
   });
 
   it("removeMessages drops a whole turn at once", () => {
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "keep", createdAt: 1 }));
     store.getState().appendMessage("c1", msg({ id: "u2", createdAt: 2 }));
     store.getState().appendMessage("c1", msg({ id: "a2", createdAt: 3, role: "assistant" }));
@@ -108,7 +108,7 @@ describe("messages store", () => {
         .mockResolvedValue([msg({ id: "srv1", text: "server truth", createdAt: 3 })]),
     });
     getProviderMock.mockResolvedValue(provider);
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "local1" }));
 
     await store.getState().fetchMessages("c1");
@@ -124,7 +124,7 @@ describe("messages store", () => {
       fetchMessages: jest.fn().mockRejectedValue(new Error("offline")),
     });
     getProviderMock.mockResolvedValue(provider);
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "local1" }));
 
     await store.getState().fetchMessages("c1");
@@ -135,7 +135,7 @@ describe("messages store", () => {
 
   it("fetchMessages without a provider leaves the cache untouched", async () => {
     getProviderMock.mockResolvedValue(null);
-    const store = createMessagesStore(createMemoryStorage());
+    const store = createMessagesStore(createMemoryStorage(), 0);
     store.getState().appendMessage("c1", msg({ id: "local1" }));
 
     await store.getState().fetchMessages("c1");
@@ -145,7 +145,7 @@ describe("messages store", () => {
 
   it("persists transcripts but not runtime turn state", async () => {
     const storage = createMemoryStorage();
-    const first = createMessagesStore(storage);
+    const first = createMessagesStore(storage, 0);
     first.getState().appendMessage("c1", msg({ id: "m1" }));
     first.getState().setTurnActive("c1", true);
     first.getState().setTurnError("c1", "boom");
@@ -159,7 +159,7 @@ describe("messages store", () => {
 
   it("keeps attachment bytes in memory but not in the persisted transcript", async () => {
     const storage = createMemoryStorage();
-    const first = createMessagesStore(storage);
+    const first = createMessagesStore(storage, 0);
     first.getState().appendMessage(
       "c1",
       msg({
@@ -179,5 +179,27 @@ describe("messages store", () => {
     // Still in memory for rendering: the live transcript keeps the payload.
     expect(first.getState().byChat.c1[0]?.attachments?.[0]?.bytes).toBe("QUJD");
     expect(JSON.stringify(storage.getItem("messages"))).not.toContain("QUJD");
+  });
+
+  it("coalesces a burst of streaming patches into one write of the final transcript", () => {
+    jest.useFakeTimers();
+    try {
+      const storage = createMemoryStorage();
+      const setItem = jest.spyOn(storage, "setItem");
+      const store = createMessagesStore(storage, 1_000);
+      store.getState().appendMessage("c1", msg({ id: "a1", role: "assistant", text: "" }));
+      for (const text of ["He", "Hello", "Hello, wor", "Hello, world"]) {
+        store.getState().patchMessage("c1", "a1", { text, status: "streaming" });
+      }
+      expect(setItem).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1_000);
+
+      expect(setItem).toHaveBeenCalledTimes(1);
+      const persisted = JSON.parse(storage.getItem("messages") as string);
+      expect(persisted.state.byChat.c1[0].text).toBe("Hello, world");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
