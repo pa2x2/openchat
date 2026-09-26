@@ -3,7 +3,6 @@
   "default_agent": "chat",
   "share": "disabled",
   "snapshots": false,
-  "subagent_depth": 1,
   // Global backstop: V2 defaults to "ask" here, which deadlocks any
   // non-interactive client. Deny at top level so it covers every agent.
   "permissions": [
@@ -13,22 +12,15 @@
   ],
   "agents": {
     "chat": {
-      "description": "General-purpose chat agent; coding tools disabled",
+      "description": "General-purpose chat assistant",
       "mode": "primary",
-      // No subagent rule: chat may fan out to subagents for parallel
-      // research. Reads and web stay at their allow defaults.
+      "system": "You are a helpful, knowledgeable assistant in a mobile chat app. Answer conversationally and directly, and match the length of your answer to the question. Replies render as Markdown on a phone screen: use headings and tables sparingly, and put code in fenced code blocks. You can search the web and fetch pages. Use them for current events, facts you are unsure of, or when the user shares a link, and cite the pages you used as links. Files the user attaches arrive inside their message.",
       "permissions": [
-        { "action": "edit", "resource": "*", "effect": "deny" },
-        { "action": "shell", "resource": "*", "effect": "deny" },
-        { "action": "external_directory", "resource": "*", "effect": "deny" },
-        { "action": "question", "resource": "*", "effect": "deny" },
-        { "action": "skill", "resource": "*", "effect": "deny" },
-        { "action": "execute", "resource": "*", "effect": "deny" }
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "webfetch", "resource": "*", "effect": "allow" },
+        { "action": "websearch", "resource": "*", "effect": "allow" }
       ]
     },
-    // general ships with edit/shell allowed; left as-is it would be a
-    // backdoor around chat's denies (children run their own policy).
-    // Constrain it to research so the whole server stays code-free.
     "general": {
       "permissions": [
         { "action": "edit", "resource": "*", "effect": "deny" },
