@@ -79,12 +79,14 @@ export async function pickImages(existing: Attachment[] = []): Promise<Attachmen
     });
     if (result.canceled) return [];
     checkCount(result.assets.length, existing);
-    const candidates = result.assets.map((asset) => {
+    const pickedAt = Date.now();
+    const candidates = result.assets.map((asset, index) => {
       const bytes = asset.base64 ?? "";
       return {
         uri: asset.uri,
         mimeType: asset.mimeType || "image/jpeg",
-        name: asset.fileName || `image-${Date.now()}.jpg`,
+        // Numbered, so unnamed images picked together stay tellable apart.
+        name: asset.fileName || `image-${pickedAt}${index > 0 ? `-${index + 1}` : ""}.jpg`,
         bytes,
         // The picker reports the size of the file on disk, which is the
         // pre-compression size; the payload is what the server receives.

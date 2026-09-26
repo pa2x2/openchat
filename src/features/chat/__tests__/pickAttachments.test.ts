@@ -62,10 +62,14 @@ describe("pickImages", () => {
     await expect(pickImages()).resolves.toEqual([]);
   });
 
-  it("names an image the picker could not name", async () => {
-    launch.mockResolvedValue({ canceled: false, assets: [imageAsset({ fileName: null })] });
-    const [attachment] = await pickImages();
-    expect(attachment?.name).toMatch(/^image-\d+\.jpg$/);
+  it("gives each image the picker could not name its own name", async () => {
+    launch.mockResolvedValue({
+      canceled: false,
+      assets: [imageAsset({ fileName: null }), imageAsset({ fileName: null })],
+    });
+    const [first, second] = await pickImages();
+    expect(first?.name).toMatch(/^image-\d+\.jpg$/);
+    expect(second?.name).toMatch(/^image-\d+-2\.jpg$/);
   });
 
   it("refuses more files than a message may carry", async () => {

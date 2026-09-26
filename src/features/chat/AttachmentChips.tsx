@@ -18,16 +18,28 @@ export interface AttachmentStripProps {
   testID?: string;
 }
 
-function keyOf(attachment: Attachment): string {
-  return `${attachment.name}-${attachment.mimeType}`;
+// Attachments have no id, and two can share a name (the same file picked
+// twice), so a staged attachment is keyed by the object itself.
+const stagedKeys = new WeakMap<Attachment, number>();
+let nextStagedKey = 0;
+
+function stagedKeyOf(attachment: Attachment): number {
+  let key = stagedKeys.get(attachment);
+  if (key === undefined) {
+    key = nextStagedKey++;
+    stagedKeys.set(attachment, key);
+  }
+  return key;
 }
 
 /** Files of a message already sent, as shown above its bubble. */
 export function AttachmentStrip({ attachments, testID }: AttachmentStripProps) {
   return (
     <View className="flex-row flex-wrap justify-end gap-2" testID={testID}>
-      {attachments.map((attachment) => (
-        <AttachmentChip key={keyOf(attachment)} attachment={attachment} size="large" />
+      {/* A sent message's files never change order; indexes also stay put
+          when a refetch replaces the objects. */}
+      {attachments.map((attachment, index) => (
+        <AttachmentChip key={index} attachment={attachment} size="large" />
       ))}
     </View>
   );
@@ -45,7 +57,11 @@ export function AttachmentChips({ attachments, onRemove, testID }: AttachmentStr
         contentContainerClassName="flex-row gap-2 pr-1 pt-1.5"
       >
         {attachments.map((attachment) => (
-          <AttachmentChip key={keyOf(attachment)} attachment={attachment} onRemove={onRemove} />
+          <AttachmentChip
+            key={stagedKeyOf(attachment)}
+            attachment={attachment}
+            onRemove={onRemove}
+          />
         ))}
       </ScrollView>
     </View>
