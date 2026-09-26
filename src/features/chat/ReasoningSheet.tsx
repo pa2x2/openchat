@@ -3,7 +3,7 @@
  * reasoning effort — or "Auto" for the model's own default.
  *
  * The caller passes the variants of the model in use and decides what the
- * choice applies to (the current chat, a new chat, or the default model).
+ * choice applies to.
  */
 
 import { Pressable, Text, View } from "react-native";
@@ -21,7 +21,6 @@ export interface ReasoningSheetProps {
   /** Current variant id; undefined is Auto. */
   selected?: string;
   onSelect: (variant: string | undefined) => void;
-  subtitle?: string;
 }
 
 export function ReasoningSheet({
@@ -30,7 +29,6 @@ export function ReasoningSheet({
   variants,
   selected,
   onSelect,
-  subtitle,
 }: ReasoningSheetProps) {
   const options: { id: string | undefined; label: string; hint?: string }[] = [
     { id: undefined, label: AUTO_LABEL, hint: "The model's default" },
@@ -38,13 +36,7 @@ export function ReasoningSheet({
   ];
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title="Reasoning"
-      subtitle={subtitle}
-      testID="reasoning-sheet"
-    >
+    <Sheet visible={visible} onClose={onClose} title="Reasoning" testID="reasoning-sheet">
       <View className="overflow-hidden rounded-[20px] bg-raised">
         {options.map((option, index) => {
           const active = option.id === selected;

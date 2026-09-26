@@ -65,7 +65,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
-  const [draftModel, setDraftModel] = useState<ModelRef | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [draftTemporary, setDraftTemporary] = useState(false);
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
@@ -78,12 +77,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
-  const defaultModel = useSettingsStore((state) =>
-    providerId ? state.defaultModels[providerId] : undefined,
+  const lastModel = useSettingsStore((state) =>
+    providerId ? state.lastModels[providerId] : undefined,
   );
-  const currentModel = isDraft
-    ? (draftModel ?? defaultModel ?? null)
-    : (chat?.model ?? defaultModel ?? null);
+  const currentModel = (isDraft ? lastModel : (chat?.model ?? lastModel)) ?? null;
   const currentInfo = useModelsStore((state) =>
     currentModel ? state.models.find((model) => sameModelRef(model.ref, currentModel)) : undefined,
   );
@@ -205,10 +202,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
 
   async function applyModel(model: ModelRef) {
-    if (isDraft) {
-      setDraftModel(model);
-      return;
-    }
+    // New chats start with whatever was picked last, in any chat.
+    if (providerId) useSettingsStore.getState().setLastModel(providerId, model);
+    if (isDraft) return;
     try {
       const provider = await getProvider();
       if (!provider) {

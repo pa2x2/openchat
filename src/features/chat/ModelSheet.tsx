@@ -53,10 +53,9 @@ export interface ModelSheetProps {
   onClose: () => void;
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
-  subtitle?: string;
 }
 
-export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: ModelSheetProps) {
+export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetProps) {
   const models = useModelsStore((state) => state.models);
   const loading = useModelsStore((state) => state.loading);
   const error = useModelsStore((state) => state.error);
@@ -82,13 +81,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
   }
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      subtitle={subtitle}
-      height="80%"
-      testID="model-sheet"
-    >
+    <Sheet visible={visible} onClose={onClose} height="80%" testID="model-sheet">
       {loading && models.length === 0 ? (
         <View className="flex-1 items-center justify-center" testID="model-loading">
           <ActivityIndicator accessibilityLabel="Loading models" />
