@@ -11,7 +11,8 @@ import { toConnectionError, type OpenCodeClient } from "./client";
 import { normalizeV2Event, type V2EventShape } from "./normalize";
 
 function isEventForChat(event: V2EventShape, chatId: ChatId): boolean {
-  return event.data?.sessionID === chatId;
+  // Forms carry their session inside the form, not beside it.
+  return (event.data?.sessionID ?? event.data?.form?.sessionID) === chatId;
 }
 
 /**

@@ -7,7 +7,106 @@
  * pinned server version.
  */
 
-import type { StreamEvent, TokenUsage } from "@/src/domain";
+import type {
+  ChatForm,
+  FormCondition,
+  FormField,
+  FormOption,
+  FormValue,
+  StreamEvent,
+  TokenUsage,
+} from "@/src/domain";
+
+/** Structural subset of the client's form field union. */
+interface WireField {
+  key: string;
+  type: "string" | "number" | "integer" | "boolean" | "multiselect" | "external";
+  title?: string;
+  description?: string;
+  required?: boolean;
+  hidden?: boolean;
+  when?: FormCondition[];
+  default?: FormValue;
+  placeholder?: string;
+  options?: FormOption[];
+  custom?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  // The server spells unbounded limits as "Infinity"/"-Infinity".
+  minimum?: number | string;
+  maximum?: number | string;
+  minItems?: number;
+  maxItems?: number;
+  url?: string;
+}
+
+export interface WireForm {
+  id: string;
+  title: string;
+  fields: readonly WireField[];
+}
+
+function finite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function toFormField(field: WireField): FormField {
+  const base = {
+    key: field.key,
+    required: field.required ?? false,
+    ...(field.title ? { title: field.title } : {}),
+    ...(field.description ? { description: field.description } : {}),
+    ...(field.hidden ? { hidden: true } : {}),
+    ...(field.when?.length ? { when: field.when } : {}),
+  };
+  switch (field.type) {
+    case "string":
+      return {
+        ...base,
+        type: "text",
+        default: typeof field.default === "string" ? field.default : undefined,
+        placeholder: field.placeholder,
+        options: field.options,
+        custom: field.custom,
+        minLength: field.minLength,
+        maxLength: field.maxLength,
+        pattern: field.pattern,
+      };
+    case "number":
+    case "integer":
+      return {
+        ...base,
+        type: "number",
+        integer: field.type === "integer",
+        default: finite(field.default),
+        minimum: finite(field.minimum),
+        maximum: finite(field.maximum),
+      };
+    case "boolean":
+      return {
+        ...base,
+        type: "boolean",
+        default: typeof field.default === "boolean" ? field.default : undefined,
+      };
+    case "multiselect":
+      return {
+        ...base,
+        type: "multiselect",
+        options: field.options ?? [],
+        custom: field.custom,
+        default: Array.isArray(field.default) ? field.default : undefined,
+        minItems: field.minItems,
+        maxItems: field.maxItems,
+      };
+    case "external":
+      return { ...base, required: false, type: "link", url: field.url ?? "" };
+  }
+}
+
+export function toChatForm(form: WireForm): ChatForm {
+  return { id: form.id, title: form.title, fields: form.fields.map(toFormField) };
+}
 
 /** Structural subset of the client's V2Event union the normalizer consumes. */
 export interface V2EventShape {
@@ -29,6 +128,7 @@ export interface V2EventShape {
       status?: number;
       data?: { message?: string; [key: string]: unknown } | null;
     } | null;
+    form?: WireForm & { sessionID: string };
     [key: string]: unknown;
   };
 }
@@ -107,6 +207,15 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         // evidence that the live subscription should be retried indefinitely.
         retryable: false,
       };
+    }
+    case "form.created":
+      return event.data.form ? { type: "form", form: toChatForm(event.data.form) } : null;
+    // Answered or dismissed by any client, or dropped by the server when the
+    // run moved on without it.
+    case "form.replied":
+    case "form.cancelled": {
+      const formId = event.data.id;
+      return typeof formId === "string" ? { type: "form-closed", formId } : null;
     }
     default:
       return null; // everything the chat UI must not see

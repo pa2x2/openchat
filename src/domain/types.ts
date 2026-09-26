@@ -73,6 +73,79 @@ export interface TokenUsage {
   cacheWrite?: number;
 }
 
+export type FormValue = string | number | boolean | string[];
+
+export type FormAnswer = Record<string, FormValue>;
+
+export interface FormOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+/** Shows a field only while another field's answer matches. */
+export interface FormCondition {
+  key: string;
+  op: "eq" | "neq";
+  value: string | number | boolean;
+}
+
+interface FormFieldBase {
+  key: string;
+  title?: string;
+  description?: string;
+  required: boolean;
+  /** Never shown; its default is still sent with the answer. */
+  hidden?: boolean;
+  /** All must hold for the field to be shown and answered. */
+  when?: FormCondition[];
+}
+
+/**
+ * One question on a form. A text field with `options` is a single choice;
+ * `custom` also lets the user type an answer of their own.
+ */
+export type FormField =
+  | (FormFieldBase & {
+      type: "text";
+      default?: string;
+      placeholder?: string;
+      options?: FormOption[];
+      custom?: boolean;
+      minLength?: number;
+      maxLength?: number;
+      /** A regular expression the whole answer must match. */
+      pattern?: string;
+    })
+  | (FormFieldBase & {
+      type: "number";
+      integer: boolean;
+      default?: number;
+      minimum?: number;
+      maximum?: number;
+    })
+  | (FormFieldBase & { type: "boolean"; default?: boolean })
+  | (FormFieldBase & {
+      type: "multiselect";
+      options: FormOption[];
+      custom?: boolean;
+      default?: string[];
+      minItems?: number;
+      maxItems?: number;
+    })
+  /** Not an answer: a page the user opens, such as a sign-in. */
+  | (FormFieldBase & { type: "link"; url: string });
+
+/**
+ * A question the backend asks in the middle of a run and waits on. The run
+ * stalls until the user answers or dismisses it, or the backend gives up.
+ */
+export interface ChatForm {
+  id: string;
+  title: string;
+  fields: FormField[];
+}
+
 /**
  * Normalized stream events — the only events the chat UI ever sees.
  * Backend-specific event types (tools, permissions, compaction, …) are
@@ -83,6 +156,9 @@ export type StreamEvent =
   | { type: "reasoning-delta"; text: string }
   | { type: "message-complete"; usage?: TokenUsage }
   | { type: "chat-idle" }
+  | { type: "form"; form: ChatForm }
+  /** The form was answered, dismissed or dropped, here or elsewhere. */
+  | { type: "form-closed"; formId: string }
   | { type: "error"; message: string; retryable: boolean };
 
 export type MessageRole = "user" | "assistant";

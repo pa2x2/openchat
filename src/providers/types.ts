@@ -8,8 +8,10 @@
 
 import type {
   Capabilities,
+  ChatForm,
   ChatId,
   ChatSummary,
+  FormAnswer,
   Message,
   ModelInfo,
   ModelRef,
@@ -94,6 +96,18 @@ export interface ChatProvider {
    * discard older turns.
    */
   discardRegenerate?(chatId: ChatId): Promise<void>;
+
+  /**
+   * Settle a form the backend raised with a `form` event. Only backends that
+   * emit forms implement these.
+   */
+  answerForm?(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void>;
+  dismissForm?(chatId: ChatId, formId: string): Promise<void>;
+  /**
+   * Forms still waiting on an answer. The event stream is live-only, so a
+   * form raised while nothing was subscribed only shows up here.
+   */
+  pendingForms?(chatId: ChatId): Promise<ChatForm[]>;
 
   /** Normalized event stream for one chat. Pass a signal to stop it. */
   events(chatId: ChatId, signal?: AbortSignal): AsyncIterable<StreamEvent>;

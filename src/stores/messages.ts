@@ -8,7 +8,7 @@
  * live updates.
  */
 
-import type { ChatId, Message } from "@/src/domain";
+import type { ChatForm, ChatId, Message } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
@@ -27,6 +27,8 @@ interface MessagesStoreState {
   activeTurns: Record<ChatId, boolean>;
   /** Last failed turn per chat, as a user-facing message (runtime only). */
   turnErrors: Record<ChatId, string | null>;
+  /** Forms the backend is waiting on, oldest first (runtime only). */
+  forms: Record<ChatId, ChatForm[]>;
   /** Replaces the whole transcript of a chat (reconcile / cold open). */
   setMessages: (chatId: ChatId, messages: Message[]) => void;
   appendMessage: (chatId: ChatId, message: Message) => void;
@@ -37,6 +39,9 @@ interface MessagesStoreState {
   setTurnActive: (chatId: ChatId, active: boolean) => void;
   setTurnError: (chatId: ChatId, error: string | null) => void;
   fetchMessages: (chatId: ChatId) => Promise<void>;
+  setForms: (chatId: ChatId, forms: ChatForm[]) => void;
+  addForm: (chatId: ChatId, form: ChatForm) => void;
+  removeForm: (chatId: ChatId, formId: string) => void;
 }
 
 function sortMessages(messages: Message[]): Message[] {
@@ -96,6 +101,24 @@ export function createMessagesStore(
         loading: {},
         activeTurns: {},
         turnErrors: {},
+        forms: {},
+        setForms: (chatId, forms) =>
+          set((state) => ({ forms: { ...state.forms, [chatId]: forms } })),
+        // The same form can arrive live and from a pending-forms sync.
+        addForm: (chatId, form) =>
+          set((state) => {
+            const existing = state.forms[chatId] ?? [];
+            if (existing.some((candidate) => candidate.id === form.id)) return state;
+            return { forms: { ...state.forms, [chatId]: [...existing, form] } };
+          }),
+        removeForm: (chatId, formId) =>
+          set((state) => {
+            const existing = state.forms[chatId];
+            if (!existing?.some((form) => form.id === formId)) return state;
+            return {
+              forms: { ...state.forms, [chatId]: existing.filter((form) => form.id !== formId) },
+            };
+          }),
         setTurnActive: (chatId, active) =>
           set((state) => ({ activeTurns: { ...state.activeTurns, [chatId]: active } })),
         setTurnError: (chatId, error) =>

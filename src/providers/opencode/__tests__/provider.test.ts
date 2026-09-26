@@ -77,4 +77,49 @@ describe("OpenCodeProvider.events", () => {
       { type: "error", message: "Could not reach the server.", retryable: true },
     ]);
   });
+
+  // Forms carry their session inside the form, so a filter on
+  // `data.sessionID` alone drops them and the run waits on a form nobody sees.
+  it("routes forms to their chat and closes them when answered anywhere", async () => {
+    const created = (id: string, sessionID: string) => ({
+      type: "form.created",
+      data: {
+        form: {
+          id,
+          sessionID,
+          title: "Web Search",
+          fields: [
+            { key: "choice", type: "string", required: true, options: [] },
+            { key: "count", type: "integer", minimum: 1, maximum: "Infinity" },
+          ],
+        },
+      },
+    });
+    const events = await collectEvents(async function* () {
+      yield created("frm_a", "ses_a");
+      yield created("frm_other", "ses_other");
+      yield { type: "form.replied", data: { id: "frm_a", sessionID: "ses_a", answer: {} } };
+    });
+    expect(events).toEqual([
+      {
+        type: "form",
+        form: {
+          id: "frm_a",
+          title: "Web Search",
+          fields: [
+            expect.objectContaining({ key: "choice", type: "text", required: true }),
+            expect.objectContaining({
+              key: "count",
+              type: "number",
+              integer: true,
+              required: false,
+              minimum: 1,
+              maximum: undefined,
+            }),
+          ],
+        },
+      },
+      { type: "form-closed", formId: "frm_a" },
+    ]);
+  });
 });

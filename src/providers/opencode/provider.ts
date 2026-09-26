@@ -4,9 +4,11 @@
  */
 
 import type {
+  ChatForm,
   ChatId,
   ChatSummary,
   Capabilities,
+  FormAnswer,
   Message,
   ModelInfo,
   ModelRef,
@@ -21,6 +23,7 @@ import {
   type OpenCodeClient,
 } from "./client";
 import { chatEvents } from "./events";
+import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
@@ -104,6 +107,18 @@ export class OpenCodeProvider implements ChatProvider {
 
   interrupt(chatId: ChatId): Promise<void> {
     return interrupt(this.client(), chatId);
+  }
+
+  answerForm(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void> {
+    return answerForm(this.client(), chatId, formId, answer);
+  }
+
+  dismissForm(chatId: ChatId, formId: string): Promise<void> {
+    return dismissForm(this.client(), chatId, formId);
+  }
+
+  pendingForms(chatId: ChatId): Promise<ChatForm[]> {
+    return pendingForms(this.client(), chatId);
   }
 
   events(chatId: ChatId, signal?: AbortSignal): AsyncIterable<StreamEvent> {

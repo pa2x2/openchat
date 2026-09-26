@@ -22,7 +22,14 @@
  * responsive even when a provider iterator ignores its abort signal.
  */
 
-import type { Attachment, ChatId, Message, StreamEvent, UserMessage } from "@/src/domain";
+import type {
+  Attachment,
+  ChatId,
+  FormAnswer,
+  Message,
+  StreamEvent,
+  UserMessage,
+} from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
 import type { ChatProvider } from "@/src/providers/types";
@@ -83,6 +90,9 @@ function settleTurn(turn: LiveTurn): void {
   if (turn.finished) return;
   flushDraft(turn);
   turn.finished = true;
+  // A form belongs to its run: once the run is over there is nothing left to
+  // answer, and no subscription to hear the backend drop it.
+  if (!liveTurns.has(turn.chatId)) useMessagesStore.getState().setForms(turn.chatId, []);
   turn.resolveCompletion();
 }
 
@@ -435,11 +445,20 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
       let iterator: AsyncIterator<StreamEvent> | undefined;
       try {
         iterator = provider.events(chatId, subscription.signal)[Symbol.asyncIterator]();
+        void syncForms(provider, chatId);
         while (!turn.finished) {
           const next = await nextEvent(iterator, subscription.signal);
           if (next.done) break;
           const event = next.value;
           lastActivity = Date.now();
+          if (event.type === "form") {
+            useMessagesStore.getState().addForm(chatId, event.form);
+            continue;
+          }
+          if (event.type === "form-closed") {
+            useMessagesStore.getState().removeForm(chatId, event.formId);
+            continue;
+          }
           applyEvent(turn, event);
           if (isRetryableError(event)) {
             streamDied = true;
@@ -510,6 +529,49 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
       { once: true },
     );
   });
+}
+
+/**
+ * Replaces the chat's forms with the backend's list. The event stream is
+ * live-only, so this is how forms raised or closed during a gap catch up.
+ */
+export async function syncForms(provider: ChatProvider, chatId: ChatId): Promise<void> {
+  if (!provider.pendingForms) return;
+  try {
+    const forms = await provider.pendingForms(chatId);
+    // Forms are cleared when the turn ends; a late reply must not bring them back.
+    if (liveTurns.has(chatId)) useMessagesStore.getState().setForms(chatId, forms);
+  } catch {
+    // The forms on screen stay; the next resubscribe syncs again.
+  }
+}
+
+/**
+ * Settles a form from the card. On failure the form list is re-synced: the
+ * usual cause is a form the backend already closed, which then disappears.
+ */
+async function settleForm(
+  chatId: ChatId,
+  formId: string,
+  settle: (provider: ChatProvider) => Promise<void> | undefined,
+): Promise<void> {
+  const provider = await getProvider();
+  if (!provider) throw new Error("Not connected. Open Settings to connect.");
+  try {
+    await settle(provider);
+  } catch (error) {
+    void syncForms(provider, chatId);
+    throw error;
+  }
+  useMessagesStore.getState().removeForm(chatId, formId);
+}
+
+export function answerForm(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void> {
+  return settleForm(chatId, formId, (provider) => provider.answerForm?.(chatId, formId, answer));
+}
+
+export function dismissForm(chatId: ChatId, formId: string): Promise<void> {
+  return settleForm(chatId, formId, (provider) => provider.dismissForm?.(chatId, formId));
 }
 
 function applyEvent(turn: LiveTurn, event: StreamEvent): void {

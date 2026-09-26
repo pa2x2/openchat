@@ -14,6 +14,7 @@ export interface InputProps {
   multiline?: boolean;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   autoCorrect?: boolean;
+  keyboardType?: "default" | "numeric" | "url";
   className?: string;
   testID?: string;
 }
@@ -29,6 +30,7 @@ export function Input({
   multiline,
   autoCapitalize,
   autoCorrect,
+  keyboardType,
   className,
   testID,
 }: InputProps) {
@@ -47,6 +49,7 @@ export function Input({
         multiline={multiline}
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
+        keyboardType={keyboardType}
         accessibilityLabel={label ?? placeholder}
         className={cn(
           "w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-text",

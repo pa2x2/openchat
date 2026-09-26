@@ -8,13 +8,16 @@ import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
 import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
+import { FormCard } from "./FormCard";
 import { Transcript } from "./Transcript";
 import { discardTemporaryChat } from "./temporaryChats";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import {
+  answerForm,
   discardPendingRegenerate,
+  dismissForm,
   interruptTurn,
   isTurnLive,
   regenerateReply,
@@ -60,6 +63,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const empty = useMessagesStore((state) => (state.byChat[chatId]?.length ?? 0) === 0);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
+  // One at a time, oldest first: a run waits on its forms in order.
+  const form = useMessagesStore((state) => state.forms[chatId]?.[0] ?? null);
 
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -287,6 +292,14 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           className="mb-2 px-3 pt-1"
           style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}
         >
+          {form ? (
+            <FormCard
+              key={form.id}
+              form={form}
+              onSubmit={(answer) => answerForm(chatId, form.id, answer)}
+              onDismiss={() => dismissForm(chatId, form.id)}
+            />
+          ) : null}
           {turnError ? (
             <Text className="px-2 pb-2 text-sm text-danger" testID="turn-error">
               {turnError}
