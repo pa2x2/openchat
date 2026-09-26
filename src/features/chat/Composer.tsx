@@ -1,6 +1,7 @@
 /**
- * Message composer: a floating pill with attach, the text input, and a round
- * send button — which becomes stop while a reply is streaming. Stop renders
+ * Message composer: a floating card with the text input on top and a toolbar
+ * below — attach and the reasoning chip on the left, a round send button on
+ * the right, which becomes stop while a reply is streaming. Stop renders
  * only when the caller passes `onStop` (gated by the provider's interrupt
  * capability at the call site), and the attach button only when the caller
  * passes `onAttach` (gated by the provider's attachments capability). The
@@ -60,7 +61,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   }
 
   const sendDisabled = text.trim().length === 0 && attachments.length === 0;
-  // Like attach, the chip steps aside while a reply streams.
+  // Attach and the chip step aside while a reply streams.
   const showAttach = Boolean(onAttach) && !streaming;
   const showReasoning = Boolean(reasoning) && !streaming;
 
@@ -73,13 +74,25 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           testID="composer-attachments"
         />
       ) : null}
-      <View className="flex-row items-end">
+      <TextInput
+        ref={input}
+        autoFocus={autoFocus}
+        value={text}
+        onChangeText={setText}
+        placeholder="Ask anything"
+        placeholderTextColor={colors.textFaint}
+        multiline
+        accessibilityLabel="Message"
+        className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"
+        testID="composer-input"
+      />
+      <View className="flex-row items-center gap-1">
         {showAttach ? (
           <Pressable
             accessibilityHint="Attaches a photo or a file to your message"
             accessibilityLabel="Add attachment"
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-raised"
+            className="h-10 w-10 items-center justify-center rounded-full active:bg-raised"
             onPress={onAttach}
             testID="composer-attach"
           >
@@ -87,45 +100,32 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           </Pressable>
         ) : null}
         {showReasoning && reasoning ? (
-          <View className={cn("h-11 justify-center", !showAttach && "pl-1.5")}>
-            <Pressable
-              accessibilityHint="Chooses how much the model thinks before answering"
-              accessibilityLabel={`Reasoning: ${reasoning.label}`}
-              accessibilityRole="button"
-              className="h-8 flex-row items-center gap-1 rounded-full bg-raised pl-2 pr-1.5 active:bg-raised-hover"
-              onPress={reasoning.onPress}
-              testID="composer-reasoning"
-            >
-              <Icon name="lightbulb-outline" size={17} tone="textMuted" />
-              <Text className="text-[14px] font-medium text-text" numberOfLines={1}>
-                {reasoning.label}
-              </Text>
-              <Icon name="chevron-down" size={16} tone="textMuted" />
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityHint="Chooses how much the model thinks before answering"
+            accessibilityLabel={`Reasoning: ${reasoning.label}`}
+            accessibilityRole="button"
+            className={cn(
+              "h-9 flex-row items-center gap-1 rounded-full pl-2 pr-1.5 active:bg-raised",
+              !showAttach && "ml-1",
+            )}
+            onPress={reasoning.onPress}
+            testID="composer-reasoning"
+          >
+            <Icon name="lightbulb-outline" size={18} tone="textMuted" />
+            <Text className="text-[15px] font-medium text-text-muted" numberOfLines={1}>
+              {reasoning.label}
+            </Text>
+            <Icon name="chevron-down" size={16} tone="textMuted" />
+          </Pressable>
         ) : null}
-        <TextInput
-          ref={input}
-          autoFocus={autoFocus}
-          value={text}
-          onChangeText={setText}
-          placeholder="Ask anything"
-          placeholderTextColor={colors.textFaint}
-          multiline
-          accessibilityLabel="Message"
-          className={cn(
-            "max-h-36 min-h-11 flex-1 py-2.5 text-base leading-[22px] text-text",
-            showReasoning ? "px-2" : showAttach ? "px-1" : "px-3",
-          )}
-          testID="composer-input"
-        />
+        <View className="flex-1" />
         {streaming ? (
           <Pressable
             accessibilityHint="Stops the current response"
             accessibilityLabel="Stop generating"
             accessibilityRole="button"
             accessibilityState={{ busy: true }}
-            className="m-0.5 h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
+            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
             onPress={onStop}
             testID="composer-stop"
           >
@@ -138,7 +138,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             accessibilityRole="button"
             accessibilityState={{ disabled: sendDisabled }}
             className={cn(
-              "m-0.5 h-10 w-10 items-center justify-center rounded-full",
+              "h-10 w-10 items-center justify-center rounded-full",
               sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
             )}
             disabled={sendDisabled}
