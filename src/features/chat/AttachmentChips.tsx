@@ -6,9 +6,11 @@
  * outgrow the width).
  */
 
-import { Image, Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 // RNGH's ScrollView, so a sideways swipe scrolls the chips instead of opening the sidebar.
 import { ScrollView } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Attachment } from "@/src/domain";
 import { attachmentUri, formatBytes, isImageAttachment } from "@/src/lib/attachments";
 import { cn } from "@/src/lib/cn";
@@ -92,17 +94,24 @@ export function AttachmentChip({
   const side = size === "large" ? 150 : 64;
   // Small chips sit inside the composer (elevated chrome), large ones on the page.
   const tile = size === "large" ? "bg-surface" : "bg-raised";
+  const [viewing, setViewing] = useState(false);
 
   return (
     <View testID={`attachment-chip-${attachment.name}`}>
       {preview ? (
-        <Image
-          accessibilityLabel={attachment.name}
-          source={{ uri: source }}
-          style={{ width: side, height: side }}
-          className={cn(tile, size === "large" ? "rounded-[18px]" : "rounded-[14px]")}
-          testID={`attachment-image-${attachment.name}`}
-        />
+        <Pressable
+          accessibilityLabel={`View ${attachment.name}`}
+          accessibilityRole="imagebutton"
+          onPress={() => setViewing(true)}
+        >
+          <Image
+            accessibilityLabel={attachment.name}
+            source={{ uri: source }}
+            style={{ width: side, height: side }}
+            className={cn(tile, size === "large" ? "rounded-[18px]" : "rounded-[14px]")}
+            testID={`attachment-image-${attachment.name}`}
+          />
+        </Pressable>
       ) : (
         <View
           className={cn(
@@ -140,6 +149,44 @@ export function AttachmentChip({
           <Icon name="close" size={14} tone="background" />
         </Pressable>
       ) : null}
+      {viewing ? (
+        <ImageViewer name={attachment.name} uri={source} onClose={() => setViewing(false)} />
+      ) : null}
     </View>
+  );
+}
+
+/** Full-screen view of an image attachment; a tap anywhere or back closes it. */
+function ImageViewer({ name, uri, onClose }: { name: string; uri: string; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      navigationBarTranslucent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        accessibilityLabel="Close image"
+        className="flex-1 bg-black"
+        onPress={onClose}
+        testID="attachment-viewer"
+      >
+        <Image
+          accessibilityLabel={name}
+          source={{ uri }}
+          resizeMode="contain"
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          className="absolute right-3 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+          style={{ top: insets.top + 8 }}
+        >
+          <Icon name="close" size={22} color="#fff" />
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
