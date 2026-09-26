@@ -1,6 +1,6 @@
-import { Alert } from "react-native";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
+import { useDialogStore } from "@/src/ui/Dialog";
 import { deleteChat } from "../ChatDrawer";
 
 jest.mock("@/src/lib/providerFactory", () => ({
@@ -13,7 +13,7 @@ const chat = { id: "c1", title: "Plans", updatedAt: 1 };
 
 beforeEach(() => {
   useChatsStore.setState({ chats: [chat] });
-  jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  useDialogStore.setState({ current: null });
 });
 
 afterEach(() => {
@@ -31,7 +31,10 @@ describe("deleteChat", () => {
 
     expect(useChatsStore.getState().chats).toEqual([chat]);
     expect(onDeleted).not.toHaveBeenCalled();
-    expect(Alert.alert).toHaveBeenCalledWith("Could not delete chat", "Server unavailable");
+    expect(useDialogStore.getState().current).toEqual({
+      title: "Could not delete chat",
+      message: "Server unavailable",
+    });
   });
 
   it("removes the chat once the server has deleted it", async () => {

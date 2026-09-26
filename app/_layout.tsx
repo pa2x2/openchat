@@ -9,6 +9,7 @@ import { colorScheme } from "nativewind";
 import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
 import { useUpdateChecks } from "@/src/features/updates/useUpdateChecks";
 import { useSettingsStore } from "@/src/stores/settings";
+import { DialogHost } from "@/src/ui/Dialog";
 import { useSystemPalettesSync } from "@/src/ui/systemPalettes";
 import { useAppTheme } from "@/src/ui/theme";
 
@@ -46,6 +47,7 @@ export default function RootLayout() {
           {/* Here rather than in a screen, so a launch check can offer an
               update over whichever screen is open. */}
           <UpdateSheet />
+          <DialogHost />
         </View>
       </ThemeProvider>
     </GestureHandlerRootView>

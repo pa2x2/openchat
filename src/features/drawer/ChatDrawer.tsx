@@ -5,7 +5,7 @@
  */
 
 import { memo, useCallback, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
@@ -13,6 +13,7 @@ import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory"
 import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
+import { showDialog } from "@/src/ui/Dialog";
 import { Icon } from "@/src/ui/Icon";
 import { useAppTheme } from "@/src/ui/theme";
 
@@ -27,14 +28,14 @@ export interface ChatDrawerProps {
 
 /** Removes a chat on the server and locally, after asking. */
 export function confirmDeleteChat(chat: Pick<ChatSummary, "id" | "title">, onDeleted?: () => void) {
-  Alert.alert("Delete chat?", `This will delete “${chat.title || "this chat"}”.`, [
-    { text: "Cancel", style: "cancel" },
-    {
-      text: "Delete",
-      style: "destructive",
-      onPress: () => void deleteChat(chat.id, onDeleted),
-    },
-  ]);
+  showDialog({
+    title: "Delete chat?",
+    message: `This will delete “${chat.title || "this chat"}”.`,
+    actions: [
+      { label: "Cancel", style: "cancel" },
+      { label: "Delete", style: "destructive", onPress: () => void deleteChat(chat.id, onDeleted) },
+    ],
+  });
 }
 
 /**
@@ -47,10 +48,10 @@ export async function deleteChat(id: ChatId, onDeleted?: () => void): Promise<vo
     if (!provider) throw new Error("Not connected. Open Settings to connect to a server.");
     await provider.deleteChat(id);
   } catch (error) {
-    Alert.alert(
-      "Could not delete chat",
-      error instanceof Error && error.message ? error.message : "Try again later.",
-    );
+    showDialog({
+      title: "Could not delete chat",
+      message: error instanceof Error && error.message ? error.message : "Try again later.",
+    });
     return;
   }
   useChatsStore.getState().remove(id);
