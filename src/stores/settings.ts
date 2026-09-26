@@ -3,7 +3,7 @@
  *
  * Holds the default model per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
- * appearance preference, and the update channel.
+ * appearance and colour preferences, and the update channel.
  */
 
 import Constants from "expo-constants";
@@ -15,6 +15,9 @@ import { mmkvStorage } from "./storage";
 
 /** Colour scheme preference; "system" follows the device setting. */
 export type Appearance = "system" | "light" | "dark";
+
+/** Where the palette comes from; "dynamic" is Material You (Android 12+). */
+export type ColorSource = "default" | "dynamic";
 
 /** Which releases the in-app updater offers; "prerelease" also gets stable ones. */
 export type UpdateChannel = "stable" | "prerelease";
@@ -31,6 +34,8 @@ interface SettingsStoreState {
   clearDefaultModel: (providerId: ProviderId) => void;
   appearance: Appearance;
   setAppearance: (appearance: Appearance) => void;
+  colorSource: ColorSource;
+  setColorSource: (colorSource: ColorSource) => void;
   updateChannel: UpdateChannel;
   setUpdateChannel: (channel: UpdateChannel) => void;
 }
@@ -45,6 +50,8 @@ export function createSettingsStore(
         defaultModels: {},
         appearance: "system",
         setAppearance: (appearance) => set({ appearance }),
+        colorSource: "default",
+        setColorSource: (colorSource) => set({ colorSource }),
         updateChannel: defaultUpdateChannel(appVersion),
         setUpdateChannel: (updateChannel) => set({ updateChannel }),
         setDefaultModel: (providerId, model) =>

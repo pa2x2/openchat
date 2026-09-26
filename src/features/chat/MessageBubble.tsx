@@ -115,4 +115,3 @@ export const MessageBubble = memo(function MessageBubble({
     </Bubble>
   );
 });
-

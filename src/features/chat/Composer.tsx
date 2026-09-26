@@ -23,8 +23,6 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
-  /** Reports whether the field has text. */
-  onDraftChange?: (hasText: boolean) => void;
   /** Focuses the field on mount. */
   autoFocus?: boolean;
 }
@@ -35,7 +33,7 @@ export interface ComposerHandle {
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, onDraftChange, autoFocus },
+  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, autoFocus },
   ref,
 ) {
   const [text, setText] = useState("");
@@ -43,14 +41,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const streaming = Boolean(onStop);
   const { colors, floatingShadow } = useAppTheme();
 
-  function updateText(next: string) {
-    setText(next);
-    onDraftChange?.(next.length > 0);
-  }
-
   useImperativeHandle(ref, () => ({
     insert: (next) => {
-      updateText(next);
+      setText(next);
       input.current?.focus();
     },
   }));
@@ -58,7 +51,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   async function handleSend() {
     const trimmed = text.trim();
     if ((!trimmed && attachments.length === 0) || streaming) return;
-    updateText("");
+    setText("");
     await onSend(trimmed, attachments);
   }
 
@@ -90,7 +83,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           ref={input}
           autoFocus={autoFocus}
           value={text}
-          onChangeText={updateText}
+          onChangeText={setText}
           placeholder="Ask anything"
           placeholderTextColor={colors.textFaint}
           multiline

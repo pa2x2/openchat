@@ -9,12 +9,14 @@ import { colorScheme } from "nativewind";
 import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
 import { useUpdateChecks } from "@/src/features/updates/useUpdateChecks";
 import { useSettingsStore } from "@/src/stores/settings";
+import { useSystemPalettesSync } from "@/src/ui/systemPalettes";
 import { useAppTheme } from "@/src/ui/theme";
 
 export default function RootLayout() {
   const { scheme, vars, navigationTheme } = useAppTheme();
   const appearance = useSettingsStore((state) => state.appearance);
   useUpdateChecks();
+  useSystemPalettesSync();
 
   // The saved preference drives the scheme; "system" follows the device.
   useEffect(() => {

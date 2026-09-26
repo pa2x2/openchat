@@ -64,7 +64,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const list = useRef<FlatList<Message>>(null);
   const composer = useRef<ComposerHandle>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
   const keyboardOpen = useKeyboardOpen();
   // A screen that mounts under an open keyboard (the draft becoming a chat on
   // first send, "new chat" from the header) takes over the typing.
@@ -348,7 +347,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
-            onDraftChange={setHasDraft}
           />
         </View>
 

@@ -40,12 +40,7 @@ export interface ConnectionInfo {
  * unauthorized (the server refused access), server-error (5xx), unknown.
  */
 export type ConnectionErrorCode =
-  | "invalid-url"
-  | "unreachable"
-  | "timeout"
-  | "unauthorized"
-  | "server-error"
-  | "unknown";
+  "invalid-url" | "unreachable" | "timeout" | "unauthorized" | "server-error" | "unknown";
 
 export class ConnectionError extends Error {
   readonly code: ConnectionErrorCode;

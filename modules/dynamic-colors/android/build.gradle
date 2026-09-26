@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.pa2x2.openchat'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.dynamiccolors"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

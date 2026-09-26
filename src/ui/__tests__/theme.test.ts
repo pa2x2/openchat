@@ -8,27 +8,15 @@ import {
   themeForScheme,
   type PaletteKey,
 } from "../theme";
+import { resolveDynamicPalette } from "../dynamicPalette";
+import { bluePalettes, vibrantOrangePalettes } from "./fixtures/systemPalettes";
+import { contrast } from "./helpers/contrast";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tailwindConfig = require("../../../tailwind.config.js");
 
 /** Every colour the navigation theme may pass to a React Navigation option. */
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-
-/** WCAG contrast ratio between two hex colours. */
-function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
-    const [r, g, b] = hexToTriplet(hex)
-      .split(" ")
-      .map((channel) => {
-        const c = Number(channel) / 255;
-        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-      });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 describe("theme", () => {
   it("defines every CSS variable tailwind.config.js reads", () => {
@@ -55,10 +43,12 @@ describe("theme", () => {
   it("only passes plain colour strings to the navigation theme", () => {
     // expo-router cannot carry ColorValue objects through the navigation
     // theme, so a PlatformColor or a var() here would render as nothing.
-    for (const scheme of ["light", "dark"] as const) {
-      const { colors } = themeForScheme(scheme).navigationTheme;
-      for (const value of Object.values(colors)) {
-        expect(String(value)).toMatch(HEX);
+    for (const system of [null, bluePalettes, vibrantOrangePalettes]) {
+      for (const scheme of ["light", "dark"] as const) {
+        const { colors } = themeForScheme(scheme, system).navigationTheme;
+        for (const value of Object.values(colors)) {
+          expect(String(value)).toMatch(HEX);
+        }
       }
     }
   });
@@ -79,16 +69,22 @@ describe("theme", () => {
       ["border", "raised"],
       ["border", "elevated"],
     ];
-    for (const scheme of ["light", "dark"] as const) {
-      const colors = resolvePalette(scheme);
-      for (const [top, bottom] of stacks) {
-        const ratio = contrast(colors[top], colors[bottom]);
-        expect({ scheme, top, bottom, ok: ratio >= 1.07 }).toEqual({
-          scheme,
-          top,
-          bottom,
-          ok: true,
-        });
+    // Material You palettes too: their surfaces come from a tone table in
+    // dynamicPalette.ts, and two tones a step apart can be just as invisible.
+    const sources = { static: null, blue: bluePalettes, vibrantOrange: vibrantOrangePalettes };
+    for (const [source, system] of Object.entries(sources)) {
+      for (const scheme of ["light", "dark"] as const) {
+        const colors = system ? resolveDynamicPalette(system, scheme) : resolvePalette(scheme);
+        for (const [top, bottom] of stacks) {
+          const ratio = contrast(colors[top], colors[bottom]);
+          expect({ source, scheme, top, bottom, ok: ratio >= 1.07 }).toEqual({
+            source,
+            scheme,
+            top,
+            bottom,
+            ok: true,
+          });
+        }
       }
     }
   });

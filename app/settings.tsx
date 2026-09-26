@@ -1,5 +1,4 @@
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,17 +8,28 @@ import { updatesSupported } from "@/src/features/updates/installer";
 import { formatTimestamp } from "@/src/lib/time";
 import { useProviderCapabilities } from "@/src/lib/providerFactory";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
-import { useSettingsStore, type Appearance, type UpdateChannel } from "@/src/stores/settings";
+import {
+  useSettingsStore,
+  type Appearance,
+  type ColorSource,
+  type UpdateChannel,
+} from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useUpdatesStore, type UpdateStatus } from "@/src/stores/updates";
 import { Group, GroupLabel, Row } from "@/src/ui/ListGroup";
 import { Segmented } from "@/src/ui/Segmented";
+import { dynamicColorsSupported } from "@/src/ui/systemPalettes";
 import type { ModelInfo } from "@/src/domain";
 
 const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
+];
+
+const COLOR_SOURCES: { value: ColorSource; label: string }[] = [
+  { value: "default", label: "Default" },
+  { value: "dynamic", label: "Dynamic" },
 ];
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
@@ -103,11 +113,10 @@ function UpdatesSection() {
 }
 
 /**
- * Settings screen: the server connection, chat defaults, appearance,
- * updates, and app info, as grouped lists.
+ * Settings screen: the server connection, chat defaults, appearance and
+ * colours, updates, and app info, as grouped lists.
  */
 export default function SettingsScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const capabilities = useProviderCapabilities();
   const providerId = useConnectionStore((state) => state.profile?.providerId);
@@ -117,6 +126,8 @@ export default function SettingsScreen() {
   const setDefaultModel = useSettingsStore((state) => state.setDefaultModel);
   const appearance = useSettingsStore((state) => state.appearance);
   const setAppearance = useSettingsStore((state) => state.setAppearance);
+  const colorSource = useSettingsStore((state) => state.colorSource);
+  const setColorSource = useSettingsStore((state) => state.setColorSource);
   const defaultLabel = useModelsStore((state) =>
     defaultModel
       ? (state.models.find((model) => sameModelRef(model.ref, defaultModel))?.label ?? null)
@@ -164,6 +175,19 @@ export default function SettingsScreen() {
           onChange={setAppearance}
           testIDPrefix="appearance"
         />
+
+        {/* Material You needs Android 12+; elsewhere there is only one choice. */}
+        {dynamicColorsSupported ? (
+          <>
+            <GroupLabel>Colors</GroupLabel>
+            <Segmented
+              options={COLOR_SOURCES}
+              value={colorSource}
+              onChange={setColorSource}
+              testIDPrefix="colors"
+            />
+          </>
+        ) : null}
 
         {updatesSupported ? <UpdatesSection /> : null}
 
