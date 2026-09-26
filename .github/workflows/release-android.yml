@@ -12,6 +12,9 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  HUSKY: "0"
+
 jobs:
   release:
     runs-on: ubuntu-24.04

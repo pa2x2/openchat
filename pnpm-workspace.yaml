@@ -1,4 +1,5 @@
 allowBuilds:
+  husky: true
   msgpackr-extract: true
   unrs-resolver: true
 minimumReleaseAgeExclude:

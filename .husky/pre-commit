@@ -1,0 +1,30 @@
+# Format staged files so `pnpm format:check` can't fail on a pushed commit.
+cd "$(git rev-parse --show-toplevel)" # pathspecs below are root-relative
+
+staged=$(mktemp)
+patterns=$(mktemp)
+partial=$(mktemp)
+trap 'rm -f "$staged" "$patterns" "$partial"' EXIT
+
+# Skip deletions; there is nothing left to format.
+git diff --cached --name-only --diff-filter=ACMR -z >"$staged"
+
+# With no paths, prettier would read stdin, and husky gives it none.
+[ -s "$staged" ] || exit 0
+
+# Prettier rewrites whole files, so re-staging a file that also has unstaged
+# edits would fold those edits into the commit. Going through tr and plain grep
+# keeps this POSIX; a filename containing a newline can only cause a missed
+# match here, never a wrong re-stage.
+tr '\0' '\n' <"$staged" >"$patterns"
+git diff --name-only -z | tr '\0' '\n' | grep -F -x -f "$patterns" >"$partial" || true
+if [ -s "$partial" ]; then
+  echo "Unstaged changes would be committed along with the formatting:" >&2
+  cat "$partial" >&2
+  echo "Stage them fully (git add <file>) or stash the edits, then commit again." >&2
+  exit 1
+fi
+
+# --ignore-unknown drops the paths prettier has no parser for (PNGs, .jks, ...).
+xargs -0 pnpm exec prettier --write --ignore-unknown <"$staged"
+git add -u --pathspec-from-file="$staged" --pathspec-file-nul

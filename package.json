@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest",
-    "icons": "sh scripts/generate-icons.sh"
+    "icons": "sh scripts/generate-icons.sh",
+    "prepare": "husky"
   },
   "dependencies": {
     "@opencode/client": "2.0.16",
@@ -63,6 +64,7 @@
     "babel-preset-expo": "~57.0.12",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "husky": "9.1.7",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "react-test-renderer": "19.2.3",

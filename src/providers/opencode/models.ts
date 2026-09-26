@@ -37,11 +37,9 @@ export async function listModels(client: OpenCodeClient): Promise<ModelInfo[]> {
       ref: { provider: model.providerID, id: model.id },
       label: model.name,
       contextWindow: model.limit?.context,
-      variants: (model.variants ?? []).map(
-        (variant): ModelVariant => ({
-          id: variant.id,
-          label: variantLabel(variant.id),
-        }),
-      ),
+      variants: (model.variants ?? []).map((variant): ModelVariant => ({
+        id: variant.id,
+        label: variantLabel(variant.id),
+      })),
     }));
 }
