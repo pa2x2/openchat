@@ -4,10 +4,10 @@
  * server at the bottom, which leads to Settings.
  */
 
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ChatSummary } from "@/src/domain";
+import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
@@ -32,21 +32,30 @@ export function confirmDeleteChat(chat: Pick<ChatSummary, "id" | "title">, onDel
     {
       text: "Delete",
       style: "destructive",
-      onPress: () => {
-        void (async () => {
-          const provider = await getProvider();
-          if (!provider) return;
-          try {
-            await provider.deleteChat(chat.id);
-          } finally {
-            useChatsStore.getState().remove(chat.id);
-            useMessagesStore.getState().removeChat(chat.id);
-            onDeleted?.();
-          }
-        })();
-      },
+      onPress: () => void deleteChat(chat.id, onDeleted),
     },
   ]);
+}
+
+/**
+ * Deletes on the server, then locally. A chat the server still has stays in
+ * the list, since the next refresh would bring it back anyway.
+ */
+export async function deleteChat(id: ChatId, onDeleted?: () => void): Promise<void> {
+  try {
+    const provider = await getProvider();
+    if (!provider) throw new Error("Not connected. Open Settings to connect to a server.");
+    await provider.deleteChat(id);
+  } catch (error) {
+    Alert.alert(
+      "Could not delete chat",
+      error instanceof Error && error.message ? error.message : "Try again later.",
+    );
+    return;
+  }
+  useChatsStore.getState().remove(id);
+  useMessagesStore.getState().removeChat(id);
+  onDeleted?.();
 }
 
 export function ChatDrawer({
@@ -60,7 +69,6 @@ export function ChatDrawer({
   const { colors } = useAppTheme();
   const chats = useChatsStore((state) => state.chats);
   const refreshChats = useChatsStore((state) => state.refresh);
-  const activeTurns = useMessagesStore((state) => state.activeTurns);
   const capabilities = useProviderCapabilities();
   const profile = useConnectionStore((state) => state.profile);
   const chatsError = useChatsStore((state) => state.error);
@@ -72,6 +80,20 @@ export function ChatDrawer({
     if (!needle) return chats;
     return chats.filter((chat) => (chat.title || "Untitled").toLowerCase().includes(needle));
   }, [chats, query]);
+
+  const canDelete = capabilities?.deleteChat === true;
+  const renderChat = useCallback(
+    ({ item }: { item: ChatSummary }) => (
+      <ChatRow
+        chat={item}
+        active={item.id === activeChatId}
+        canDelete={canDelete}
+        onSelect={onSelectChat}
+        onDeletedActive={onDeletedActive}
+      />
+    ),
+    [activeChatId, canDelete, onSelectChat, onDeletedActive],
+  );
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -142,36 +164,7 @@ export function ChatDrawer({
             </Text>
           </>
         }
-        renderItem={({ item }) => {
-          const active = item.id === activeChatId;
-          const live = activeTurns[item.id] === true;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={item.title || "Untitled"}
-              accessibilityState={{ selected: active }}
-              className={cn(
-                "flex-row items-center gap-2 rounded-[14px] px-3 py-3",
-                active ? "bg-surface" : "active:bg-surface",
-              )}
-              onPress={() => onSelectChat(item.id)}
-              onLongPress={
-                capabilities?.deleteChat
-                  ? () => confirmDeleteChat(item, active ? onDeletedActive : undefined)
-                  : undefined
-              }
-              testID={`chat-row-${item.id}`}
-            >
-              {live ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
-              <Text
-                className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
-                numberOfLines={1}
-              >
-                {item.title || "Untitled"}
-              </Text>
-            </Pressable>
-          );
-        }}
+        renderItem={renderChat}
         ListEmptyComponent={
           <Text className="px-3 py-2 text-sm text-text-muted">
             {query ? "No matching chats" : "No chats yet"}
@@ -208,3 +201,44 @@ export function ChatDrawer({
     </View>
   );
 }
+
+const ChatRow = memo(function ChatRow({
+  chat,
+  active,
+  canDelete,
+  onSelect,
+  onDeletedActive,
+}: {
+  chat: ChatSummary;
+  active: boolean;
+  canDelete: boolean;
+  onSelect: (id: string) => void;
+  onDeletedActive: () => void;
+}) {
+  // Per row, so a turn starting or ending re-renders only its own chat.
+  const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={chat.title || "Untitled"}
+      accessibilityState={{ selected: active }}
+      className={cn(
+        "flex-row items-center gap-2 rounded-[14px] px-3 py-3",
+        active ? "bg-surface" : "active:bg-surface",
+      )}
+      onPress={() => onSelect(chat.id)}
+      onLongPress={
+        canDelete ? () => confirmDeleteChat(chat, active ? onDeletedActive : undefined) : undefined
+      }
+      testID={`chat-row-${chat.id}`}
+    >
+      {live ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
+      <Text
+        className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
+        numberOfLines={1}
+      >
+        {chat.title || "Untitled"}
+      </Text>
+    </Pressable>
+  );
+});

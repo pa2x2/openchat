@@ -87,6 +87,12 @@ export default function MainLayout() {
     [id, router],
   );
 
+  const startNewChat = useCallback(() => goToChat("new"), [goToChat]);
+  const openSettings = useCallback(() => {
+    setOpen(false);
+    router.push("/settings");
+  }, [router]);
+
   return (
     <DrawerContext.Provider value={controls}>
       <Drawer
@@ -103,12 +109,9 @@ export default function MainLayout() {
           <ChatDrawer
             activeChatId={id}
             onSelectChat={goToChat}
-            onNewChat={() => goToChat("new")}
-            onOpenSettings={() => {
-              setOpen(false);
-              router.push("/settings");
-            }}
-            onDeletedActive={() => goToChat("new")}
+            onNewChat={startNewChat}
+            onOpenSettings={openSettings}
+            onDeletedActive={startNewChat}
           />
         )}
       >
