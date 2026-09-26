@@ -174,13 +174,6 @@ export default function SettingsScreen() {
             title="Version"
             value={Constants.expoConfig?.version ?? "—"}
           />
-          <Row
-            icon="palette-outline"
-            title="Design primitives"
-            subtitle="Developer preview of the UI building blocks"
-            chevron
-            onPress={() => router.push("/ui-demo")}
-          />
         </Group>
       </ScrollView>
       {capabilities?.modelSelection === true ? (
