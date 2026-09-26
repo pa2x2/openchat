@@ -1,9 +1,0 @@
-{
-  "openFence": "Intro\n\n```js\nconst a = 1;\nconst b",
-  "closedFence": "```ts\nconst answer = 42;\n```",
-  "fenceThenParagraph": "Intro\n\n```ts\nconst answer = 42;\n```\n\nMore",
-  "fenceThenLongerParagraph": "Intro\n\n```ts\nconst answer = 42;\n```\n\nMore text arrives",
-  "remoteImage": "![remote](https://example.com/image.png)",
-  "links": "[safe](https://example.com) and [unsafe](javascript:alert(1))",
-  "orderedFromThree": "3. first\n4. second"
-}

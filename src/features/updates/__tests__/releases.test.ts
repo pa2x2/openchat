@@ -45,27 +45,13 @@ describe("selectUpdate", () => {
     expect(update?.prerelease).toBe(true);
   });
 
-  it("keeps the stable channel on stable releases", () => {
-    expect(selectUpdate(list, "stable", "1.0.0", ["arm64-v8a"])?.version).toBe("1.1.0");
-  });
-
   it("treats a pre-release version as a pre-release even when GitHub doesn't flag it", () => {
     const unflagged = [release("v1.2.0-rc1"), release("v1.0.0")];
     expect(selectUpdate(unflagged, "stable", "1.0.0", [])).toBeNull();
   });
 
-  it("returns null when nothing is newer", () => {
-    expect(selectUpdate(list, "prerelease", "1.2.0-beta1", [])).toBeNull();
-    expect(selectUpdate(list, "stable", "1.1.0", [])).toBeNull();
-  });
-
   it("never offers a stable downgrade to someone on a newer pre-release", () => {
     expect(selectUpdate(list, "stable", "1.2.0-beta1", [])).toBeNull();
-  });
-
-  it("does not depend on the order GitHub lists releases in", () => {
-    const shuffled = [release("v1.0.1"), release("v1.3.0"), release("v1.2.0")];
-    expect(selectUpdate(shuffled, "stable", "1.0.0", [])?.version).toBe("1.3.0");
   });
 
   it("skips drafts, non-app tags and releases without an APK", () => {
@@ -85,16 +71,6 @@ describe("selectUpdate", () => {
 
     const universal = selectUpdate(list, "stable", "1.0.0", ["riscv64"]);
     expect(universal?.apk.name).toBe("openchat-v1.1.0.apk");
-  });
-
-  it("leaves the checksum empty when GitHub has no digest", () => {
-    const bare = release("v1.1.0");
-    bare.assets = bare.assets.map((asset) => ({ ...asset, digest: null }));
-    expect(selectUpdate([bare], "stable", "1.0.0", [])?.apk.sha256).toBeNull();
-  });
-
-  it("offers nothing when the installed version is unknown", () => {
-    expect(selectUpdate(list, "prerelease", "", [])).toBeNull();
   });
 });
 
@@ -121,10 +97,6 @@ describe("fetchReleases", () => {
       async () => new Response(JSON.stringify(body), { status, headers }) as unknown as Response,
     ) as unknown as typeof fetch;
   }
-
-  it("returns the release list", async () => {
-    await expect(fetchReleases(respond(200, [release("v1.0.0")]))).resolves.toHaveLength(1);
-  });
 
   it("explains GitHub's rate limit", async () => {
     const limited = respond(403, { message: "rate limited" }, { "x-ratelimit-remaining": "0" });

@@ -32,7 +32,7 @@ import { useSystemPalettesStore } from "./systemPalettes";
  * consumers follow along, since both read the theme built here.
  *
  * Never pass a `var(--oc-*)` string to (2). RN cannot parse it and drops it
- * silently; `noRawCssVars.test.ts` fails the build if you try.
+ * silently; a lint rule in `eslint.config.js` fails the build if you try.
  */
 
 export type { ColorSchemeName } from "./palette";

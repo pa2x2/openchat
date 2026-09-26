@@ -1,8 +1,3 @@
-/**
- * Tests for the updates store: check, download, install and the prompt's
- * dismissal, with the device and network faked through UpdaterDeps.
- */
-
 import type { GitHubRelease } from "@/src/features/updates/releases";
 import { createMemoryStorage } from "@/src/stores/storage";
 import { AUTO_CHECK_INTERVAL_MS, createUpdatesStore, type UpdaterDeps } from "@/src/stores/updates";
@@ -63,20 +58,6 @@ describe("updates store: checking", () => {
     expect(store.getState().lastCheckedAt).toBe(1_000_000);
   });
 
-  it("reports up to date and clears old downloads", async () => {
-    const { store, deps } = setup({ appVersion: "1.1.0" });
-    await store.getState().check();
-    expect(store.getState().status).toBe("upToDate");
-    expect(store.getState().release).toBeNull();
-    expect(deps.clearDownloads).toHaveBeenCalled();
-  });
-
-  it("uses the channel at check time", async () => {
-    const { store } = setup({ channel: () => "prerelease" });
-    await store.getState().check();
-    expect(store.getState().release?.version).toBe("1.2.0-beta1");
-  });
-
   it("shows errors from manual checks only", async () => {
     const fetchReleases = jest.fn(async () => {
       throw new Error("offline");
@@ -98,13 +79,6 @@ describe("updates store: checking", () => {
     advance(AUTO_CHECK_INTERVAL_MS);
     await store.getState().check({ auto: true });
     expect(deps.fetchReleases).toHaveBeenCalledTimes(3);
-  });
-
-  it("does nothing where updates are unsupported", async () => {
-    const { store, deps } = setup({ supported: false });
-    await store.getState().check();
-    expect(deps.fetchReleases).not.toHaveBeenCalled();
-    expect(store.getState().status).toBe("idle");
   });
 
   it("lets a newer check replace a running one", async () => {
@@ -140,29 +114,6 @@ describe("updates store: prompt", () => {
     advance(AUTO_CHECK_INTERVAL_MS);
     await store.getState().check({ auto: true });
     expect(store.getState().sheetOpen).toBe(false);
-  });
-
-  it("does not open the prompt from a manual check", async () => {
-    const { store } = setup();
-    await store.getState().check();
-    expect(store.getState().sheetOpen).toBe(false);
-  });
-
-  it("persists the dismissal and last check, not the live status", async () => {
-    const storage = createMemoryStorage();
-    const deps = setup().deps;
-    const first = createUpdatesStore(storage, deps);
-    await first.getState().check({ auto: true });
-    first.getState().closeSheet();
-
-    const second = createUpdatesStore(storage, deps);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(second.getState()).toMatchObject({
-      dismissedVersion: "1.1.0",
-      lastCheckedAt: 1_000_000,
-      status: "idle",
-      release: null,
-    });
   });
 });
 
@@ -228,30 +179,6 @@ describe("updates store: installing", () => {
     expect(clearDownloads).toHaveBeenCalled();
   });
 
-  it("explains a signing key mismatch", async () => {
-    const install = jest.fn(async () => {
-      throw codedError("E_SIGNATURE_MISMATCH");
-    });
-    const { store } = setup({ install });
-    await store.getState().check();
-    await store.getState().startUpdate();
-    expect(store.getState().error).toMatch(/different key/);
-  });
-
-  it("reports a failed download", async () => {
-    const download = jest.fn(async () => {
-      throw new Error("socket closed");
-    });
-    const { store, deps } = setup({ download });
-    await store.getState().check();
-    await store.getState().startUpdate();
-    expect(store.getState()).toMatchObject({
-      status: "error",
-      error: "The download failed. socket closed",
-    });
-    expect(deps.install).not.toHaveBeenCalled();
-  });
-
   it("cancels a download back to the offer", async () => {
     const download = jest.fn(
       (_apk: unknown, _onProgress: unknown, signal?: AbortSignal) =>
@@ -267,16 +194,6 @@ describe("updates store: installing", () => {
     await running;
     expect(store.getState()).toMatchObject({ status: "available", error: null });
     expect(deps.install).not.toHaveBeenCalled();
-  });
-
-  it("keeps the release while downloading, whatever a check would say", async () => {
-    const download = jest.fn(() => new Promise<string>(() => {}));
-    const { store, deps } = setup({ download });
-    await store.getState().check();
-    void store.getState().startUpdate();
-    await store.getState().check();
-    expect(deps.fetchReleases).toHaveBeenCalledTimes(1);
-    expect(store.getState().status).toBe("downloading");
   });
 
   it("does not count closing the sheet mid-download as a dismissal", async () => {

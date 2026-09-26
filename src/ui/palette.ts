@@ -11,7 +11,7 @@
  *
  * Do not reach for a raw `var(--oc-*)` string outside `theme.ts`: RN cannot
  * parse CSS variables in a style or a native prop, so such a value is
- * silently dropped at runtime. `noRawCssVars.test.ts` enforces this.
+ * silently dropped at runtime. A lint rule in `eslint.config.js` enforces this.
  */
 
 export type ColorSchemeName = "light" | "dark";

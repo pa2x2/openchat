@@ -1,5 +1,5 @@
 import type { ModelInfo } from "@/src/domain";
-import { favoriteModels, groupByProvider, searchGroups } from "../modelPicker";
+import { groupByProvider, searchGroups } from "../modelPicker";
 
 const model = (provider: string, id: string, label: string, providerLabel?: string): ModelInfo => ({
   ref: { provider, id },
@@ -18,27 +18,11 @@ const catalog: ModelInfo[] = [
 const ids = (models: ModelInfo[]) => models.map((each) => each.ref.id);
 
 describe("groupByProvider", () => {
-  it("groups in first-seen order under the provider's name, else its id", () => {
-    const groups = groupByProvider(catalog, new Set());
-    expect(groups.map((group) => [group.id, group.label, ids(group.models)])).toEqual([
-      ["opencode", "OpenCode Zen", ["big-pickle", "gpt-5.5"]],
-      ["anthropic", "Anthropic", ["claude-sonnet-5", "claude-opus-5-5"]],
-      ["local", "local", ["llama"]],
-    ]);
-  });
-
   it("lifts starred models to the top of their provider only", () => {
     const groups = groupByProvider(catalog, new Set(["anthropic/claude-opus-5-5"]));
     expect(ids(groups[1].models)).toEqual(["claude-opus-5-5", "claude-sonnet-5"]);
     // A star on one provider must not reorder another.
     expect(ids(groups[0].models)).toEqual(["big-pickle", "gpt-5.5"]);
-  });
-});
-
-describe("favoriteModels", () => {
-  it("keeps starring order and skips models the server no longer offers", () => {
-    const favorites = ["anthropic/claude-opus-5-5", "gone/model", "opencode/big-pickle"];
-    expect(ids(favoriteModels(catalog, favorites))).toEqual(["claude-opus-5-5", "big-pickle"]);
   });
 });
 

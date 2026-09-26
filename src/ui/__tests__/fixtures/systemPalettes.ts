@@ -1,88 +1,10 @@
 /**
- * Palettes read from DynamicColors.getPalettes() on an API 36 emulator: the
- * default blue wallpaper, and an orange seed with the "Vibrant" style (the
- * most saturated style Android offers).
+ * Palettes read from DynamicColors.getPalettes() on an API 36 emulator: an
+ * orange seed with the "Vibrant" style, the most saturated style Android
+ * offers and so the hardest to keep readable.
  */
 
 import type { SystemPalettes } from "@/modules/dynamic-colors";
-
-export const bluePalettes: SystemPalettes = {
-  accent1: {
-    "0": "#FFFFFF",
-    "10": "#FEFBFF",
-    "50": "#EEF0FF",
-    "100": "#D9E2FF",
-    "200": "#B0C6FF",
-    "300": "#94AAE4",
-    "400": "#7A90C8",
-    "500": "#6076AC",
-    "600": "#475D92",
-    "700": "#2F4578",
-    "800": "#152E60",
-    "900": "#001945",
-    "1000": "#000000",
-  },
-  accent2: {
-    "0": "#FFFFFF",
-    "10": "#FEFBFF",
-    "50": "#EEF0FF",
-    "100": "#DCE2F9",
-    "200": "#C0C6DC",
-    "300": "#A4ABC1",
-    "400": "#8A90A5",
-    "500": "#70778B",
-    "600": "#575E71",
-    "700": "#404659",
-    "800": "#2A3042",
-    "900": "#151B2C",
-    "1000": "#000000",
-  },
-  accent3: {
-    "0": "#FFFFFF",
-    "10": "#FFFBFF",
-    "50": "#FFEBFA",
-    "100": "#FDD7FA",
-    "200": "#E0BBDD",
-    "300": "#C3A0C1",
-    "400": "#A886A6",
-    "500": "#8C6D8C",
-    "600": "#725572",
-    "700": "#593D59",
-    "800": "#412742",
-    "900": "#2A122C",
-    "1000": "#000000",
-  },
-  neutral1: {
-    "0": "#FFFFFF",
-    "10": "#FEFBFF",
-    "50": "#F1F0F7",
-    "100": "#E2E2E9",
-    "200": "#C6C6CD",
-    "300": "#ABABB1",
-    "400": "#909097",
-    "500": "#76777D",
-    "600": "#5D5E64",
-    "700": "#45464C",
-    "800": "#2F3036",
-    "900": "#1A1B20",
-    "1000": "#000000",
-  },
-  neutral2: {
-    "0": "#FFFFFF",
-    "10": "#FEFBFF",
-    "50": "#F0F0FA",
-    "100": "#E1E2EC",
-    "200": "#C5C6D0",
-    "300": "#A9ABB4",
-    "400": "#8F9099",
-    "500": "#757780",
-    "600": "#5C5E67",
-    "700": "#44464F",
-    "800": "#2E3038",
-    "900": "#191B23",
-    "1000": "#000000",
-  },
-};
 
 export const vibrantOrangePalettes: SystemPalettes = {
   accent1: {

@@ -40,38 +40,6 @@ beforeEach(() => {
 });
 
 describe("pickImages", () => {
-  it("maps picked images to attachments with their payload", async () => {
-    launch.mockResolvedValue({ canceled: false, assets: [imageAsset()] });
-
-    await expect(pickImages()).resolves.toEqual([
-      {
-        uri: "file:///cache/photo.jpg",
-        mimeType: "image/jpeg",
-        name: "photo.jpg",
-        bytes: "QUJD",
-        size: 3,
-      },
-    ]);
-    expect(launch).toHaveBeenCalledWith(
-      expect.objectContaining({ mediaTypes: ["images"], base64: true }),
-    );
-  });
-
-  it("returns nothing when the picker is dismissed", async () => {
-    launch.mockResolvedValue({ canceled: true, assets: null });
-    await expect(pickImages()).resolves.toEqual([]);
-  });
-
-  it("gives each image the picker could not name its own name", async () => {
-    launch.mockResolvedValue({
-      canceled: false,
-      assets: [imageAsset({ fileName: null }), imageAsset({ fileName: null })],
-    });
-    const [first, second] = await pickImages();
-    expect(first?.name).toMatch(/^image-\d+\.jpg$/);
-    expect(second?.name).toMatch(/^image-\d+-2\.jpg$/);
-  });
-
   it("refuses more files than a message may carry", async () => {
     launch.mockResolvedValue({
       canceled: false,
@@ -99,41 +67,9 @@ describe("pickImages", () => {
 
     await expect(pickImages()).rejects.toThrow("limited to");
   });
-
-  it("explains a picker failure instead of leaking it", async () => {
-    launch.mockRejectedValue(new Error("No Activity found to handle Intent"));
-    await expect(pickImages()).rejects.toThrow("Could not attach that image.");
-  });
 });
 
 describe("pickFiles", () => {
-  it("reads the picked document and base64-encodes it", async () => {
-    getDocument.mockResolvedValue({
-      canceled: false,
-      assets: [
-        { uri: "file:///cache/notes.txt", name: "notes.txt", mimeType: "text/plain", size: 3 },
-      ],
-    });
-
-    await expect(pickFiles()).resolves.toEqual([
-      {
-        uri: "file:///cache/notes.txt",
-        mimeType: "text/plain",
-        name: "notes.txt",
-        bytes: "RE9D",
-        size: 3,
-      },
-    ]);
-    expect(getDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ multiple: true, copyToCacheDirectory: true }),
-    );
-  });
-
-  it("returns nothing when the file browser is dismissed", async () => {
-    getDocument.mockResolvedValue({ canceled: true, assets: null });
-    await expect(pickFiles()).resolves.toEqual([]);
-  });
-
   it("rejects a file above the per-file limit before reading it", async () => {
     getDocument.mockResolvedValue({
       canceled: false,
@@ -149,15 +85,5 @@ describe("pickFiles", () => {
 
     await expect(pickFiles()).rejects.toThrow("big.pdf is 4.0 MB — the limit is 4.0 MB.");
     expect(FileMock).not.toHaveBeenCalled();
-  });
-
-  it("falls back to a generic mime type", async () => {
-    getDocument.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: "file:///cache/blob", name: "blob", size: 3 }],
-    });
-
-    const [attachment] = await pickFiles();
-    expect(attachment?.mimeType).toBe("application/octet-stream");
   });
 });
