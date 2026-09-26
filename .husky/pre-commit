@@ -13,16 +13,31 @@ git diff --cached --name-only --diff-filter=ACMR -z >"$staged"
 [ -s "$staged" ] || exit 0
 
 # Prettier rewrites whole files, so re-staging a file that also has unstaged
-# edits would fold those edits into the commit. Going through tr and plain grep
-# keeps this POSIX; a filename containing a newline can only cause a missed
-# match here, never a wrong re-stage.
+# edits would fold those edits into the commit. Those partially staged files
+# are formatted in the index only, leaving the working tree alone. Going
+# through tr and plain grep keeps this POSIX; a filename containing a newline
+# can only cause a missed match here, never a wrong re-stage.
 tr '\0' '\n' <"$staged" >"$patterns"
 git diff --name-only -z | tr '\0' '\n' | grep -F -x -f "$patterns" >"$partial" || true
+
 if [ -s "$partial" ]; then
-  echo "Unstaged changes would be committed along with the formatting:" >&2
-  cat "$partial" >&2
-  echo "Stage them fully (git add <file>) or stash the edits, then commit again." >&2
-  exit 1
+  while IFS= read -r file; do
+    # Skip paths prettier has no parser for (PNGs, .jks, ...) or ignores.
+    info=$(pnpm exec prettier --file-info "$file")
+    case $info in *'"ignored": true'* | *'"inferredParser": null'*) continue ;; esac
+
+    # ls-files -s prints "<mode> <blob> <stage>\t<path>".
+    mode=$(git ls-files -s -- "$file" | cut -d' ' -f1)
+    formatted=$(mktemp)
+    git show ":$file" | pnpm exec prettier --stdin-filepath "$file" >"$formatted"
+    blob=$(git hash-object -w -- "$formatted")
+    rm -f "$formatted"
+    git update-index --cacheinfo "$mode,$blob,$file"
+  done <"$partial"
+
+  # Everything else is fully staged and safe to format on disk.
+  grep -v -F -x -f "$partial" "$patterns" | tr '\n' '\0' >"$staged" || true
+  [ -s "$staged" ] || exit 0
 fi
 
 # --ignore-unknown drops the paths prettier has no parser for (PNGs, .jks, ...).
