@@ -39,7 +39,6 @@ description: Generate OpenChat app release notes in CHANGELOG.md. Use when asked
      config plugins, and developer tooling;
    - internal APIs, store and domain model changes, and implementation details with no
      verified effect on users;
-   - the `ui-demo` screen and other developer-only screens;
    - changes under `docker/`, which ship separately as `server-opencode-*` image releases;
    - intermediate fixes whose final released behavior is unchanged, and fixes for bugs
      introduced and corrected entirely within the same release range.
