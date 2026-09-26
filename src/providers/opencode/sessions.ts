@@ -49,6 +49,12 @@ export async function deleteChat(client: OpenCodeClient, id: ChatId): Promise<vo
   await client.session.remove({ sessionID: id });
 }
 
+export async function isRunning(client: OpenCodeClient, id: ChatId): Promise<boolean> {
+  // Lists only the sessions that are running right now.
+  const active = await client.session.active();
+  return id in active;
+}
+
 /** Switches the model, the variant, or both; leaving the variant out resets it. */
 export async function switchModel(
   client: OpenCodeClient,

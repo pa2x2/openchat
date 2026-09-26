@@ -54,6 +54,7 @@ export function Transcript({
   const { colors } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
+  const activity = useMessagesStore((state) => state.activity[chatId] ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [following, setFollowing] = useState(true);
 
@@ -66,15 +67,18 @@ export function Transcript({
   const regenerableId =
     canRegenerate && !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
+  const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
       <MessageBubble
         message={item}
         showReasoning={showReasoning}
+        activity={item.id === liveId ? activity : null}
         onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
       />
     ),
-    [showReasoning, regenerableId, onRegenerate],
+    [showReasoning, liveId, activity, regenerableId, onRegenerate],
   );
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {

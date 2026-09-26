@@ -31,6 +31,7 @@ export async function* chatEvents(
       // session-scoped member; one boundary cast keeps the normalizer pure.
       const shape = event as unknown as V2EventShape;
       if (!isEventForChat(shape, chatId)) continue;
+      console.log("OCDEBUG", shape.type, JSON.stringify(shape.data).slice(0, 160)); // TEMP-DEBUG
       const normalized = normalizeV2Event(shape);
       if (normalized) yield normalized;
     }

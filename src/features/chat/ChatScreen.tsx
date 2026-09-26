@@ -18,6 +18,7 @@ import {
   answerForm,
   discardPendingRegenerate,
   dismissForm,
+  followRunningTurn,
   interruptTurn,
   isTurnLive,
   regenerateReply,
@@ -96,18 +97,24 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       currentModel.variant)
     : AUTO_LABEL;
 
-  // Cold open: reconcile the transcript from the server (cache first),
-  // then bury streams this app instance is not going to continue.
+  // Cold open: reconcile the transcript from the server (cache first), bury
+  // streams this app instance is not going to continue, and pick up a run
+  // that is still going on the server.
   useEffect(() => {
     if (isDraft || isTurnLive(chatId)) return;
     let cancelled = false;
     const messagesStore = useMessagesStore.getState();
     void messagesStore.fetchMessages(chatId).then(() => {
-      if (!cancelled) settleOrphanedStreams(chatId);
+      if (cancelled) return;
+      settleOrphanedStreams(chatId);
+      void followRunningTurn(chatId);
     });
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active" && !isTurnLive(chatId)) {
-        void useMessagesStore.getState().fetchMessages(chatId);
+        void useMessagesStore
+          .getState()
+          .fetchMessages(chatId)
+          .then(() => followRunningTurn(chatId));
       }
     });
     return () => {

@@ -70,6 +70,12 @@ export interface ChatProvider {
   send(chatId: ChatId, msg: UserMessage): Promise<void>;
   interrupt(chatId: ChatId): Promise<void>;
   /**
+   * Whether the backend is still working on a run in this chat, whoever
+   * started it. Without it the app can only guess from the transcript, and
+   * cannot pick up runs it did not start.
+   */
+  isRunning?(chatId: ChatId): Promise<boolean>;
+  /**
    * Switches the model of an existing chat, variant included: a ref without
    * a variant puts the chat back on the model's default.
    */

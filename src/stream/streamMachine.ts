@@ -11,8 +11,9 @@
  * replaces the optimistic transcript) and re-subscribes with exponential
  * backoff while the turn is still live. A watchdog guards against silent
  * stalls: if nothing arrives for a while, the machine reconciles anyway;
- * two consecutive reconciles that see an unchanged, server-terminal
- * message end the turn (its closing events were lost to a gap).
+ * two consecutive reconciles that see an unchanged message end the turn
+ * (its closing events were lost to a gap), unless the backend says the run
+ * is still going, as it is while a slow tool works.
  *
  * Reconnection is for *transport* loss only. Errors the server reports about
  * the run itself (provider auth, rejected model, aborted message) are
@@ -28,6 +29,7 @@ import type {
   FormAnswer,
   Message,
   StreamEvent,
+  TurnActivity,
   UserMessage,
 } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
@@ -39,7 +41,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 15_000;
 /** Stream silence longer than this triggers a reconcile. */
-const STALL_MS = 45_000;
+const STALL_MS = 4_000; // TEMP-DEBUG 45_000
 const WATCHDOG_TICK_MS = 5_000;
 
 /** Local id for optimistic messages; server-assigned ids arrive later. */
@@ -78,6 +80,13 @@ interface LiveTurn {
    * each one would redo the transcript's work for frames never shown.
    */
   pendingFrame: number | null;
+  /** Mirrors the store's activity so a text delta can clear it without reading the store. */
+  activity: TurnActivity | null;
+  /**
+   * A new text part started after earlier text. The backend keeps each step's
+   * text apart, but the live reply is one string, so the parts need a break.
+   */
+  textBreak: boolean;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
@@ -92,7 +101,11 @@ function settleTurn(turn: LiveTurn): void {
   turn.finished = true;
   // A form belongs to its run: once the run is over there is nothing left to
   // answer, and no subscription to hear the backend drop it.
-  if (!liveTurns.has(turn.chatId)) useMessagesStore.getState().setForms(turn.chatId, []);
+  if (!liveTurns.has(turn.chatId)) {
+    const messages = useMessagesStore.getState();
+    messages.setForms(turn.chatId, []);
+    messages.setActivity(turn.chatId, null);
+  }
   turn.resolveCompletion();
 }
 
@@ -347,19 +360,24 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
     createdAt: Date.now() + 1, // after the user message
   };
   messages.setTurnError(chatId, null);
-  messages.setTurnActive(chatId, true);
   // A rerun takes the place of the turn it replaces, so the old turn leaves
   // the screen before the new one lands in it.
   if (replaceIds.length > 0) messages.removeMessages(chatId, replaceIds);
   messages.appendMessage(chatId, user);
   messages.appendMessage(chatId, assistant);
+  trackTurn(chatId, assistant);
+  useChatsStore.getState().touch(chatId);
+}
+
+/** Makes `draft` the chat's live reply; its events stream into it from here on. */
+function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
   let resolveCompletion!: () => void;
   const completion = new Promise<void>((resolve) => {
     resolveCompletion = resolve;
   });
-  liveTurns.set(chatId, {
+  const turn: LiveTurn = {
     chatId,
-    draft: assistant,
+    draft,
     controller: new AbortController(),
     paused: false,
     queue: [],
@@ -368,8 +386,58 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
     resolveCompletion,
     finished: false,
     pendingFrame: null,
-  });
-  useChatsStore.getState().touch(chatId);
+    activity: null,
+    textBreak: false,
+  };
+  liveTurns.set(chatId, turn);
+  const messages = useMessagesStore.getState();
+  messages.setTurnActive(chatId, true);
+  messages.setActivity(chatId, null);
+  return turn;
+}
+
+/**
+ * Picks up a run this app instance did not start: one from another client,
+ * or its own from before a restart. Call it after the transcript is fetched.
+ *
+ * Events are live-only, so text written between that fetch and the
+ * subscription is missing from the live reply; the transcript is fetched
+ * again when the run ends to fill it in.
+ */
+export async function followRunningTurn(chatId: ChatId): Promise<void> {
+  if (isTurnLive(chatId)) return;
+  const provider = await getProvider().catch(() => null);
+  if (!provider?.isRunning) return;
+  const running = await provider.isRunning(chatId).catch(() => false);
+  if (!running || isTurnLive(chatId)) return;
+
+  const messages = useMessagesStore.getState();
+  const last = (messages.byChat[chatId] ?? []).at(-1);
+  let draft: Message;
+  if (last?.role === "assistant") {
+    // The server reports an unfinished reply as interrupted; it is not.
+    draft = { ...last, status: "streaming" };
+    messages.patchMessage(chatId, draft.id, { status: "streaming" });
+  } else {
+    draft = {
+      id: localId("assistant"),
+      role: "assistant",
+      text: "",
+      status: "pending",
+      createdAt: Date.now(),
+    };
+    messages.appendMessage(chatId, draft);
+  }
+  messages.setTurnError(chatId, null);
+  const turn = trackTurn(chatId, draft);
+  // The run is well under way, so it may be between events for a while.
+  turn.activity = { kind: "thinking" };
+  messages.setActivity(chatId, turn.activity);
+
+  await Promise.race([consumeEvents(turn), turn.completion]);
+  if (turn.draft.status === "complete" && !isTurnLive(chatId)) {
+    await useMessagesStore.getState().fetchMessages(chatId);
+  }
 }
 
 function nextEvent(
@@ -581,7 +649,11 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
     return;
   }
   if (event.type === "text-delta") {
-    turn.draft = { ...turn.draft, status: "streaming", text: turn.draft.text + event.text };
+    // Covers a missed `activity: null`, e.g. when the text started during a reconnect.
+    if (turn.activity) setActivity(turn, null);
+    const text = turn.draft.text + (turn.textBreak ? "\n\n" : "") + event.text;
+    turn.textBreak = false;
+    turn.draft = { ...turn.draft, status: "streaming", text };
     scheduleDraftWrite(turn);
     return;
   }
@@ -597,6 +669,10 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   flushDraft(turn);
   const messages = useMessagesStore.getState();
   switch (event.type) {
+    case "activity":
+      if (event.activity === null && turn.draft.text.length > 0) turn.textBreak = true;
+      setActivity(turn, event.activity);
+      break;
     case "message-complete":
       // Step-level completion; usage is final for the step so far.
       turn.draft = { ...turn.draft, ...(event.usage ? { usage: event.usage } : {}) };
@@ -628,6 +704,11 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       }
       break;
   }
+}
+
+function setActivity(turn: LiveTurn, activity: TurnActivity | null): void {
+  turn.activity = activity;
+  useMessagesStore.getState().setActivity(turn.chatId, activity);
 }
 
 /**
@@ -667,14 +748,22 @@ async function reconcile(turn: LiveTurn): Promise<void> {
       endTurn(turn);
       return;
     }
-    if (previousSnapshot !== null && lastAssistant.text === previousSnapshot) {
-      // Two consecutive snapshots agree and the server copy is terminal:
-      // the turn ended while the stream was down. Adopt its ending.
+    if (
+      previousSnapshot !== null &&
+      lastAssistant.text === previousSnapshot &&
+      // A tool can run for minutes without a word, so an unchanged reply
+      // alone does not mean the run is over.
+      !(await stillRunning(provider, turn.chatId))
+    ) {
+      if (turn.finished || turn.controller.signal.aborted) return;
+      // Two consecutive snapshots agree and the run is over: the turn ended
+      // while the stream was down. Adopt its ending.
       turn.draft = lastAssistant;
       messages.setMessages(turn.chatId, fetched);
       endTurn(turn);
       return;
     }
+    if (turn.finished || turn.controller.signal.aborted) return;
     turn.draft = { ...lastAssistant, status: "streaming" };
     // The draft carries the streaming status the raw server copy lacks.
     messages.setMessages(turn.chatId, [
@@ -692,6 +781,12 @@ async function reconcile(turn: LiveTurn): Promise<void> {
       applyEvent(turn, event);
     }
   }
+}
+
+/** Backends that can't tell are assumed done; a failed check assumes the run goes on. */
+function stillRunning(provider: ChatProvider, chatId: ChatId): Promise<boolean> {
+  if (!provider.isRunning) return Promise.resolve(false);
+  return provider.isRunning(chatId).catch(() => true);
 }
 
 /**

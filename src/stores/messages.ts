@@ -8,7 +8,7 @@
  * live updates.
  */
 
-import type { ChatForm, ChatId, Message } from "@/src/domain";
+import type { ChatForm, ChatId, Message, TurnActivity } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
@@ -29,6 +29,8 @@ interface MessagesStoreState {
   turnErrors: Record<ChatId, string | null>;
   /** Forms the backend is waiting on, oldest first (runtime only). */
   forms: Record<ChatId, ChatForm[]>;
+  /** What the live turn is doing; null while it writes text or no turn runs (runtime only). */
+  activity: Record<ChatId, TurnActivity | null>;
   /** Replaces the whole transcript of a chat (reconcile / cold open). */
   setMessages: (chatId: ChatId, messages: Message[]) => void;
   appendMessage: (chatId: ChatId, message: Message) => void;
@@ -38,6 +40,7 @@ interface MessagesStoreState {
   removeChat: (chatId: ChatId) => void;
   setTurnActive: (chatId: ChatId, active: boolean) => void;
   setTurnError: (chatId: ChatId, error: string | null) => void;
+  setActivity: (chatId: ChatId, activity: TurnActivity | null) => void;
   fetchMessages: (chatId: ChatId) => Promise<void>;
   setForms: (chatId: ChatId, forms: ChatForm[]) => void;
   addForm: (chatId: ChatId, form: ChatForm) => void;
@@ -102,6 +105,7 @@ export function createMessagesStore(
         activeTurns: {},
         turnErrors: {},
         forms: {},
+        activity: {},
         setForms: (chatId, forms) =>
           set((state) => ({ forms: { ...state.forms, [chatId]: forms } })),
         // The same form can arrive live and from a pending-forms sync.
@@ -123,6 +127,8 @@ export function createMessagesStore(
           set((state) => ({ activeTurns: { ...state.activeTurns, [chatId]: active } })),
         setTurnError: (chatId, error) =>
           set((state) => ({ turnErrors: { ...state.turnErrors, [chatId]: error } })),
+        setActivity: (chatId, activity) =>
+          set((state) => ({ activity: { ...state.activity, [chatId]: activity } })),
         setMessages: (chatId, messages) =>
           set((state) => ({
             byChat: {

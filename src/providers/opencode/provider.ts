@@ -27,7 +27,7 @@ import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
-import { createChat, deleteChat, listChats, switchModel } from "./sessions";
+import { createChat, deleteChat, isRunning, listChats, switchModel } from "./sessions";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
@@ -107,6 +107,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   interrupt(chatId: ChatId): Promise<void> {
     return interrupt(this.client(), chatId);
+  }
+
+  isRunning(chatId: ChatId): Promise<boolean> {
+    return isRunning(this.client(), chatId);
   }
 
   answerForm(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void> {

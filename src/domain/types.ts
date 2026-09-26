@@ -146,6 +146,21 @@ export interface ChatForm {
   fields: FormField[];
 }
 
+export type ToolCategory =
+  "command" | "read" | "search" | "edit" | "web-search" | "web-fetch" | "subtask" | "other";
+
+/**
+ * What a running reply is doing when it isn't writing text. Tool calls and
+ * model round-trips can take minutes without a visible token; this is what
+ * tells the user the run is still alive.
+ */
+export type TurnActivity =
+  | { kind: "thinking" }
+  /** `name` is the backend's own tool name, shown for the "other" category. */
+  | { kind: "tool"; category: ToolCategory; name: string }
+  | { kind: "retrying"; attempt: number }
+  | { kind: "compacting" };
+
 /**
  * Normalized stream events — the only events the chat UI ever sees.
  * Backend-specific event types (tools, permissions, compaction, …) are
@@ -154,6 +169,8 @@ export interface ChatForm {
 export type StreamEvent =
   | { type: "text-delta"; text: string }
   | { type: "reasoning-delta"; text: string }
+  /** `null`: the reply is writing its text. */
+  | { type: "activity"; activity: TurnActivity | null }
   | { type: "message-complete"; usage?: TokenUsage }
   | { type: "chat-idle" }
   | { type: "form"; form: ChatForm }

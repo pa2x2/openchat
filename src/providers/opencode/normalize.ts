@@ -15,6 +15,8 @@ import type {
   FormValue,
   StreamEvent,
   TokenUsage,
+  ToolCategory,
+  TurnActivity,
 } from "@/src/domain";
 
 /** Structural subset of the client's form field union. */
@@ -108,6 +110,29 @@ export function toChatForm(form: WireForm): ChatForm {
   return { id: form.id, title: form.title, fields: form.fields.map(toFormField) };
 }
 
+// OpenCode's built-in tools. Anything else (MCP, plugins) is "other".
+const TOOL_CATEGORIES: Record<string, ToolCategory> = {
+  bash: "command",
+  read: "read",
+  list: "read",
+  glob: "search",
+  grep: "search",
+  edit: "edit",
+  write: "edit",
+  patch: "edit",
+  apply_patch: "edit",
+  webfetch: "web-fetch",
+  websearch: "web-search",
+  task: "subtask",
+};
+
+function toolActivity(name: unknown): TurnActivity {
+  const tool = typeof name === "string" ? name : "";
+  return { kind: "tool", category: TOOL_CATEGORIES[tool] ?? "other", name: tool };
+}
+
+const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" } };
+
 /** Structural subset of the client's V2Event union the normalizer consumes. */
 export interface V2EventShape {
   type: string;
@@ -160,6 +185,29 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         ? { type: "reasoning-delta", text: delta }
         : null;
     }
+    // A step or a tool result hands control back to the model, which may sit
+    // silent for a while before its next token.
+    case "session.step.started":
+    case "session.reasoning.started":
+    case "session.tool.success":
+    case "session.tool.failed":
+    case "session.compaction.ended":
+      return THINKING;
+    case "session.text.started":
+      return { type: "activity", activity: null };
+    // The call's name arrives with its input; `session.tool.called` only
+    // carries the call id.
+    case "session.tool.input.started":
+      return { type: "activity", activity: toolActivity(event.data.name) };
+    case "session.retry.scheduled": {
+      const attempt = event.data.attempt;
+      return {
+        type: "activity",
+        activity: { kind: "retrying", attempt: typeof attempt === "number" ? attempt : 1 },
+      };
+    }
+    case "session.compaction.started":
+      return { type: "activity", activity: { kind: "compacting" } };
     case "session.step.ended": {
       const tokens = event.data.tokens;
       const usage: TokenUsage | undefined = tokens

@@ -18,5 +18,7 @@ export type {
   ProviderId,
   StreamEvent,
   TokenUsage,
+  ToolCategory,
+  TurnActivity,
   UserMessage,
 } from "./types";

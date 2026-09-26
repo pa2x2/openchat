@@ -50,8 +50,6 @@ describe("normalizeV2Event", () => {
       "server.connected",
       "session.inbox.enqueued",
       "session.execution.started",
-      "session.step.started",
-      "session.text.started",
       "session.text.ended",
       "session.usage.updated",
       "session.renamed",

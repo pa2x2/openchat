@@ -210,6 +210,24 @@ describe("mid-turn reconnection", () => {
     expect(state().byChat.c8[0]).toMatchObject({ text: "Hello", status: "complete" });
     expect(state().activeTurns.c8).toBe(false);
   });
+
+  it("keeps a turn whose reply stands still while the backend is still running", async () => {
+    // A slow tool: the stream goes quiet and the reply doesn't change across
+    // two reconciles, but the run is not over.
+    useProvider({
+      events: scriptedEvents([
+        { events: [textDelta("Hel")], drop: true },
+        { events: [], drop: true },
+        { events: [textDelta("!"), chatIdle()] },
+      ]),
+      fetchMessages: jest.fn().mockResolvedValue([assistant({ text: "Hello" })]),
+      isRunning: jest.fn().mockResolvedValue(true),
+    });
+
+    await sendMessage("c9", "hi");
+
+    expect(state().byChat.c9[0]).toMatchObject({ text: "Hello!", status: "complete" });
+  });
 });
 
 it("settles cached streaming messages when no turn is live", () => {
