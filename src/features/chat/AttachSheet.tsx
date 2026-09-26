@@ -1,5 +1,5 @@
 /**
- * Attachment source sheet: photo library or a file from the device.
+ * Attachment source sheet: camera, photo library or a file from the device.
  *
  * Rendered only when the backend accepts attachments (the screen gates on the
  * provider's attachments capability).
@@ -17,6 +17,12 @@ export interface AttachSheetProps {
 }
 
 const OPTIONS: { source: AttachmentSource; title: string; icon: IconName; hint: string }[] = [
+  {
+    source: "camera",
+    title: "Camera",
+    icon: "camera-outline",
+    hint: "Take a photo and attach it",
+  },
   {
     source: "image",
     title: "Photos",

@@ -7,8 +7,10 @@
  * re-compressed, which is what keeps phone photos inside the size budget;
  * other files are read from the app's cache directory.
  *
- * No runtime permission is requested: both pickers use the system photo /
- * document pickers, which grant access to the chosen item only.
+ * The library and document pickers need no runtime permission: the system
+ * pickers grant access to the chosen item only. The camera does, because
+ * expo-image-picker declares CAMERA in its manifest, and Android refuses the
+ * capture intent to an app that declares the permission without holding it.
  */
 
 import * as DocumentPicker from "expo-document-picker";
@@ -26,7 +28,7 @@ import {
 /** Compression applied to picked photos; full-size camera photos are megabytes. */
 const IMAGE_QUALITY = 0.7;
 
-export type AttachmentSource = "image" | "file";
+export type AttachmentSource = "camera" | "image" | "file";
 
 export class AttachmentError extends Error {
   readonly name = "AttachmentError";
@@ -58,14 +60,40 @@ function friendlyError(error: unknown, source: AttachmentSource): AttachmentErro
   const message = error instanceof Error ? error.message : "";
   if (/permission|denied/i.test(message)) {
     return new AttachmentError(
-      source === "image"
-        ? "OpenChat could not open your photos."
-        : "OpenChat could not open your files.",
+      source === "camera"
+        ? "OpenChat could not open the camera."
+        : source === "image"
+          ? "OpenChat could not open your photos."
+          : "OpenChat could not open your files.",
     );
   }
   return new AttachmentError(
-    source === "image" ? "Could not attach that image." : "Could not attach that file.",
+    source === "file" ? "Could not attach that file." : "Could not attach that image.",
   );
+}
+
+function fromImagePicker(
+  result: ImagePicker.ImagePickerResult,
+  existing: Attachment[],
+): Attachment[] {
+  if (result.canceled) return [];
+  checkCount(result.assets.length, existing);
+  const pickedAt = Date.now();
+  const candidates = result.assets.map((asset, index) => {
+    const bytes = asset.base64 ?? "";
+    return {
+      uri: asset.uri,
+      mimeType: asset.mimeType || "image/jpeg",
+      // Numbered, so unnamed images picked together stay tellable apart.
+      name: asset.fileName || `image-${pickedAt}${index > 0 ? `-${index + 1}` : ""}.jpg`,
+      bytes,
+      // The picker reports the size of the file on disk, which is the
+      // pre-compression size; the payload is what the server receives.
+      size: base64ByteLength(bytes),
+    };
+  });
+  checkTotal(candidates, existing);
+  return candidates;
 }
 
 /** Opens the photo library. Resolves to nothing when the user backs out. */
@@ -77,26 +105,34 @@ export async function pickImages(existing: Attachment[] = []): Promise<Attachmen
       quality: IMAGE_QUALITY,
       base64: true,
     });
-    if (result.canceled) return [];
-    checkCount(result.assets.length, existing);
-    const pickedAt = Date.now();
-    const candidates = result.assets.map((asset, index) => {
-      const bytes = asset.base64 ?? "";
-      return {
-        uri: asset.uri,
-        mimeType: asset.mimeType || "image/jpeg",
-        // Numbered, so unnamed images picked together stay tellable apart.
-        name: asset.fileName || `image-${pickedAt}${index > 0 ? `-${index + 1}` : ""}.jpg`,
-        bytes,
-        // The picker reports the size of the file on disk, which is the
-        // pre-compression size; the payload is what the server receives.
-        size: base64ByteLength(bytes),
-      };
-    });
-    checkTotal(candidates, existing);
-    return candidates;
+    return fromImagePicker(result, existing);
   } catch (error) {
     throw friendlyError(error, "image");
+  }
+}
+
+/** Opens the camera. Resolves to nothing when the user backs out. */
+export async function takePhoto(existing: Attachment[] = []): Promise<Attachment[]> {
+  // Checked before the camera opens, so a full composer doesn't cost a photo.
+  checkCount(1, existing);
+  let granted: boolean;
+  try {
+    granted = (await ImagePicker.requestCameraPermissionsAsync()).granted;
+  } catch (error) {
+    throw friendlyError(error, "camera");
+  }
+  if (!granted) {
+    throw new AttachmentError("Allow camera access in system settings to take a photo.");
+  }
+  try {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: IMAGE_QUALITY,
+      base64: true,
+    });
+    return fromImagePicker(result, existing);
+  } catch (error) {
+    throw friendlyError(error, "camera");
   }
 }
 

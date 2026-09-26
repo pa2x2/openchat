@@ -40,6 +40,13 @@
       ],
       "expo-secure-store",
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to take photos to attach to your messages",
+          "microphonePermission": false
+        }
+      ],
       ["expo-navigation-bar", { "enforceContrast": false }],
       "@react-native-vector-icons/material-design-icons",
       "./plugins/withAndroidRelease",

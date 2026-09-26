@@ -9,7 +9,7 @@ import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { Transcript } from "./Transcript";
-import { AttachmentSource, pickFiles, pickImages } from "./pickAttachments";
+import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import {
@@ -163,8 +163,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     setAttachSheetOpen(false);
     setBanner(null);
     try {
-      const picked =
-        source === "image" ? await pickImages(attachments) : await pickFiles(attachments);
+      const pick = { camera: takePhoto, image: pickImages, file: pickFiles }[source];
+      const picked = await pick(attachments);
       if (picked.length === 0) return;
       setAttachments((current) => [...current, ...picked]);
     } catch (error) {
