@@ -25,6 +25,8 @@ export interface ComposerProps {
   onRemoveAttachment?: (attachment: Attachment) => void;
   /** Reports whether the field has text, e.g. to hide suggestions. */
   onDraftChange?: (hasText: boolean) => void;
+  /** Focuses the field on mount. */
+  autoFocus?: boolean;
 }
 
 export interface ComposerHandle {
@@ -33,7 +35,7 @@ export interface ComposerHandle {
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, onDraftChange },
+  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, onDraftChange, autoFocus },
   ref,
 ) {
   const [text, setText] = useState("");
@@ -86,6 +88,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         ) : null}
         <TextInput
           ref={input}
+          autoFocus={autoFocus}
           value={text}
           onChangeText={updateText}
           placeholder="Ask anything"

@@ -7,6 +7,7 @@ import {
   Pressable,
   Text,
   View,
+  type KeyboardEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -65,6 +66,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
   const keyboardOpen = useKeyboardOpen();
+  // A screen that mounts under an open keyboard (the draft becoming a chat on
+  // first send, "new chat" from the header) takes over the typing.
+  const [focusOnMount] = useState(() => Keyboard.isVisible());
 
   const chat = useChatsStore((state) => state.chats.find((candidate) => candidate.id === chatId));
   // The empty-array fallback lives outside the selector: a fresh `[]` per
@@ -267,7 +271,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   return (
     <View className="flex-1 bg-background">
-      <KeyboardAvoidingView behavior="padding" className="flex-1">
+      <SeededKeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View className="flex-1">
           {empty ? (
             <View className="flex-1" style={{ paddingTop: insets.top + HEADER_HEIGHT }}>
@@ -343,6 +347,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           ) : null}
           <Composer
             ref={composer}
+            autoFocus={focusOnMount}
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
             onAttach={canAttach ? () => setAttachSheetOpen(true) : undefined}
@@ -370,14 +375,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             subtitle={isDraft ? "For this new chat" : "For this chat"}
           />
         ) : null}
-      </KeyboardAvoidingView>
+      </SeededKeyboardAvoidingView>
     </View>
   );
 }
 
 /** Whether the soft keyboard is up, so the composer can drop the nav-bar inset. */
 function useKeyboardOpen(): boolean {
-  const [open, setOpen] = useState(false);
+  // Seeded from the current state: the show event may have fired before mount.
+  const [open, setOpen] = useState(() => Keyboard.isVisible());
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardDidShow", () => setOpen(true));
     const hidden = Keyboard.addListener("keyboardDidHide", () => setOpen(false));
@@ -387,4 +393,24 @@ function useKeyboardOpen(): boolean {
     };
   }, []);
   return open;
+}
+
+/**
+ * React Native's KeyboardAvoidingView learns about the keyboard only from
+ * show/hide events, so one mounted while the keyboard is already up lays out
+ * as if it were hidden and leaves the composer under the keyboard. Seed it
+ * with the keyboard's current frame; its first layout pass picks that up.
+ */
+class SeededKeyboardAvoidingView extends KeyboardAvoidingView {
+  componentDidMount() {
+    super.componentDidMount?.();
+    const endCoordinates = Keyboard.metrics();
+    if (!endCoordinates) return;
+    // `_keyboardEvent` is the component's own record of the last show event.
+    (this as unknown as { _keyboardEvent: KeyboardEvent })._keyboardEvent = {
+      duration: 0,
+      easing: "keyboard",
+      endCoordinates,
+    };
+  }
 }
