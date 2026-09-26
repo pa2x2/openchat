@@ -107,6 +107,11 @@ async function flush(times = 8) {
   for (let i = 0; i < times; i += 1) await Promise.resolve();
 }
 
+/** Deltas reach the store on the next animation frame. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 beforeEach(() => {
   resetStores();
   getProviderMock.mockReset();
@@ -266,6 +271,24 @@ describe("interruptTurn", () => {
     expect(useMessagesStore.getState().activeTurns.c5b).toBe(false);
   });
 
+  it("keeps deltas that arrived in the frame before the interrupt", async () => {
+    const provider = makeProvider({
+      events: scriptedEvents([{ events: [textDelta("Hel"), textDelta("lo")] }]), // parks
+    });
+    getProviderMock.mockResolvedValue(provider);
+
+    const done = sendMessage("c5c", "hi");
+    await flush();
+    await interruptTurn("c5c");
+    await done;
+    await nextFrame();
+
+    expect(useMessagesStore.getState().byChat.c5c[1]).toMatchObject({
+      text: "Hello",
+      status: "interrupted",
+    });
+  }, 10_000);
+
   it("removes the empty placeholder when nothing streamed yet", async () => {
     const provider = makeProvider({
       events: scriptedEvents([{ events: [] }]), // parks before any delta
@@ -394,6 +417,7 @@ describe("settleOrphanedStreams", () => {
     getProviderMock.mockResolvedValue(provider);
     const done = sendMessage("c11", "hi");
     await flush();
+    await nextFrame();
 
     settleOrphanedStreams("c11");
 

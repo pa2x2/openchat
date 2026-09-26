@@ -65,6 +65,12 @@ interface LiveTurn {
   resolveCompletion: () => void;
   /** Prevents a stale event stream from mutating a turn after it is settled. */
   finished: boolean;
+  /**
+   * Frame that will copy `draft`'s text and reasoning to the store, or null
+   * when the store is current. Deltas can arrive many per frame; rendering
+   * each one would redo the transcript's work for frames never shown.
+   */
+  pendingFrame: number | null;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
@@ -75,8 +81,38 @@ function isCurrentTurn(turn: LiveTurn): boolean {
 
 function settleTurn(turn: LiveTurn): void {
   if (turn.finished) return;
+  flushDraft(turn);
   turn.finished = true;
   turn.resolveCompletion();
+}
+
+function writeDraft(turn: LiveTurn): void {
+  const { draft } = turn;
+  useMessagesStore.getState().patchMessage(turn.chatId, draft.id, {
+    status: draft.status,
+    text: draft.text,
+    ...(draft.reasoning !== undefined ? { reasoning: draft.reasoning } : {}),
+  });
+}
+
+function scheduleDraftWrite(turn: LiveTurn): void {
+  if (turn.pendingFrame !== null) return;
+  turn.pendingFrame = requestAnimationFrame(() => {
+    turn.pendingFrame = null;
+    if (!turn.finished) writeDraft(turn);
+  });
+}
+
+/**
+ * Writes deltas still waiting for a frame. Every other store update of a
+ * live turn runs after this, so it lands on the full text and a stale frame
+ * cannot overwrite it.
+ */
+function flushDraft(turn: LiveTurn): void {
+  if (turn.pendingFrame === null) return;
+  cancelAnimationFrame(turn.pendingFrame);
+  turn.pendingFrame = null;
+  if (!turn.finished) writeDraft(turn);
 }
 
 /**
@@ -321,6 +357,7 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
     completion,
     resolveCompletion,
     finished: false,
+    pendingFrame: null,
   });
   useChatsStore.getState().touch(chatId);
 }
@@ -481,30 +518,23 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
     turn.queue.push(event);
     return;
   }
+  if (event.type === "text-delta") {
+    turn.draft = { ...turn.draft, status: "streaming", text: turn.draft.text + event.text };
+    scheduleDraftWrite(turn);
+    return;
+  }
+  if (event.type === "reasoning-delta") {
+    turn.draft = {
+      ...turn.draft,
+      status: "streaming",
+      reasoning: (turn.draft.reasoning ?? "") + event.text,
+    };
+    scheduleDraftWrite(turn);
+    return;
+  }
+  flushDraft(turn);
   const messages = useMessagesStore.getState();
   switch (event.type) {
-    case "text-delta":
-      turn.draft = {
-        ...turn.draft,
-        status: "streaming",
-        text: turn.draft.text + event.text,
-      };
-      messages.patchMessage(turn.chatId, turn.draft.id, {
-        status: "streaming",
-        text: turn.draft.text,
-      });
-      break;
-    case "reasoning-delta":
-      turn.draft = {
-        ...turn.draft,
-        status: "streaming",
-        reasoning: (turn.draft.reasoning ?? "") + event.text,
-      };
-      messages.patchMessage(turn.chatId, turn.draft.id, {
-        status: "streaming",
-        reasoning: turn.draft.reasoning,
-      });
-      break;
     case "message-complete":
       // Step-level completion; usage is final for the step so far.
       turn.draft = { ...turn.draft, ...(event.usage ? { usage: event.usage } : {}) };
@@ -549,6 +579,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
  * forever.
  */
 async function reconcile(turn: LiveTurn): Promise<void> {
+  flushDraft(turn);
   turn.paused = true;
   try {
     const provider = await getProvider();
@@ -609,6 +640,7 @@ async function reconcile(turn: LiveTurn): Promise<void> {
 export async function interruptTurn(chatId: ChatId): Promise<void> {
   const turn = liveTurns.get(chatId);
   if (!turn) return;
+  flushDraft(turn);
   turn.controller.abort();
   if (liveTurns.get(chatId) === turn) liveTurns.delete(chatId);
   const messages = useMessagesStore.getState();
@@ -629,6 +661,7 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
 
 function failTurn(turn: LiveTurn, error: unknown): void {
   if (turn.finished) return;
+  flushDraft(turn);
   turn.controller.abort(); // stop the consume loop, if still running
   const isCurrent = liveTurns.get(turn.chatId) === turn;
   if (isCurrent) liveTurns.delete(turn.chatId);
