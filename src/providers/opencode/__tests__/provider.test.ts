@@ -423,4 +423,55 @@ describe("OpenCodeProvider", () => {
       [],
     ]);
   });
+
+  const oneModel = {
+    list: async () => ({
+      location: {},
+      data: [
+        {
+          id: "glm-5.3",
+          providerID: "opencode-go",
+          name: "GLM 5.3",
+          enabled: true,
+          capabilities: { input: ["text"], output: ["text"] },
+          limit: { context: 200000, output: 32000 },
+          variants: [],
+        },
+      ],
+    }),
+  };
+
+  it("names each model's provider from the provider list", async () => {
+    const client = stubClient({
+      model: oneModel,
+      provider: {
+        list: async () => ({
+          location: {},
+          data: [
+            { id: "opencode", name: "OpenCode Zen" },
+            { id: "opencode-go", name: "OpenCode Go" },
+          ],
+        }),
+      },
+    } as unknown as Partial<OpenCodeClient>);
+    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(client));
+    const [model] = await provider.listModels();
+    expect(model.providerLabel).toBe("OpenCode Go");
+  });
+
+  it("still lists models when the provider list fails", async () => {
+    const client = stubClient({
+      model: oneModel,
+      provider: {
+        list: async () => {
+          throw new Error("404");
+        },
+      },
+    } as unknown as Partial<OpenCodeClient>);
+    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(client));
+    const models = await provider.listModels();
+    expect(models.map((model) => [model.ref.id, model.providerLabel])).toEqual([
+      ["glm-5.3", undefined],
+    ]);
+  });
 });

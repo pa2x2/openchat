@@ -5,6 +5,10 @@
  * cached list persists in MMKV so the picker opens instantly and works
  * offline until the server answers. Text-only models are kept; anything
  * else never reaches the picker.
+ *
+ * Favorites are the models the user starred in the picker, stored as
+ * `modelKey`s. They are device-local and outlive the catalog: a starred model
+ * the server stops offering is just not shown, and comes back if it returns.
  */
 
 import type { ModelInfo, ModelRef } from "@/src/domain";
@@ -19,6 +23,10 @@ interface ModelsStoreState {
   loading: boolean;
   /** Last refresh failure, as a user-facing message. */
   error: string | null;
+  /** `modelKey`s of starred models, most recently starred last. */
+  favorites: string[];
+  /** Stars `ref`'s model, or unstars it when it already is. */
+  toggleFavorite: (ref: ModelRef) => void;
   /** Re-reads the model list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
   clear: () => void;
@@ -29,6 +37,11 @@ export function sameModelRef(
   b: { provider: string; id: string },
 ): boolean {
   return a.provider === b.provider && a.id === b.id;
+}
+
+/** Identifies a model regardless of variant, e.g. "opencode/big-pickle". */
+export function modelKey(ref: { provider: string; id: string }): string {
+  return `${ref.provider}/${ref.id}`;
 }
 
 /**
@@ -48,6 +61,15 @@ export function createModelsStore(storage = mmkvStorage) {
         models: [],
         loading: false,
         error: null,
+        favorites: [],
+        toggleFavorite: (ref) => {
+          const key = modelKey(ref);
+          set((state) => ({
+            favorites: state.favorites.includes(key)
+              ? state.favorites.filter((each) => each !== key)
+              : [...state.favorites, key],
+          }));
+        },
         refresh: async () => {
           if (get().loading) return;
           set({ loading: true, error: null });
@@ -72,8 +94,8 @@ export function createModelsStore(storage = mmkvStorage) {
       {
         name: "models",
         storage: createJSONStorage(() => storage),
-        // Only the durable list persists; loading/error are live state.
-        partialize: (state) => ({ models: state.models }),
+        // Only the durable lists persist; loading/error are live state.
+        partialize: (state) => ({ models: state.models, favorites: state.favorites }),
       },
     ),
   );

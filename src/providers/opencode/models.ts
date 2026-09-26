@@ -28,14 +28,28 @@ export function variantLabel(id: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * Display names keyed by provider id. The names only decorate the picker, so
+ * a failed lookup yields none rather than failing the model list.
+ */
+async function providerNames(client: OpenCodeClient): Promise<Map<string, string>> {
+  try {
+    const response = await client.provider.list();
+    return new Map(response.data.map((provider) => [provider.id, provider.name]));
+  } catch {
+    return new Map();
+  }
+}
+
 export async function listModels(client: OpenCodeClient): Promise<ModelInfo[]> {
-  const response = await client.model.list();
+  const [response, names] = await Promise.all([client.model.list(), providerNames(client)]);
   return response.data
     .filter((model) => model.enabled !== false)
     .filter((model) => model.capabilities?.input?.includes("text") ?? true)
     .map((model) => ({
       ref: { provider: model.providerID, id: model.id },
       label: model.name,
+      providerLabel: names.get(model.providerID),
       contextWindow: model.limit?.context,
       variants: (model.variants ?? []).map((variant): ModelVariant => ({
         id: variant.id,

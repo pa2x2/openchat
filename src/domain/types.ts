@@ -34,6 +34,12 @@ export interface ModelInfo {
   ref: ModelRef;
   /** Human-facing label, e.g. "GLM-5.3-Flash". */
   label: string;
+  /**
+   * Human-facing name of the provider serving the model, e.g. "OpenCode Zen".
+   * Omitted when the backend does not name its providers; the UI falls back
+   * to `ref.provider`.
+   */
+  providerLabel?: string;
   contextWindow?: number;
   /** Variants the model can run with, in the backend's order; empty when it has none. */
   variants?: ModelVariant[];

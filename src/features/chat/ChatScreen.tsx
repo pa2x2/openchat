@@ -374,7 +374,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onClose={() => setSheetOpen(false)}
             selected={currentModel}
             onSelect={handleSelectModel}
-            subtitle={isDraft ? "For this new chat" : "For this chat"}
           />
         ) : null}
         {modelSelection && variants.length > 0 ? (
@@ -384,7 +383,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             variants={variants}
             selected={currentModel?.variant}
             onSelect={handleSelectVariant}
-            subtitle={isDraft ? "For this new chat" : "For this chat"}
           />
         ) : null}
       </SeededKeyboardAvoidingView>

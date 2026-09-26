@@ -95,6 +95,27 @@ describe("models store", () => {
   });
 });
 
+describe("favorites", () => {
+  it("toggle stars and unstars by model, ignoring the variant", () => {
+    const store = createModelsStore(createMemoryStorage());
+    store.getState().toggleFavorite({ provider: "opencode", id: "big-pickle" });
+    store.getState().toggleFavorite({ provider: "anthropic", id: "claude-sonnet-5" });
+    store.getState().toggleFavorite({ provider: "opencode", id: "big-pickle", variant: "high" });
+    expect(store.getState().favorites).toEqual(["anthropic/claude-sonnet-5"]);
+  });
+
+  it("persist across restarts and survive clearing the catalog", async () => {
+    const storage = createMemoryStorage();
+    const first = createModelsStore(storage);
+    first.getState().toggleFavorite({ provider: "opencode", id: "big-pickle" });
+    first.getState().clear();
+
+    const second = createModelsStore(storage);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(second.getState().favorites).toEqual(["opencode/big-pickle"]);
+  });
+});
+
 describe("refWithVariant", () => {
   const withEfforts = {
     ref: { provider: "opencode", id: "claude-sonnet-5" },
