@@ -5,6 +5,7 @@ import Markdown, {
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useMemo } from "react";
 import { Linking, Text, View } from "react-native";
+import { Pulse } from "@/src/ui/Pulse";
 import { useAppTheme } from "@/src/ui/theme";
 import { projectMarkdown } from "./streamProjection";
 import { getMarkdownStyles, type MarkdownBackdrop } from "./styles";
@@ -82,12 +83,14 @@ export function MarkdownContent({
         </Text>
       ) : null}
       {streaming ? (
-        <Text
-          accessibilityLabel="Generating"
-          style={{ color: textColor, fontSize: 14, lineHeight: 24 }}
-        >
-          ●
-        </Text>
+        <Pulse>
+          <Text
+            accessibilityLabel="Generating"
+            style={{ color: textColor, fontSize: 14, lineHeight: 24 }}
+          >
+            ●
+          </Text>
+        </Pulse>
       ) : null}
     </View>
   );

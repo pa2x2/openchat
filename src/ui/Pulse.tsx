@@ -3,7 +3,7 @@ import { Animated, Easing } from "react-native";
 
 /**
  * Gently pulses its children's opacity: the "work in progress" cue used for
- * "Thinking…" while a reply has not produced text yet.
+ * "Thinking…" and the dot that trails a streaming reply.
  */
 export function Pulse({ children }: { children: ReactNode }) {
   const opacity = useRef(new Animated.Value(1)).current;
