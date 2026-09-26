@@ -6,12 +6,15 @@ import { Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colorScheme } from "nativewind";
+import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
+import { useUpdateChecks } from "@/src/features/updates/useUpdateChecks";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useAppTheme } from "@/src/ui/theme";
 
 export default function RootLayout() {
   const { scheme, vars, navigationTheme } = useAppTheme();
   const appearance = useSettingsStore((state) => state.appearance);
+  useUpdateChecks();
 
   // The saved preference drives the scheme; "system" follows the device.
   useEffect(() => {
@@ -35,6 +38,9 @@ export default function RootLayout() {
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
             <Stack.Screen name="ui-demo" options={{ title: "Design primitives" }} />
           </Stack>
+          {/* Here rather than in a screen, so a launch check can offer an
+              update over whichever screen is open. */}
+          <UpdateSheet />
         </View>
       </ThemeProvider>
     </GestureHandlerRootView>

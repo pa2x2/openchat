@@ -9,8 +9,7 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
-.kotlin/
+# Native signing / keystores
 *.orig.*
 *.jks
 *.p8
@@ -36,9 +35,21 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders (Expo CNG prebuild output, repo root only)
 /ios
 /android
+
+# Android/Gradle build output at ANY depth.
+# Local native modules under modules/ are source and must stay tracked;
+# only their generated build/ dirs are ignored.
+build/
+.gradle/
+.cxx/
+.kotlin/
+local.properties
+*.iml
+*.hprof
+*.jsbundle
 
 # agent planning workspaces
 /.agents-workspaces/

@@ -3,6 +3,7 @@
  */
 
 import { createMemoryStorage, createSettingsStore } from "@/src/stores";
+import { defaultUpdateChannel } from "@/src/stores/settings";
 
 describe("settings store", () => {
   it("stores and replaces the default model per provider", () => {
@@ -45,5 +46,22 @@ describe("settings store", () => {
     expect(store.getState().appearance).toBe("system");
     store.getState().setAppearance("dark");
     expect(store.getState().appearance).toBe("dark");
+  });
+});
+
+describe("update channel", () => {
+  it("starts pre-release builds on the pre-release channel", () => {
+    expect(defaultUpdateChannel("1.0.0-alpha01")).toBe("prerelease");
+    expect(defaultUpdateChannel("1.0.0")).toBe("stable");
+    expect(
+      createSettingsStore(createMemoryStorage(), "1.0.0-alpha01").getState().updateChannel,
+    ).toBe("prerelease");
+  });
+
+  it("keeps the chosen channel", () => {
+    const store = createSettingsStore(createMemoryStorage(), "1.0.0");
+    expect(store.getState().updateChannel).toBe("stable");
+    store.getState().setUpdateChannel("prerelease");
+    expect(store.getState().updateChannel).toBe("prerelease");
   });
 });
