@@ -6,7 +6,7 @@
  */
 
 import { useImperativeHandle, useRef, useState, type Ref } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
@@ -69,8 +69,8 @@ export function Composer({
     const trimmed = text.trim();
     if ((!trimmed && attachments.length === 0) || streaming) return;
     setText("");
+    Keyboard.dismiss();
     const sent = await onSend(trimmed, attachments);
-    // Anything typed while the send was in flight wins over the old draft.
     if (sent === false) setText((current) => current || text);
   }
 
