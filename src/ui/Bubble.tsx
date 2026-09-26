@@ -5,11 +5,8 @@ import { cn } from "@/src/lib/cn";
 export interface BubbleProps {
   /** Plain-text fallback used by the design-system demo and simple callers. */
   text?: string;
-  /** Rich content supplied by chat features. */
   children?: ReactNode;
-  /** Which side of the conversation the message belongs to. */
   role: "user" | "assistant";
-  /** Optional status line shown under the text. */
   status?: string;
   className?: string;
   testID?: string;

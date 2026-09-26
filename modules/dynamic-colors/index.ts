@@ -7,7 +7,6 @@
 
 import { requireOptionalNativeModule } from "expo";
 
-/** Android's tonal palettes, by name. */
 export type SystemPaletteName = "accent1" | "accent2" | "accent3" | "neutral1" | "neutral2";
 
 /**

@@ -64,11 +64,9 @@ export interface UpdaterDeps {
 
 interface UpdatesStoreState {
   status: UpdateStatus;
-  /** The update on offer, if the last check found one. */
   release: AppRelease | null;
   /** Download progress 0–1, or null when the size is unknown. */
   progress: number | null;
-  /** Last failure, as a user-facing message. */
   error: string | null;
   lastCheckedAt: number | null;
   /** The version whose prompt the user closed; not offered again on launch. */
@@ -79,9 +77,7 @@ interface UpdatesStoreState {
    * stay quiet on failure, and open the sheet for a version not yet dismissed.
    */
   check: (options?: { auto?: boolean }) => Promise<void>;
-  /** Downloads and installs the update on offer. */
   startUpdate: () => Promise<void>;
-  /** Stops a running download. */
   cancelDownload: () => void;
   /** Sends the user to the system screen that allows installs from this app. */
   requestInstallPermission: () => void;

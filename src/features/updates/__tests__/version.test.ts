@@ -1,7 +1,3 @@
-/**
- * Tests for semantic version parsing and precedence.
- */
-
 import { compareVersions, isNewer, isPrerelease, parseVersion } from "../version";
 
 function order(a: string, b: string): number {

@@ -26,7 +26,6 @@ export const mmkvStorage: StateStorage = {
   },
 };
 
-/** Simple in-memory StateStorage for tests. */
 export function createMemoryStorage(): StateStorage {
   const map = new Map<string, string>();
   return {

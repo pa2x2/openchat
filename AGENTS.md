@@ -10,6 +10,15 @@ pnpm lint
 pnpm test
 ```
 
+## Comments
+
+A comment earns its place by telling the reader something the code can't: why it's done this way, a constraint or platform quirk it works around, a bug it prevents, or what a non-obvious value means. If deleting the comment loses nothing a careful reader couldn't get from the code, delete it.
+
+- **Don't restate the code.** No `/** Stops a running download. */` over `cancelDownload`, no `// Re-fetch on foreground` over an `AppState` listener, no `/** Last failure, as a user-facing message. */` over `error: string | null`.
+- **Don't narrate names or types.** If a field, prop or function name plus its type already says it, leave it bare. Document a field only when its meaning isn't obvious: units, what `null`/`undefined` stands for, who sets it, what it must never be.
+- **Don't write file headers that only name the file.** "Tests for the chats store" or "Model listing against the API" add nothing. A header is worth it when it explains a design: how the parts fit, what the module owns, a contract callers rely on.
+- **Keep comments true.** When you change code, update or delete the comments it touches. A stale comment is worse than none.
+
 ## Writing tests
 
 A test earns its place by failing when the app breaks in a way a user or a caller would notice. Before you write one, name the bug it catches. If you can't, don't write it.

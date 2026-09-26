@@ -16,7 +16,6 @@ export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 /** Largest combined payload per message, in bytes (before base64 expansion). */
 export const MAX_ATTACHMENTS_TOTAL_BYTES = 10 * 1024 * 1024;
 
-/** Most files one message may carry. */
 export const MAX_ATTACHMENT_COUNT = 5;
 
 /** The uri a backend can fetch the attachment from, inline. */
@@ -39,7 +38,6 @@ export function isImageAttachment(attachment: Attachment): boolean {
   return attachment.mimeType.startsWith("image/");
 }
 
-/** Short human label: "photo.png" or "notes.txt". */
 export function describeAttachment(attachment: Attachment): string {
   return attachment.name || "attachment";
 }

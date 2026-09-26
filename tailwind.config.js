@@ -5,9 +5,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Semantic tokens mapped to CSS variables. Both the variable *names*
-        // and their values are derived from src/ui/palette.ts — do not hand-
-        // edit a colour here. Values are space-separated RGB so alpha
+        // The variables are built from src/ui/palette.ts by src/ui/theme.ts;
+        // change colours there. Values are space-separated RGB so alpha
         // utilities work (e.g. bg-primary/10).
         background: "rgb(var(--oc-background) / <alpha-value>)",
         surface: "rgb(var(--oc-surface) / <alpha-value>)",

@@ -1,8 +1,3 @@
-/**
- * Message history fetch (reconciliation / cold open) against the OpenCode
- * V2 API.
- */
-
 import type { PromptFileAttachment, SessionMessageInfo } from "@opencode/client";
 import type { Attachment, ChatId, Message } from "@/src/domain";
 import type { OpenCodeClient } from "./client";

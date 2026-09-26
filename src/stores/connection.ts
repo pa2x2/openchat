@@ -15,14 +15,12 @@ export type ConnectionState = "disconnected" | "connecting" | "connected";
 export interface ConnectionProfile {
   providerId: ProviderId;
   baseUrl: string;
-  /** Server-reported version, set after a successful connect(). */
   serverVersion?: string;
 }
 
 interface ConnectionStoreState {
   profile: ConnectionProfile | null;
   state: ConnectionState;
-  /** Last connection failure, as a user-facing message. */
   error: string | null;
   saveProfile: (profile: {
     providerId: ProviderId;
@@ -47,7 +45,6 @@ export function createConnectionStore(storage = mmkvStorage) {
       {
         name: "connection",
         storage: createJSONStorage(() => storage),
-        // Only the durable profile persists; live status resets on restart.
         partialize: (state) => ({ profile: state.profile }),
       },
     ),

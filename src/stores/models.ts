@@ -19,13 +19,10 @@ import { mmkvStorage } from "./storage";
 
 interface ModelsStoreState {
   models: ModelInfo[];
-  /** True while a server refresh is in flight. */
   loading: boolean;
-  /** Last refresh failure, as a user-facing message. */
   error: string | null;
   /** `modelKey`s of starred models, most recently starred last. */
   favorites: string[];
-  /** Stars `ref`'s model, or unstars it when it already is. */
   toggleFavorite: (ref: ModelRef) => void;
   /** Re-reads the model list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
@@ -94,7 +91,6 @@ export function createModelsStore(storage = mmkvStorage) {
       {
         name: "models",
         storage: createJSONStorage(() => storage),
-        // Only the durable lists persist; loading/error are live state.
         partialize: (state) => ({ models: state.models, favorites: state.favorites }),
       },
     ),

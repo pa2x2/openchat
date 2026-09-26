@@ -40,10 +40,8 @@ function localId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** How a rerun ended, as the screen shows it. */
 export interface RegenerateOutcome {
   ok: boolean;
-  /** Why the rerun could not start; absent on success. */
   error?: string;
 }
 
@@ -259,7 +257,6 @@ const MESSAGE_ID_PREFIX = "msg_";
 
 interface TurnTarget {
   user: Message;
-  /** Ids of the messages this rerun replaces on screen. */
   replaceIds: string[];
 }
 
@@ -267,7 +264,6 @@ function lastTurn(messages: Message[]): TurnTarget | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message.role === "user") {
-      // Everything from the prompt onwards is the turn being replaced.
       return {
         user: message,
         replaceIds: messages.slice(index).map((candidate) => candidate.id),
@@ -379,7 +375,6 @@ function closeEventIterator(iterator?: AsyncIterator<StreamEvent>): void {
   }
 }
 
-/** Consumes the event stream until the turn ends. */
 async function consumeEvents(turn: LiveTurn): Promise<void> {
   const { controller, chatId } = turn;
   let backoffMs = INITIAL_BACKOFF_MS;
@@ -480,7 +475,6 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** Applies one normalized event to the live turn. */
 function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   if (turn.finished) return;
   if (turn.paused) {
@@ -619,7 +613,6 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
   if (liveTurns.get(chatId) === turn) liveTurns.delete(chatId);
   const messages = useMessagesStore.getState();
   if (turn.draft.status === "pending" && turn.draft.text.length === 0) {
-    // Nothing streamed yet — remove the empty placeholder entirely.
     messages.removeMessage(chatId, turn.draft.id);
   } else {
     messages.patchMessage(chatId, turn.draft.id, { status: "interrupted" });
@@ -634,7 +627,6 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
   }
 }
 
-/** Marks a turn failed: the optimistic assistant message shows the error. */
 function failTurn(turn: LiveTurn, error: unknown): void {
   if (turn.finished) return;
   turn.controller.abort(); // stop the consume loop, if still running
@@ -651,7 +643,6 @@ function failTurn(turn: LiveTurn, error: unknown): void {
   settleTurn(turn);
 }
 
-/** True while a turn is streaming for the chat (drives the interrupt UI). */
 export function isTurnLive(chatId: ChatId): boolean {
   return liveTurns.has(chatId);
 }

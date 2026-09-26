@@ -28,7 +28,6 @@ export function defaultUpdateChannel(appVersion: string): UpdateChannel {
 }
 
 interface SettingsStoreState {
-  /** Default model keyed by provider id. */
   defaultModels: Record<ProviderId, ModelRef>;
   setDefaultModel: (providerId: ProviderId, model: ModelRef) => void;
   clearDefaultModel: (providerId: ProviderId) => void;

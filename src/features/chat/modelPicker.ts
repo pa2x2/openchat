@@ -8,14 +8,12 @@ import type { ModelInfo } from "@/src/domain";
 import { modelKey } from "@/src/stores/models";
 
 export interface ProviderGroup {
-  /** Provider id, as in `ModelRef.provider`. */
   id: string;
   /** Display name: the backend's provider label, else the id. */
   label: string;
   models: ModelInfo[];
 }
 
-/** Starred models first; otherwise the backend's order is kept. */
 function favoritesFirst(models: ModelInfo[], favorites: ReadonlySet<string>): ModelInfo[] {
   const starred = models.filter((model) => favorites.has(modelKey(model.ref)));
   const rest = models.filter((model) => !favorites.has(modelKey(model.ref)));
@@ -38,7 +36,6 @@ export function groupByProvider(
       group = { id, label: id, models: [] };
       groups.set(id, group);
     }
-    // The first model that names the provider supplies the label.
     if (group.label === id && model.providerLabel) group.label = model.providerLabel;
     group.models.push(model);
   }

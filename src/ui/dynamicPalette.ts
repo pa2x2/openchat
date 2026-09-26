@@ -131,7 +131,6 @@ const ROLES: Partial<Record<PaletteKey, Role>> = {
  */
 const DANGER: Record<ColorSchemeName, string> = { light: "#ba1a1a", dark: "#ffb4ab" };
 
-/** The full palette for a scheme, built from Android's system palettes. */
 export function resolveDynamicPalette(
   system: SystemPalettes,
   scheme: ColorSchemeName,

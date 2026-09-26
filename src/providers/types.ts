@@ -28,9 +28,7 @@ export interface ConnectionConfig {
 }
 
 export interface ConnectionInfo {
-  /** Server-reported version, when available. */
   serverVersion?: string;
-  /** Server-reported name/label, when available. */
   serverName?: string;
 }
 
@@ -103,7 +101,6 @@ export interface ChatProvider {
   fetchMessages(chatId: ChatId): Promise<Message[]>;
 }
 
-/** A single connection-form field, described by the provider. */
 export interface ConfigField {
   key: "baseUrl" | "password";
   label: string;
@@ -115,7 +112,6 @@ export interface ConfigField {
   keyboardType?: "default" | "url";
 }
 
-/** Registry entry: drives config UI and constructs provider instances. */
 export interface ProviderDescriptor {
   id: ProviderId;
   label: string;

@@ -17,7 +17,6 @@ import { join, relative } from "node:path";
 const ROOT = join(__dirname, "..", "..", "..");
 const SEARCH_DIRS = ["app", "src"];
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
-/** The only files allowed to mention a CSS variable name. */
 const ALLOWED = new Set([
   join("src", "ui", "theme.ts"),
   join("src", "ui", "palette.ts"),

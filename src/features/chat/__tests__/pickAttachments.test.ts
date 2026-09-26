@@ -1,7 +1,3 @@
-/**
- * Attachment picking, with the two pickers and the file system stubbed.
- */
-
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";

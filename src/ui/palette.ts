@@ -73,13 +73,10 @@ export const palette = {
 
 export type PaletteKey = keyof typeof palette;
 
-/** Every semantic name, in a stable order. */
 export const paletteKeys = Object.keys(palette) as PaletteKey[];
 
-/** All colours for one scheme, keyed by semantic name. */
 export type ResolvedPalette = Record<PaletteKey, string>;
 
-/** Resolve the full palette for a scheme. */
 export function resolvePalette(scheme: ColorSchemeName): ResolvedPalette {
   const resolved = {} as ResolvedPalette;
   for (const key of paletteKeys) {

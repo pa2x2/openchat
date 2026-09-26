@@ -1,7 +1,3 @@
-/**
- * Prompt delivery and regeneration against a stubbed OpenCode client.
- */
-
 import type { OpenCodeClient } from "../client";
 import { discardRegenerate, prepareRegenerate, regenerate, send } from "../prompt";
 

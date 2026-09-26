@@ -16,7 +16,6 @@ import { mmkvStorage } from "./storage";
 
 interface MessagesStoreState {
   byChat: Record<ChatId, Message[]>;
-  /** True while a server fetch for the given chat is in flight. */
   loading: Record<ChatId, boolean>;
   /** Chats with a live streaming turn (runtime only; never persisted). */
   activeTurns: Record<ChatId, boolean>;
@@ -25,16 +24,12 @@ interface MessagesStoreState {
   /** Replaces the whole transcript of a chat (reconcile / cold open). */
   setMessages: (chatId: ChatId, messages: Message[]) => void;
   appendMessage: (chatId: ChatId, message: Message) => void;
-  /** Patch one message in place (streaming updates, status changes). */
   patchMessage: (chatId: ChatId, messageId: string, patch: Partial<Message>) => void;
-  /** Drops one message (e.g. an empty optimistic placeholder). */
   removeMessage: (chatId: ChatId, messageId: string) => void;
-  /** Drops several messages at once (a turn being replaced by a rerun). */
   removeMessages: (chatId: ChatId, messageIds: string[]) => void;
   removeChat: (chatId: ChatId) => void;
   setTurnActive: (chatId: ChatId, active: boolean) => void;
   setTurnError: (chatId: ChatId, error: string | null) => void;
-  /** Loads the server transcript for a chat into the store. */
   fetchMessages: (chatId: ChatId) => Promise<void>;
 }
 
@@ -54,7 +49,6 @@ function normalizeTranscript(messages: Message[]): Message[] {
   );
 }
 
-/** Attachment metadata without the base64 payload, for the persisted cache. */
 function stripAttachmentBytes(byChat: Record<ChatId, Message[]>): Record<ChatId, Message[]> {
   const stripped: Record<ChatId, Message[]> = {};
   for (const [chatId, messages] of Object.entries(byChat)) {

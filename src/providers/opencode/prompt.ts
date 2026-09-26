@@ -14,7 +14,6 @@ import { timeoutSignal, type OpenCodeClient } from "./client";
 const PROMPT_TIMEOUT_MS = 30_000;
 const CONTROL_TIMEOUT_MS = 10_000;
 
-/** The uri the server can read the attachment from. */
 function fileUri(file: Attachment): string {
   return file.bytes ? `data:${file.mimeType};base64,${file.bytes}` : file.uri;
 }

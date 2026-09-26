@@ -1,12 +1,8 @@
 /**
  * Message composer: a floating card with the text input on top and a toolbar
- * below — attach and the reasoning chip on the left, a round send button on
- * the right, which becomes stop while a reply is streaming. Stop renders
- * only when the caller passes `onStop` (gated by the provider's interrupt
- * capability at the call site), and the attach button only when the caller
- * passes `onAttach` (gated by the provider's attachments capability). The
- * reasoning chip next to it shows when the caller passes `reasoning`, which
- * it does for models that offer variants.
+ * below. Each optional control (stop, attach, reasoning chip) renders only
+ * when the caller passes its prop, so capability gating stays at the call
+ * site.
  */
 
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
@@ -28,7 +24,6 @@ export interface ComposerProps {
   onRemoveAttachment?: (attachment: Attachment) => void;
   /** Present when the model offers variants: the current level and a way to change it. */
   reasoning?: { label: string; onPress: () => void };
-  /** Focuses the field on mount. */
   autoFocus?: boolean;
 }
 

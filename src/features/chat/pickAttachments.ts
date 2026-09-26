@@ -26,10 +26,8 @@ import {
 /** Compression applied to picked photos; full-size camera photos are megabytes. */
 const IMAGE_QUALITY = 0.7;
 
-/** Which picker produced a file, for error copy. */
 export type AttachmentSource = "image" | "file";
 
-/** A pick that could not be turned into an attachment, with copy worth showing. */
 export class AttachmentError extends Error {
   readonly name = "AttachmentError";
 }

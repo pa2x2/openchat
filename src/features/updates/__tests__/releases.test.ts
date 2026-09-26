@@ -1,7 +1,3 @@
-/**
- * Tests for picking the update to offer from GitHub's release list.
- */
-
 import { cleanNotes, fetchReleases, selectUpdate, type GitHubRelease } from "../releases";
 
 const DIGEST = "a".repeat(64);

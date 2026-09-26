@@ -45,7 +45,6 @@ export interface ModelInfo {
   variants?: ModelVariant[];
 }
 
-/** A file attached to a message. */
 export interface Attachment {
   /** Where the file can be displayed from: a local file uri, or empty when only `bytes` is set. */
   uri: string;
@@ -57,7 +56,6 @@ export interface Attachment {
    * back from a backend carry the bytes the backend stored.
    */
   bytes?: string;
-  /** File size in bytes, when known. */
   size?: number;
 }
 
@@ -95,7 +93,6 @@ export interface Message {
   id: string;
   role: MessageRole;
   text: string;
-  /** Accumulated reasoning text, when the model exposed it. */
   reasoning?: string;
   attachments?: Attachment[];
   status: MessageStatus;

@@ -64,7 +64,6 @@ function updateStatusLine(
   }
 }
 
-/** Settings rows for in-app updates: the channel and a check/status row. */
 function UpdatesSection() {
   const channel = useSettingsStore((state) => state.updateChannel);
   const setChannel = useSettingsStore((state) => state.setUpdateChannel);
@@ -113,10 +112,6 @@ function UpdatesSection() {
   );
 }
 
-/**
- * Settings screen: the server connection, chat defaults, appearance and
- * colours, updates, and app info, as grouped lists.
- */
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const capabilities = useProviderCapabilities();

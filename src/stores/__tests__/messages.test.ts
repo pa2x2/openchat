@@ -1,7 +1,3 @@
-/**
- * Tests for the messages store (factory-built with in-memory storage).
- */
-
 import { getProvider } from "@/src/lib/providerFactory";
 import type { ChatProvider } from "@/src/providers/types";
 import { createMemoryStorage, createMessagesStore } from "@/src/stores";

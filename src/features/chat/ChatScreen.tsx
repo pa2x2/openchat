@@ -115,7 +115,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void messagesStore.fetchMessages(chatId).then(() => {
       if (!cancelled) settleOrphanedStreams(chatId);
     });
-    // Re-reconcile when the app comes back to the foreground.
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active" && !isTurnLive(chatId)) {
         void useMessagesStore.getState().fetchMessages(chatId);

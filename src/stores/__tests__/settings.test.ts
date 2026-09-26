@@ -1,7 +1,3 @@
-/**
- * Tests for the settings store (factory-built with in-memory storage).
- */
-
 import { createMemoryStorage, createSettingsStore } from "@/src/stores";
 import { defaultUpdateChannel } from "@/src/stores/settings";
 

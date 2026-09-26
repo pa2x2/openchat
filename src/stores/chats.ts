@@ -16,9 +16,7 @@ import { mmkvStorage } from "./storage";
 
 interface ChatsStoreState {
   chats: ChatSummary[];
-  /** True while a server refresh is in flight. */
   loading: boolean;
-  /** Last refresh failure, as a user-facing message. */
   error: string | null;
   /**
    * Chats whose last rerun was staged on the server but never delivered, as
@@ -28,7 +26,6 @@ interface ChatsStoreState {
    * rerun when it opens.
    */
   pendingRegenerate: Record<ChatId, string>;
-  /** Insert or update one chat (e.g. after createChat or a title change). */
   upsert: (chat: ChatSummary) => void;
   /** Moves a chat to the top of the list with a fresh timestamp. */
   touch: (id: ChatId, updatedAt?: number) => void;
@@ -96,8 +93,6 @@ export function createChatsStore(storage = mmkvStorage) {
       {
         name: "chats",
         storage: createJSONStorage(() => storage),
-        // The durable list and the staged-rerun markers persist; loading/error
-        // are live state.
         partialize: (state) => ({
           chats: state.chats,
           pendingRegenerate: state.pendingRegenerate,

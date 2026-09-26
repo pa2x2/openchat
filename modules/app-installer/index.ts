@@ -12,7 +12,6 @@ export interface AppInstallerModule {
   readonly supportedAbis: string[];
   /** Whether Android lets this app install packages ("Install unknown apps"). */
   canRequestInstalls(): boolean;
-  /** Opens the system screen where the user allows this app to install packages. */
   openInstallSettings(): void;
   /**
    * Installs an update APK of this app from a local `file://` URI, checking

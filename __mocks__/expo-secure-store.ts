@@ -1,7 +1,3 @@
-/**
- * Jest mock for expo-secure-store: in-memory key/value store.
- */
-
 const store = new Map<string, string>();
 
 export async function getItemAsync(key: string): Promise<string | null> {

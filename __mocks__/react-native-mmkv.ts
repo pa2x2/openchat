@@ -1,8 +1,3 @@
-/**
- * Jest mock for react-native-mmkv: in-memory MMKV replacement so store
- * logic is testable without native modules.
- */
-
 class MemoryMMKV {
   private map = new Map<string, string>();
 

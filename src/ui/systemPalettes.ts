@@ -11,7 +11,6 @@ import { AppState, Platform } from "react-native";
 import { create } from "zustand";
 import { DynamicColors, type SystemPalettes } from "@/modules/dynamic-colors";
 
-/** Whether this device can offer Material You colours. */
 export const dynamicColorsSupported =
   Platform.OS === "android" && DynamicColors !== null && DynamicColors.supported;
 
@@ -29,7 +28,6 @@ export const useSystemPalettesStore = create<{ palettes: SystemPalettes | null }
   palettes: readPalettes(),
 }));
 
-/** Re-reads the palettes each time the app comes to the foreground. */
 export function useSystemPalettesSync(): void {
   useEffect(() => {
     if (!dynamicColorsSupported) return;

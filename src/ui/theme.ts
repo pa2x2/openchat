@@ -86,7 +86,6 @@ function navigationThemeFor(scheme: ColorSchemeName, colors: ResolvedPalette): T
 
 export interface AppTheme {
   scheme: ColorSchemeName;
-  /** Concrete hex colours for the active scheme. */
   colors: ResolvedPalette;
   /** `vars()` style for the single root View. */
   vars: object;

@@ -17,7 +17,6 @@ import { Icon } from "@/src/ui/Icon";
 import { useAppTheme } from "@/src/ui/theme";
 
 export interface ChatDrawerProps {
-  /** The chat on screen, highlighted in the list. */
   activeChatId?: string;
   onSelectChat: (id: string) => void;
   onNewChat: () => void;

@@ -19,7 +19,6 @@ export interface AppRelease {
   prerelease: boolean;
   /** Release notes as Markdown; may be empty. */
   notes: string;
-  /** The release page on GitHub. */
   pageUrl: string;
   apk: {
     name: string;

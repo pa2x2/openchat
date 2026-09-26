@@ -20,7 +20,6 @@ export interface SheetProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
-  /** Muted line under the title. */
   subtitle?: string;
   children: React.ReactNode;
   /**

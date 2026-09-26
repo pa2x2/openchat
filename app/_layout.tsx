@@ -18,7 +18,6 @@ export default function RootLayout() {
   useUpdateChecks();
   useSystemPalettesSync();
 
-  // The saved preference drives the scheme; "system" follows the device.
   useEffect(() => {
     colorScheme.set(appearance);
   }, [appearance]);

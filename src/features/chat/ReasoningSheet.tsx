@@ -21,7 +21,6 @@ export interface ReasoningSheetProps {
   /** Current variant id; undefined is Auto. */
   selected?: string;
   onSelect: (variant: string | undefined) => void;
-  /** Muted line under the title, e.g. what the choice applies to. */
   subtitle?: string;
 }
 

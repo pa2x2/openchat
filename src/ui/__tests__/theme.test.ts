@@ -15,7 +15,6 @@ import { contrast } from "./helpers/contrast";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tailwindConfig = require("../../../tailwind.config.js");
 
-/** Every colour the navigation theme may pass to a React Navigation option. */
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 describe("theme", () => {

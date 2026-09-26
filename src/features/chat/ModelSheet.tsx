@@ -51,10 +51,8 @@ interface Section {
 export interface ModelSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** Currently active model, marked with a check. */
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
-  /** Muted line under the title, e.g. what the choice applies to. */
   subtitle?: string;
 }
 

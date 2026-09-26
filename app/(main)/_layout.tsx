@@ -37,7 +37,6 @@ export default function MainLayout() {
     })();
   }, [refreshChats, refreshModels]);
 
-  // Keep the list fresh whenever the sidebar is opened.
   useEffect(() => {
     if (open) void refreshChats();
   }, [open, refreshChats]);

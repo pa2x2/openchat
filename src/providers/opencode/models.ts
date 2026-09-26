@@ -1,7 +1,3 @@
-/**
- * Model listing against the OpenCode V2 API.
- */
-
 import type { ModelInfo, ModelVariant } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
 
