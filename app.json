@@ -42,7 +42,8 @@
       "expo-font",
       "@react-native-vector-icons/material-design-icons",
       "./plugins/withAndroidRelease",
-      "./plugins/withAndroidGradlePerformance"
+      "./plugins/withAndroidGradleProperties",
+      "./plugins/withAndroidProguard"
     ],
     "experiments": {
       "typedRoutes": true
