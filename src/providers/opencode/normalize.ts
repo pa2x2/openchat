@@ -16,7 +16,6 @@ import type {
   StreamEvent,
   TokenUsage,
   ToolCategory,
-  TurnActivity,
 } from "@/src/domain";
 
 /** Structural subset of the client's form field union. */
@@ -126,9 +125,21 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   task: "subtask",
 };
 
-function toolActivity(name: unknown): TurnActivity {
-  const tool = typeof name === "string" ? name : "";
-  return { kind: "tool", category: TOOL_CATEGORIES[tool] ?? "other", name: tool };
+export function toolCategory(name: string): ToolCategory {
+  return TOOL_CATEGORIES[name] ?? "other";
+}
+
+// The input fields that name what the built-in tools work on.
+const SUBJECT_KEYS = ["query", "url", "command", "filePath", "pattern", "path", "description"];
+
+export function toolSubject(input: unknown): string {
+  if (typeof input !== "object" || input === null) return "";
+  const fields = input as Record<string, unknown>;
+  for (const key of SUBJECT_KEYS) {
+    const value = fields[key];
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return "";
 }
 
 const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" } };
@@ -185,20 +196,37 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         ? { type: "reasoning-delta", text: delta }
         : null;
     }
-    // A step or a tool result hands control back to the model, which may sit
-    // silent for a while before its next token.
+    // A step hands control back to the model, which may sit silent for a
+    // while before its next token.
     case "session.step.started":
     case "session.reasoning.started":
-    case "session.tool.success":
-    case "session.tool.failed":
     case "session.compaction.ended":
       return THINKING;
     case "session.text.started":
       return { type: "activity", activity: null };
-    // The call's name arrives with its input; `session.tool.called` only
-    // carries the call id.
-    case "session.tool.input.started":
-      return { type: "activity", activity: toolActivity(event.data.name) };
+    // A call is named when the model starts writing its input, and gets that
+    // input once the model is done with it.
+    case "session.tool.input.started": {
+      const id = event.data.id;
+      if (typeof id !== "string") return null;
+      const name = typeof event.data.name === "string" ? event.data.name : "";
+      return {
+        type: "tool",
+        id,
+        update: { name, category: toolCategory(name), subject: "", status: "running" },
+      };
+    }
+    case "session.tool.called":
+    case "session.tool.success":
+    case "session.tool.failed": {
+      const id = event.data.id;
+      if (typeof id !== "string") return null;
+      if (event.type === "session.tool.called") {
+        return { type: "tool", id, update: { subject: toolSubject(event.data.input) } };
+      }
+      const status = event.type === "session.tool.success" ? "done" : "failed";
+      return { type: "tool", id, update: { status } };
+    }
     case "session.retry.scheduled": {
       const attempt = event.data.attempt;
       return {

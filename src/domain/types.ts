@@ -149,6 +149,28 @@ export interface ChatForm {
 export type ToolCategory =
   "command" | "read" | "search" | "edit" | "web-search" | "web-fetch" | "subtask" | "other";
 
+export type ToolStatus = "running" | "done" | "failed";
+
+export interface ToolCall {
+  id: string;
+  category: ToolCategory;
+  /** The backend's own tool name. */
+  name: string;
+  /** What the call works on (a query, URL, command or path); empty until its input arrives. */
+  subject: string;
+  status: ToolStatus;
+}
+
+/**
+ * One piece of an assistant reply, in the order the backend produced it. A
+ * reply that uses tools interleaves them with its text: progress notes, the
+ * calls they announce, and finally the answer.
+ */
+export type ReplyPart =
+  | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
+  | { type: "tool"; tool: ToolCall };
+
 /**
  * What a running reply is doing when it isn't writing text. Tool calls and
  * model round-trips can take minutes without a visible token; this is what
@@ -171,6 +193,8 @@ export type StreamEvent =
   | { type: "reasoning-delta"; text: string }
   /** `null`: the reply is writing its text. */
   | { type: "activity"; activity: TurnActivity | null }
+  /** Starts or updates the tool call `id`; fields left out keep their value. */
+  | { type: "tool"; id: string; update: Partial<Omit<ToolCall, "id">> }
   | { type: "message-complete"; usage?: TokenUsage }
   | { type: "chat-idle" }
   | { type: "form"; form: ChatForm }
@@ -185,12 +209,16 @@ export type MessageStatus = "pending" | "streaming" | "complete" | "error" | "in
 export interface Message {
   id: string;
   role: MessageRole;
+  /** For a reply, its text parts joined by blank lines. */
   text: string;
-  reasoning?: string;
+  /** A reply's parts in order. Missing on replies cached before parts existed. */
+  parts?: ReplyPart[];
   attachments?: Attachment[];
   status: MessageStatus;
   usage?: TokenUsage;
   createdAt: number;
+  /** When a reply stopped running; unset while it runs or when the backend didn't say. */
+  completedAt?: number;
 }
 
 export interface ChatSummary {

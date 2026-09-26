@@ -1,11 +1,11 @@
 import * as Clipboard from "expo-clipboard";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Message, TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
-import { ReasoningDrawer } from "@/src/features/markdown/ReasoningDrawer";
-import { ActivityIndicator } from "./ActivityIndicator";
 import { AttachmentStrip } from "./AttachmentChips";
+import { layoutReply, type ReplyBlock } from "./replyLayout";
+import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
 import { Icon } from "@/src/ui/Icon";
 
@@ -35,8 +35,6 @@ function statusFor(message: Message): string | undefined {
 }
 
 const COPIED_MS = 1500;
-
-const THINKING: TurnActivity = { kind: "thinking" };
 
 function CopyButton({ text, label, testID }: { text: string; label: string; testID: string }) {
   const [copied, setCopied] = useState(false);
@@ -79,9 +77,13 @@ export const MessageBubble = memo(function MessageBubble({
   const attachments = message.attachments ?? [];
   const isUser = message.role === "user";
   const hasText = message.text.length > 0;
-  const hasReasoning = showReasoning && Boolean(message.reasoning?.trim());
+  const [foldOpen, setFoldOpen] = useState(false);
+  const layout = useMemo(
+    () => (isUser ? null : layoutReply(message, { showReasoning, activity })),
+    [isUser, message, showReasoning, activity],
+  );
 
-  if (isUser) {
+  if (isUser || !layout) {
     return (
       <View className="mb-4 mt-2" testID={`bubble-${message.role}`}>
         {attachments.length > 0 ? (
@@ -112,30 +114,49 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   const status = statusFor(message);
-  // Before any text the reply is at least thinking; once text flows, the
-  // indicator only returns when the run pauses it for something else.
-  const live = streaming ? (activity ?? (hasText ? null : THINKING)) : null;
-  // The reasoning drawer already says "Thinking…" while it fills.
-  const drawerThinking = streaming && !hasText && live?.kind === "thinking";
-  return (
-    <Bubble role="assistant" className="mb-5 mt-1" testID={`bubble-${message.role}`}>
-      <ReasoningDrawer
-        enabled={showReasoning}
-        streaming={drawerThinking}
-        text={message.reasoning}
-      />
-      {live && !hasText && !(hasReasoning && drawerThinking) ? (
-        <ActivityIndicator activity={live} />
-      ) : null}
-      {hasText ? (
+  const lastBlock = layout.blocks.at(-1);
+  const renderBlock = (block: ReplyBlock) =>
+    block.type === "work" ? (
+      <WorkRow key={block.key} block={block} />
+    ) : (
+      <View key={block.key} className="my-0.5">
         <MarkdownContent
           role="assistant"
-          streaming={streaming}
-          text={message.text}
-          testID={`markdown-${message.id}`}
+          streaming={streaming && block === lastBlock}
+          text={block.text}
+          testID={`markdown-${message.id}-${block.key}`}
         />
+      </View>
+    );
+  return (
+    <Bubble role="assistant" className="mb-5 mt-1" testID={`bubble-${message.role}`}>
+      {layout.fold ? (
+        <View className="mb-1 self-stretch">
+          <Pressable
+            accessibilityHint={
+              foldOpen ? "Hides how the reply was worked out" : "Shows how the reply was worked out"
+            }
+            accessibilityLabel={layout.fold.label}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: foldOpen }}
+            className="flex-row items-center gap-1 self-start py-1"
+            hitSlop={6}
+            onPress={() => setFoldOpen((current) => !current)}
+            testID="reply-fold"
+          >
+            <Text className="text-[15px] text-text-muted">{layout.fold.label}</Text>
+            <Icon name={foldOpen ? "chevron-down" : "chevron-right"} size={18} tone="textMuted" />
+          </Pressable>
+          {foldOpen ? (
+            <View className="mt-1 border-b border-border pb-2">
+              {layout.fold.blocks.map(renderBlock)}
+            </View>
+          ) : null}
+        </View>
       ) : null}
-      {status ? (
+      {layout.blocks.map(renderBlock)}
+      {/* The fold already says a stopped reply was stopped. */}
+      {status && !(layout.fold && message.status === "interrupted") ? (
         <Text
           accessibilityLabel={status}
           className={
@@ -147,13 +168,11 @@ export const MessageBubble = memo(function MessageBubble({
       ) : null}
       {streaming ? (
         // Holds the action row's place so the reply doesn't jump when it ends.
-        <View className="mt-1 h-9 justify-center">
-          {live && hasText ? <ActivityIndicator activity={live} /> : null}
-        </View>
-      ) : hasText || onRegenerate ? (
+        <View className="mt-1 h-9" />
+      ) : layout.answer || onRegenerate ? (
         <View className="-ml-2 mt-1 flex-row">
-          {hasText ? (
-            <CopyButton label="Copy reply" testID="copy-reply-button" text={message.text} />
+          {layout.answer ? (
+            <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
           ) : null}
           {onRegenerate ? (
             <Pressable

@@ -16,9 +16,12 @@ export type {
   ModelRef,
   ModelVariant,
   ProviderId,
+  ReplyPart,
   StreamEvent,
   TokenUsage,
+  ToolCall,
   ToolCategory,
+  ToolStatus,
   TurnActivity,
   UserMessage,
 } from "./types";

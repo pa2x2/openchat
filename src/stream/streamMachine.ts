@@ -28,7 +28,9 @@ import type {
   ChatId,
   FormAnswer,
   Message,
+  ReplyPart,
   StreamEvent,
+  ToolCall,
   TurnActivity,
   UserMessage,
 } from "@/src/domain";
@@ -41,7 +43,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 15_000;
 /** Stream silence longer than this triggers a reconcile. */
-const STALL_MS = 4_000; // TEMP-DEBUG 45_000
+const STALL_MS = 45_000;
 const WATCHDOG_TICK_MS = 5_000;
 
 /** Local id for optimistic messages; server-assigned ids arrive later. */
@@ -75,7 +77,7 @@ interface LiveTurn {
   /** Prevents a stale event stream from mutating a turn after it is settled. */
   finished: boolean;
   /**
-   * Frame that will copy `draft`'s text and reasoning to the store, or null
+   * Frame that will copy `draft`'s text and parts to the store, or null
    * when the store is current. Deltas can arrive many per frame; rendering
    * each one would redo the transcript's work for frames never shown.
    */
@@ -83,10 +85,11 @@ interface LiveTurn {
   /** Mirrors the store's activity so a text delta can clear it without reading the store. */
   activity: TurnActivity | null;
   /**
-   * A new text part started after earlier text. The backend keeps each step's
-   * text apart, but the live reply is one string, so the parts need a break.
+   * Kind of the delta applied last, or null once any other event came in. A
+   * delta continues the reply's last part only straight after one of its own
+   * kind; after a tool call or a new step it starts a part of its own.
    */
-  textBreak: boolean;
+  lastDelta: "text" | "reasoning" | null;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
@@ -114,7 +117,7 @@ function writeDraft(turn: LiveTurn): void {
   useMessagesStore.getState().patchMessage(turn.chatId, draft.id, {
     status: draft.status,
     text: draft.text,
-    ...(draft.reasoning !== undefined ? { reasoning: draft.reasoning } : {}),
+    ...(draft.parts ? { parts: draft.parts } : {}),
   });
 }
 
@@ -356,6 +359,7 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
     id: localId("assistant"),
     role: "assistant",
     text: "",
+    parts: [],
     status: "pending",
     createdAt: Date.now() + 1, // after the user message
   };
@@ -387,7 +391,7 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
     finished: false,
     pendingFrame: null,
     activity: null,
-    textBreak: false,
+    lastDelta: null,
   };
   liveTurns.set(chatId, turn);
   const messages = useMessagesStore.getState();
@@ -423,6 +427,7 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
       id: localId("assistant"),
       role: "assistant",
       text: "",
+      parts: [],
       status: "pending",
       createdAt: Date.now(),
     };
@@ -431,7 +436,7 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
   messages.setTurnError(chatId, null);
   const turn = trackTurn(chatId, draft);
   // The run is well under way, so it may be between events for a while.
-  turn.activity = { kind: "thinking" };
+  turn.activity = THINKING;
   messages.setActivity(chatId, turn.activity);
 
   await Promise.race([consumeEvents(turn), turn.completion]);
@@ -648,31 +653,33 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
     turn.queue.push(event);
     return;
   }
-  if (event.type === "text-delta") {
+  if (event.type === "text-delta" || event.type === "reasoning-delta") {
+    const kind = event.type === "text-delta" ? "text" : "reasoning";
     // Covers a missed `activity: null`, e.g. when the text started during a reconnect.
-    if (turn.activity) setActivity(turn, null);
-    const text = turn.draft.text + (turn.textBreak ? "\n\n" : "") + event.text;
-    turn.textBreak = false;
-    turn.draft = { ...turn.draft, status: "streaming", text };
-    scheduleDraftWrite(turn);
-    return;
-  }
-  if (event.type === "reasoning-delta") {
-    turn.draft = {
-      ...turn.draft,
-      status: "streaming",
-      reasoning: (turn.draft.reasoning ?? "") + event.text,
-    };
+    if (kind === "text" && turn.activity) setActivity(turn, null);
+    turn.draft = appendDelta(turn.draft, kind, event.text, turn.lastDelta === kind);
+    turn.lastDelta = kind;
     scheduleDraftWrite(turn);
     return;
   }
   flushDraft(turn);
+  turn.lastDelta = null;
   const messages = useMessagesStore.getState();
   switch (event.type) {
     case "activity":
-      if (event.activity === null && turn.draft.text.length > 0) turn.textBreak = true;
       setActivity(turn, event.activity);
       break;
+    case "tool": {
+      turn.draft = updateTool(turn.draft, event.id, event.update);
+      writeDraft(turn);
+      // With calls running side by side, the latest one still going is shown.
+      const running = runningTool(turn.draft);
+      setActivity(
+        turn,
+        running ? { kind: "tool", category: running.category, name: running.name } : THINKING,
+      );
+      break;
+    }
     case "message-complete":
       // Step-level completion; usage is final for the step so far.
       turn.draft = { ...turn.draft, ...(event.usage ? { usage: event.usage } : {}) };
@@ -684,9 +691,16 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       // The whole prompt run finished. An assistant message that never
       // produced visible text failed silently — surface it as an error with a
       // reason instead of leaving the user on a blank, unexplained bubble.
-      const produced = turn.draft.text.length > 0 || Boolean(turn.draft.reasoning);
-      turn.draft = { ...turn.draft, status: produced ? "complete" : "error" };
-      messages.patchMessage(turn.chatId, turn.draft.id, { status: turn.draft.status });
+      const produced = turn.draft.text.length > 0 || (turn.draft.parts ?? []).length > 0;
+      turn.draft = {
+        ...turn.draft,
+        status: produced ? "complete" : "error",
+        completedAt: Date.now(),
+      };
+      messages.patchMessage(turn.chatId, turn.draft.id, {
+        status: turn.draft.status,
+        completedAt: turn.draft.completedAt,
+      });
       if (!produced) {
         messages.setTurnError(
           turn.chatId,
@@ -704,6 +718,51 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       }
       break;
   }
+}
+
+const THINKING: TurnActivity = { kind: "thinking" };
+
+function appendDelta(
+  draft: Message,
+  kind: "text" | "reasoning",
+  delta: string,
+  continues: boolean,
+): Message {
+  const parts = draft.parts ?? [];
+  const last = parts.at(-1);
+  const nextParts: ReplyPart[] =
+    continues && last?.type === kind
+      ? [...parts.slice(0, -1), { type: kind, text: last.text + delta }]
+      : [...parts, { type: kind, text: delta }];
+  if (kind === "reasoning") return { ...draft, status: "streaming", parts: nextParts };
+  // `text` joins the text parts, so a new one starts after a blank line.
+  const joiner = continues || draft.text.length === 0 ? "" : "\n\n";
+  return { ...draft, status: "streaming", parts: nextParts, text: draft.text + joiner + delta };
+}
+
+function updateTool(draft: Message, id: string, update: Partial<Omit<ToolCall, "id">>): Message {
+  const parts = draft.parts ?? [];
+  const index = parts.findIndex((part) => part.type === "tool" && part.tool.id === id);
+  const current = index >= 0 ? parts[index] : undefined;
+  // A call's first event can be lost to a reconnect; later ones still add it.
+  const tool: ToolCall = {
+    ...(current?.type === "tool"
+      ? current.tool
+      : { id, name: "", category: "other", subject: "", status: "running" }),
+    ...update,
+  };
+  const nextParts: ReplyPart[] =
+    index >= 0
+      ? parts.map((part, at) => (at === index ? { type: "tool", tool } : part))
+      : [...parts, { type: "tool", tool }];
+  return { ...draft, status: "streaming", parts: nextParts };
+}
+
+function runningTool(draft: Message): ToolCall | undefined {
+  for (const part of [...(draft.parts ?? [])].reverse()) {
+    if (part.type === "tool" && part.tool.status === "running") return part.tool;
+  }
+  return undefined;
 }
 
 function setActivity(turn: LiveTurn, activity: TurnActivity | null): void {
@@ -801,10 +860,17 @@ export async function interruptTurn(chatId: ChatId): Promise<void> {
   turn.controller.abort();
   if (liveTurns.get(chatId) === turn) liveTurns.delete(chatId);
   const messages = useMessagesStore.getState();
-  if (turn.draft.status === "pending" && turn.draft.text.length === 0) {
+  if (
+    turn.draft.status === "pending" &&
+    turn.draft.text.length === 0 &&
+    (turn.draft.parts ?? []).length === 0
+  ) {
     messages.removeMessage(chatId, turn.draft.id);
   } else {
-    messages.patchMessage(chatId, turn.draft.id, { status: "interrupted" });
+    messages.patchMessage(chatId, turn.draft.id, {
+      status: "interrupted",
+      completedAt: Date.now(),
+    });
   }
   if (!isTurnLive(chatId)) messages.setTurnActive(chatId, false);
   settleTurn(turn);
