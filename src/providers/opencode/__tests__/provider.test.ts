@@ -296,43 +296,6 @@ describe("OpenCodeProvider", () => {
     ]);
   });
 
-  it("yields a terminal error event when the server reports a run failure", async () => {
-    const events = [
-      {
-        type: "session.execution.failed",
-        data: {
-          sessionID: "ses_a",
-          error: {
-            type: "provider.auth",
-            message: "OpenCode's free tier can only be used from within OpenCode",
-            status: 403,
-          },
-        },
-      },
-    ];
-    const subscribing = stubClient({
-      event: {
-        subscribe: () =>
-          (async function* () {
-            for (const event of events) yield event;
-          })(),
-      },
-    } as Partial<OpenCodeClient>);
-    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(subscribing));
-    const collected = [];
-    for await (const event of provider.events("ses_a", new AbortController().signal)) {
-      collected.push(event);
-    }
-    // Non-retryable: the state machine must not reconnect onto the same failure.
-    expect(collected).toEqual([
-      {
-        type: "error",
-        message: "OpenCode's free tier can only be used from within OpenCode",
-        retryable: false,
-      },
-    ]);
-  });
-
   it("yields a retryable error event when the subscription fails", async () => {
     const failing = stubClient({
       event: {

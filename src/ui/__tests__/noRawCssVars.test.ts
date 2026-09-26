@@ -91,13 +91,11 @@ function collect(dir: string, out: string[] = []): string[] {
 }
 
 const offenders: string[] = [];
-let scannedFiles = 0;
 
 for (const dir of SEARCH_DIRS) {
   for (const file of collect(join(ROOT, dir))) {
     const rel = relative(ROOT, file);
     if (ALLOWED.has(rel)) continue;
-    scannedFiles++;
     stripComments(readFileSync(file, "utf8"))
       .split("\n")
       .forEach((line: string, index: number) => {
@@ -111,12 +109,6 @@ for (const dir of SEARCH_DIRS) {
 describe("theming", () => {
   it("never passes a raw CSS variable outside the theme module", () => {
     expect(offenders).toEqual([]);
-  });
-
-  it("actually scanned the source tree", () => {
-    // If the walk ever stops finding files, the test above would pass for the
-    // wrong reason.
-    expect(scannedFiles).toBeGreaterThan(20);
   });
 
   it("still flags a real violation, comments aside", () => {

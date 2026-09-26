@@ -1,4 +1,4 @@
-import { compareVersions, isNewer, isPrerelease, parseVersion } from "../version";
+import { compareVersions, isPrerelease, parseVersion } from "../version";
 
 function order(a: string, b: string): number {
   return Math.sign(compareVersions(parseVersion(a)!, parseVersion(b)!));
@@ -52,13 +52,7 @@ describe("compareVersions", () => {
   });
 });
 
-describe("isNewer / isPrerelease", () => {
-  it("compares tags against the installed version", () => {
-    expect(isNewer("v1.0.0-alpha02", "1.0.0-alpha01")).toBe(true);
-    expect(isNewer("v1.0.0-alpha01", "1.0.0-alpha01")).toBe(false);
-    expect(isNewer("garbage", "1.0.0")).toBe(false);
-  });
-
+describe("isPrerelease", () => {
   it("spots pre-release versions", () => {
     expect(isPrerelease("1.0.0-alpha01")).toBe(true);
     expect(isPrerelease("1.0.0")).toBe(false);

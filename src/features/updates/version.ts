@@ -53,10 +53,3 @@ export function compareVersions(a: Version, b: Version): number {
   }
   return a.prerelease.length - b.prerelease.length;
 }
-
-/** Whether `candidate` is newer than `current`; false if either does not parse. */
-export function isNewer(candidate: string, current: string): boolean {
-  const next = parseVersion(candidate);
-  const installed = parseVersion(current);
-  return next !== null && installed !== null && compareVersions(next, installed) > 0;
-}

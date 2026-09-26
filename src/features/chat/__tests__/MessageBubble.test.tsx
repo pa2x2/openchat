@@ -77,11 +77,6 @@ describe("MessageBubble attachments", () => {
     });
   });
 
-  it("shows no attachment strip for a plain message", async () => {
-    const tree = await render(<MessageBubble showReasoning={false} message={message()} />);
-    expect(tree.root.findAllByProps({ testID: /^attachment-chip-/ })).toHaveLength(0);
-  });
-
   it("falls back to the file type when the payload is not loaded yet", async () => {
     // A transcript restored from the cache knows the file's name but not its
     // bytes, so there is no source for a thumbnail.

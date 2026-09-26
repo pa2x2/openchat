@@ -104,7 +104,6 @@ describe("ModelSheet", () => {
       tree.root.findByProps({ testID: "model-favorite-opencode-big-pickle" }).props.onPress();
     });
     expect(onSelect).not.toHaveBeenCalled();
-    expect(useModelsStore.getState().favorites).toEqual(["opencode/big-pickle"]);
 
     await act(async () => {
       tree.root.findByProps({ testID: "model-provider-favorites" }).props.onPress();

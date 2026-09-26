@@ -1,5 +1,4 @@
 import { createMemoryStorage, createSettingsStore } from "@/src/stores";
-import { defaultUpdateChannel } from "@/src/stores/settings";
 
 describe("settings store", () => {
   it("persists defaults and rehydrates them into a fresh store", async () => {
@@ -17,11 +16,11 @@ describe("settings store", () => {
 });
 
 describe("update channel", () => {
-  it("starts pre-release builds on the pre-release channel", () => {
-    expect(defaultUpdateChannel("1.0.0-alpha01")).toBe("prerelease");
-    expect(defaultUpdateChannel("1.0.0")).toBe("stable");
-    expect(
-      createSettingsStore(createMemoryStorage(), "1.0.0-alpha01").getState().updateChannel,
-    ).toBe("prerelease");
+  it("picks the channel from the build's version", () => {
+    const channelFor = (appVersion: string) =>
+      createSettingsStore(createMemoryStorage(), appVersion).getState().updateChannel;
+
+    expect(channelFor("1.0.0-alpha01")).toBe("prerelease");
+    expect(channelFor("1.0.0")).toBe("stable");
   });
 });

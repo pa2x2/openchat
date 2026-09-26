@@ -4,7 +4,6 @@ describe("connection store", () => {
   it("persists the profile through saveProfile and rehydrates it", async () => {
     const storage = createMemoryStorage();
     const first = createConnectionStore(storage);
-    first.getState().markConnecting();
     first.getState().saveProfile({
       providerId: "opencode",
       baseUrl: "http://127.0.0.1:4097",
