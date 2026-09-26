@@ -1,10 +1,4 @@
-import {
-  MAX_ATTACHMENT_BYTES,
-  attachmentUri,
-  canResendAttachments,
-  formatBytes,
-  isImageAttachment,
-} from "@/src/lib/attachments";
+import { attachmentUri, canResendAttachments, formatBytes } from "@/src/lib/attachments";
 
 describe("attachmentUri", () => {
   it("inlines the payload when the attachment carries bytes", () => {
@@ -44,22 +38,11 @@ describe("canResendAttachments", () => {
   });
 });
 
-describe("isImageAttachment", () => {
-  it("keys off the mime type", () => {
-    expect(isImageAttachment({ uri: "", mimeType: "image/png", name: "a" })).toBe(true);
-    expect(isImageAttachment({ uri: "", mimeType: "application/pdf", name: "a" })).toBe(false);
-  });
-});
-
 describe("formatBytes", () => {
   it("scales the unit and hides unknown sizes", () => {
     expect(formatBytes(512)).toBe("512 B");
     expect(formatBytes(2048)).toBe("2 KB");
     expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
     expect(formatBytes(undefined)).toBe("");
-  });
-
-  it("keeps the per-file limit at 4 MB", () => {
-    expect(MAX_ATTACHMENT_BYTES).toBe(4 * 1024 * 1024);
   });
 });

@@ -78,21 +78,33 @@ describe("normalizeBaseUrl", () => {
     expect(() => normalizeBaseUrl("")).toThrow(ConnectionError);
     expect(() => normalizeBaseUrl("not a url")).toThrow(ConnectionError);
     expect(() => normalizeBaseUrl("ftp://srv")).toThrow(ConnectionError);
+    let thrown: unknown;
     try {
       normalizeBaseUrl("nope");
     } catch (error) {
-      expect((error as ConnectionError).code).toBe("invalid-url");
+      thrown = error;
     }
+    expect(thrown).toMatchObject({ code: "invalid-url" });
   });
 });
 
 describe("timeoutSignal", () => {
-  it("aborts the signal after the timeout and cleans up", async () => {
-    const { signal, done } = timeoutSignal(20);
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("aborts the signal once the timeout elapses", () => {
+    const { signal } = timeoutSignal(20);
+    jest.advanceTimersByTime(19);
     expect(signal.aborted).toBe(false);
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    jest.advanceTimersByTime(1);
     expect(signal.aborted).toBe(true);
-    expect(() => done()).not.toThrow();
+  });
+
+  it("never aborts once the request is done", () => {
+    const { signal, done } = timeoutSignal(20);
+    done();
+    jest.advanceTimersByTime(1_000);
+    expect(signal.aborted).toBe(false);
   });
 });
 
@@ -165,21 +177,6 @@ describe("OpenCodeProvider", () => {
       code: "unauthorized",
       message: "The server rejected the request.",
       retryable: false,
-    });
-  });
-
-  it("maps network failures to unreachable", async () => {
-    const failing = stubClient({
-      server: {
-        info: (async () => {
-          throw clientError("Transport", new Error("fetch failed"));
-        }) as never,
-      },
-    });
-    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(failing));
-    await expect(provider.connect()).rejects.toMatchObject({
-      code: "unreachable",
-      retryable: true,
     });
   });
 

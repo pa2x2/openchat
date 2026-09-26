@@ -1,6 +1,7 @@
-import React, { act } from "react";
-import { create } from "react-test-renderer";
+import { act } from "react";
+import { render } from "@/src/test-utils/render";
 import type { ModelInfo } from "@/src/domain";
+import { useModelsStore } from "@/src/stores/models";
 import { ModelSheet } from "../ModelSheet";
 
 const catalog: ModelInfo[] = [
@@ -8,38 +9,14 @@ const catalog: ModelInfo[] = [
   { ref: { provider: "opencode-go", id: "glm-5.3" }, label: "GLM 5.3" },
 ];
 
-const mockRefresh = jest.fn();
+const refresh = jest.fn();
 
-jest.mock("@/src/stores/models", () => {
-  const actual = jest.requireActual("@/src/stores/models");
-  return {
-    ...actual,
-    useModelsStore: (selector: (state: object) => unknown) =>
-      selector({
-        models: (globalThis as { __models?: ModelInfo[] }).__models ?? catalog,
-        loading: (globalThis as { __modelsLoading?: boolean }).__modelsLoading ?? false,
-        error: (globalThis as { __modelsError?: string | null }).__modelsError ?? null,
-        refresh: mockRefresh,
-      }),
-  };
-});
-
-async function render(ui: React.ReactElement) {
-  let tree!: ReturnType<typeof create>;
-  await act(async () => {
-    tree = create(ui);
-  });
-  return tree;
-}
-
-function setStoreState(state: { models?: ModelInfo[]; loading?: boolean; error?: string | null }) {
-  (globalThis as Record<string, unknown>).__models = state.models;
-  (globalThis as Record<string, unknown>).__modelsLoading = state.loading;
-  (globalThis as Record<string, unknown>).__modelsError = state.error;
+function setStoreState(state: { models: ModelInfo[]; loading: boolean; error: string | null }) {
+  useModelsStore.setState({ ...state, refresh });
 }
 
 beforeEach(() => {
-  mockRefresh.mockClear();
+  refresh.mockClear();
   setStoreState({ models: catalog, loading: false, error: null });
 });
 
@@ -51,7 +28,7 @@ describe("ModelSheet", () => {
       <ModelSheet visible onClose={onClose} selected={null} onSelect={onSelect} />,
     );
 
-    expect(mockRefresh).toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalled();
     const option = tree.root.findByProps({ testID: "model-option-opencode-big-pickle" });
     await act(async () => {
       option.props.onPress();
@@ -69,7 +46,13 @@ describe("ModelSheet", () => {
         onSelect={jest.fn()}
       />,
     );
-    expect(tree.root.findByProps({ testID: "model-selected" })).toBeTruthy();
+    const option = (testID: string) => tree.root.findByProps({ testID });
+    expect(option("model-option-opencode-go-glm-5.3").props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(option("model-option-opencode-big-pickle").props.accessibilityState).toEqual({
+      selected: false,
+    });
   });
 
   it("shows the error with a retry action", async () => {
@@ -78,9 +61,9 @@ describe("ModelSheet", () => {
       <ModelSheet visible onClose={jest.fn()} selected={null} onSelect={jest.fn()} />,
     );
     expect(tree.root.findByProps({ testID: "model-error" }).props.children).toBe("offline");
-    mockRefresh.mockClear();
+    refresh.mockClear();
     tree.root.findByProps({ testID: "model-retry" }).props.onPress();
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("shows a loading indicator while the first fetch is in flight", async () => {

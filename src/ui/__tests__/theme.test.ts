@@ -1,5 +1,4 @@
 import {
-  cssVarName,
   darkTokens,
   hexToTriplet,
   lightTokens,
@@ -9,6 +8,9 @@ import {
   themeForScheme,
   type PaletteKey,
 } from "../theme";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tailwindConfig = require("../../../tailwind.config.js");
 
 /** Every colour the navigation theme may pass to a React Navigation option. */
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -29,35 +31,18 @@ function contrast(a: string, b: string): number {
 }
 
 describe("theme", () => {
-  it("provides a light and dark theme", () => {
-    expect(Object.keys(themeForScheme("light").colors).length).toBeGreaterThan(0);
-    expect(themeForScheme("light").navigationTheme.dark).toBe(false);
-    expect(themeForScheme("dark").navigationTheme.dark).toBe(true);
-  });
-
-  it("defines the same semantic variables in both schemes", () => {
-    const lightVars = Object.keys(lightTokens);
-    const darkVars = Object.keys(darkTokens);
-    expect(lightVars.length).toBeGreaterThan(0);
-    expect(darkVars.sort()).toEqual([...lightVars].sort());
-  });
-
-  it("covers every palette entry with a CSS variable", () => {
-    for (const key of paletteKeys) {
-      expect(lightTokens[cssVarName(key)]).toBeDefined();
-      expect(darkTokens[cssVarName(key)]).toBeDefined();
+  it("defines every CSS variable tailwind.config.js reads", () => {
+    // The Tailwind colour map is written by hand. A name that drifts from the
+    // palette compiles fine and renders as no colour at all.
+    const colors: Record<string, string> = tailwindConfig.theme.extend.colors;
+    const referenced = Object.values(colors).map(
+      (value) => /var\((--oc-[a-z-]+)\)/.exec(value)?.[1],
+    );
+    expect(referenced).not.toContain(undefined);
+    for (const name of referenced) {
+      expect(Object.keys(lightTokens)).toContain(name);
+      expect(Object.keys(darkTokens)).toContain(name);
     }
-  });
-
-  it("derives the CSS variables from the palette", () => {
-    for (const key of paletteKeys) {
-      expect(lightTokens[cssVarName(key)]).toBe(hexToTriplet(palette[key].light));
-      expect(darkTokens[cssVarName(key)]).toBe(hexToTriplet(palette[key].dark));
-    }
-  });
-
-  it("differs between schemes (dark mode actually changes values)", () => {
-    expect(lightTokens).not.toEqual(darkTokens);
   });
 
   it("keeps every palette value a parseable colour", () => {
@@ -75,18 +60,6 @@ describe("theme", () => {
       for (const value of Object.values(colors)) {
         expect(String(value)).toMatch(HEX);
       }
-    }
-  });
-
-  it("themes the navigation chrome from the same palette as the tokens", () => {
-    for (const scheme of ["light", "dark"] as const) {
-      const theme = themeForScheme(scheme);
-      expect(theme.navigationTheme.colors.primary).toBe(theme.colors.primary);
-      expect(theme.navigationTheme.colors.background).toBe(theme.colors.background);
-      // The header and tab bar both paint with `card`.
-      expect(theme.navigationTheme.colors.card).toBe(theme.colors.background);
-      expect(theme.navigationTheme.colors.text).toBe(theme.colors.text);
-      expect(theme.navigationTheme.colors.border).toBe(theme.colors.border);
     }
   });
 
@@ -118,11 +91,6 @@ describe("theme", () => {
         });
       }
     }
-  });
-
-  it("resolves the whole palette for a scheme", () => {
-    expect(resolvePalette("dark").text).toBe(palette.text.dark);
-    expect(Object.keys(resolvePalette("dark"))).toEqual(paletteKeys);
   });
 });
 

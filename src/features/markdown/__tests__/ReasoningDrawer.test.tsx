@@ -1,14 +1,6 @@
-import React, { act } from "react";
-import { create } from "react-test-renderer";
+import { act } from "react";
+import { render } from "@/src/test-utils/render";
 import { ReasoningDrawer } from "../ReasoningDrawer";
-
-async function render(ui: React.ReactElement) {
-  let tree!: ReturnType<typeof create>;
-  await act(async () => {
-    tree = create(ui);
-  });
-  return tree;
-}
 
 describe("ReasoningDrawer", () => {
   it("stays hidden when the capability is disabled or there is no reasoning", async () => {

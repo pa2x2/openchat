@@ -90,7 +90,7 @@ describe("pickImages", () => {
   });
 
   it("refuses a batch that would blow the per-message budget", async () => {
-    // Four megabytes of payload, twice: over the 10 MB per-message budget.
+    // Six megabytes of payload, twice: over the 10 MB per-message budget.
     const heavy = "A".repeat(Math.ceil((6 * 1024 * 1024 * 4) / 3));
     launch.mockResolvedValue({
       canceled: false,

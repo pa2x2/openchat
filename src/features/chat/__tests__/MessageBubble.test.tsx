@@ -1,15 +1,7 @@
-import React, { act } from "react";
-import { create } from "react-test-renderer";
+import { act } from "react";
+import { render } from "@/src/test-utils/render";
 import type { Message } from "@/src/domain";
 import { MessageBubble } from "../MessageBubble";
-
-async function render(ui: React.ReactElement) {
-  let tree!: ReturnType<typeof create>;
-  await act(async () => {
-    tree = create(ui);
-  });
-  return tree;
-}
 
 function message(patch: Partial<Message> = {}): Message {
   return {

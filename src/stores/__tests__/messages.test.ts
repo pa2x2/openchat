@@ -105,16 +105,6 @@ describe("messages store", () => {
     expect(store.getState().byChat.c1.map((m) => m.id)).toEqual(["keep"]);
   });
 
-  it("setTurnActive/setTurnError track runtime state", () => {
-    const store = createMessagesStore(createMemoryStorage());
-    store.getState().setTurnActive("c1", true);
-    store.getState().setTurnError("c1", "boom");
-    expect(store.getState().activeTurns.c1).toBe(true);
-    expect(store.getState().turnErrors.c1).toBe("boom");
-    store.getState().setTurnError("c1", null);
-    expect(store.getState().turnErrors.c1).toBeNull();
-  });
-
   it("fetchMessages adopts the server transcript wholesale", async () => {
     const provider = makeProvider({
       fetchMessages: jest

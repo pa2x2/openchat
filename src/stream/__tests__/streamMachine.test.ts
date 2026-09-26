@@ -110,7 +110,6 @@ async function flush(times = 8) {
 beforeEach(() => {
   resetStores();
   getProviderMock.mockReset();
-  jest.spyOn(Date, "now").mockRestore?.();
 });
 
 describe("sendMessage", () => {
@@ -342,7 +341,6 @@ describe("mid-turn reconnection", () => {
       ]),
       fetchMessages: jest
         .fn()
-        .mockResolvedValueOnce([assistantMessage({ text: "Hello", status: "complete" })])
         .mockResolvedValue([assistantMessage({ text: "Hello", status: "complete" })]),
     });
     getProviderMock.mockResolvedValue(provider);

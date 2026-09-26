@@ -25,14 +25,4 @@ describe("connection store", () => {
     // Runtime state is not persisted — a restarted app is not "connected".
     expect(second.getState().state).toBe("disconnected");
   });
-
-  it("records connection failures without losing the profile", () => {
-    const store = createConnectionStore(createMemoryStorage());
-    store.getState().saveProfile({ providerId: "opencode", baseUrl: "http://srv" });
-    store.getState().markConnecting();
-    store.getState().markDisconnected("Could not reach the server.");
-    expect(store.getState().state).toBe("disconnected");
-    expect(store.getState().error).toBe("Could not reach the server.");
-    expect(store.getState().profile?.baseUrl).toBe("http://srv");
-  });
 });

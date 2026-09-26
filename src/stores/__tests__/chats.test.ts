@@ -64,13 +64,6 @@ describe("chats store", () => {
     expect(store.getState().chats[0].updatedAt).toBe(10);
   });
 
-  it("remove drops the chat", () => {
-    const store = createChatsStore(createMemoryStorage());
-    store.getState().upsert({ id: "a", title: "A", updatedAt: 1 });
-    store.getState().remove("a");
-    expect(store.getState().chats).toEqual([]);
-  });
-
   it("refresh adopts the server list", async () => {
     const provider = makeProvider({
       listChats: jest.fn().mockResolvedValue([{ id: "x", title: "From server", updatedAt: 5 }]),

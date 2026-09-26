@@ -1,19 +1,11 @@
-import React, { act } from "react";
-import { create } from "react-test-renderer";
+import { act } from "react";
+import { render } from "@/src/test-utils/render";
 import * as Clipboard from "expo-clipboard";
 import { MarkdownContent } from "../MarkdownContent";
 
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn().mockResolvedValue(true),
 }));
-
-async function render(ui: React.ReactElement) {
-  let tree!: ReturnType<typeof create>;
-  await act(async () => {
-    tree = create(ui);
-  });
-  return tree;
-}
 
 describe("MarkdownContent", () => {
   beforeEach(() => {
@@ -33,16 +25,20 @@ describe("MarkdownContent", () => {
       <MarkdownContent
         role="assistant"
         streaming
-        text={"# Done\n\nA paragraph is still arriving"}
-        testID="markdown-content"
+        text={"# Done\n\nA **paragraph** is still arriving"}
       />,
     );
 
-    expect(tree.root.findByProps({ testID: "markdown-content" })).toBeTruthy();
+    // The finished block is parsed: the heading marker is gone.
+    expect(tree.root.findAllByProps({ children: "Done" }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ children: "# Done" })).toHaveLength(0);
+    // The live tail is not: half-arrived syntax stays literal until it settles.
     expect(
-      tree.root.findAllByProps({ children: "A paragraph is still arriving" }).length,
+      tree.root.findAllByProps({ children: "A **paragraph** is still arriving" }).length,
     ).toBeGreaterThan(0);
-    expect(tree.root.findByProps({ accessibilityLabel: "Generating" })).toBeTruthy();
+    expect(tree.root.findAllByProps({ accessibilityLabel: "Generating" }).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("renders terminal markdown and copies fenced code", async () => {

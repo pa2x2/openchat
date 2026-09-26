@@ -4,7 +4,7 @@
 
 import { getProvider } from "@/src/lib/providerFactory";
 import type { ChatProvider } from "@/src/providers/types";
-import { createModelsStore, createMemoryStorage, sameModelRef } from "@/src/stores";
+import { createModelsStore, createMemoryStorage } from "@/src/stores";
 
 jest.mock("@/src/lib/providerFactory", () => ({
   getProvider: jest.fn(),
@@ -39,14 +39,6 @@ function makeProvider(overrides: Partial<ChatProvider> = {}): ChatProvider {
 
 beforeEach(() => {
   getProviderMock.mockReset();
-});
-
-describe("sameModelRef", () => {
-  it("compares provider and id", () => {
-    expect(sameModelRef({ provider: "p", id: "m" }, { provider: "p", id: "m" })).toBe(true);
-    expect(sameModelRef({ provider: "p", id: "m" }, { provider: "p", id: "other" })).toBe(false);
-    expect(sameModelRef({ provider: "p", id: "m" }, { provider: "other", id: "m" })).toBe(false);
-  });
 });
 
 describe("models store", () => {

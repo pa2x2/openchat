@@ -1,23 +1,25 @@
-import React, { act } from "react";
-import { create } from "react-test-renderer";
+import { act } from "react";
+import { render } from "@/src/test-utils/render";
 import { Composer } from "../Composer";
-
-async function render(ui: React.ReactElement) {
-  let tree!: ReturnType<typeof create>;
-  await act(async () => {
-    tree = create(ui);
-  });
-  return tree;
-}
 
 describe("Composer", () => {
   it("keeps send disabled until there is text", async () => {
     const onSend = jest.fn();
     const tree = await render(<Composer onSend={onSend} />);
-    const send = tree.root.findByProps({ testID: "composer-send" });
+    const send = () => tree.root.findByProps({ testID: "composer-send" });
 
-    expect(send.props.disabled).toBe(true);
-    expect(send.props.accessibilityState).toEqual({ disabled: true });
+    expect(send().props.disabled).toBe(true);
+    expect(send().props.accessibilityState).toEqual({ disabled: true });
+
+    await act(async () => {
+      tree.root.findByProps({ testID: "composer-input" }).props.onChangeText("   ");
+    });
+    expect(send().props.disabled).toBe(true);
+
+    await act(async () => {
+      tree.root.findByProps({ testID: "composer-input" }).props.onChangeText("hi");
+    });
+    expect(send().props.disabled).toBe(false);
   });
 
   it("renders one accessible stop control while streaming", async () => {
