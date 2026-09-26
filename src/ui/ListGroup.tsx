@@ -1,6 +1,8 @@
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "./Pressable";
 import { cn } from "@/src/lib/cn";
+import type { Haptic } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 
 /**
@@ -47,6 +49,7 @@ export interface RowProps {
   destructive?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
+  haptic?: Haptic;
   accessibilityLabel?: string;
   accessibilityHint?: string;
   selected?: boolean;
@@ -63,6 +66,7 @@ export function Row({
   destructive,
   onPress,
   onLongPress,
+  haptic,
   accessibilityLabel,
   accessibilityHint,
   selected,
@@ -79,6 +83,7 @@ export function Row({
       disabled={!onPress && !onLongPress}
       onPress={onPress}
       onLongPress={onLongPress}
+      haptic={haptic}
       testID={testID}
     >
       {icon ? <Icon name={icon} size={22} tone={tone} /> : null}

@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "./Pressable";
 import { create } from "zustand";
 import { Button, type ButtonVariant } from "./Button";
 import { useAppTheme } from "./theme";
@@ -66,6 +67,7 @@ export function DialogHost() {
       <View className="flex-1 items-center justify-center px-8">
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: 0.4 }]}
+          haptic="none"
           onPress={dismiss}
           accessibilityLabel="Close dialog"
         />

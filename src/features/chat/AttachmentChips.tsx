@@ -7,7 +7,8 @@
  */
 
 import { useState } from "react";
-import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 // RNGH's ScrollView, so a sideways swipe scrolls the chips instead of opening the sidebar.
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -170,6 +171,7 @@ function ImageViewer({ name, uri, onClose }: { name: string; uri: string; onClos
     >
       <Pressable
         accessibilityLabel="Close image"
+        haptic="none"
         className="flex-1 bg-black"
         onPress={onClose}
         testID="attachment-viewer"

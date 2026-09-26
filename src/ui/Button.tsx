@@ -1,4 +1,5 @@
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
+import { Pressable } from "./Pressable";
 import { cn } from "@/src/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";

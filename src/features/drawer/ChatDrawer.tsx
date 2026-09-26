@@ -8,15 +8,8 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  BackHandler,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { BackHandler, FlatList, RefreshControl, Text, TextInput, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";

@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "./Pressable";
 import { cn } from "@/src/lib/cn";
 
 export interface SegmentedOption<T extends string> {

@@ -12,15 +12,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  SectionList,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, SectionList, Text, TextInput, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import type { ModelInfo, ModelRef } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { modelKey, sameModelRef, useModelsStore } from "@/src/stores/models";
@@ -451,6 +444,7 @@ function ModelRow({
           </View>
         ) : null}
         <Pressable
+          haptic={favorite ? "toggle-off" : "toggle-on"}
           onPress={onToggleFavorite}
           accessibilityRole="button"
           accessibilityLabel={

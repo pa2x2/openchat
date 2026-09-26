@@ -10,6 +10,13 @@ module.exports = defineConfig([
       "no-restricted-imports": [
         "error",
         {
+          paths: [
+            {
+              name: "react-native",
+              importNames: ["Pressable"],
+              message: "Use Pressable from @/src/ui/Pressable, which plays haptic feedback.",
+            },
+          ],
           patterns: [
             {
               group: ["@opencode/client", "**/providers/opencode/**"],
@@ -18,6 +25,13 @@ module.exports = defineConfig([
           ],
         },
       ],
+    },
+  },
+  {
+    // The wrapper that the Pressable ban points to.
+    files: ["src/ui/Pressable.tsx"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
   {

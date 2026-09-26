@@ -6,7 +6,8 @@
  */
 
 import { useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Text, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
 import { Icon, MenuGlyph, TemporaryChatGlyph, type IconName } from "@/src/ui/Icon";
@@ -94,6 +95,7 @@ export function ChatHeader({
             accessibilityRole="switch"
             accessibilityState={{ checked: temporary.on }}
             className="h-11 w-10 items-center justify-center rounded-full active:opacity-60"
+            haptic={temporary.on ? "toggle-off" : "toggle-on"}
             onPress={temporary.onToggle}
             testID="temporary-chat"
           >
@@ -153,7 +155,7 @@ function HeaderMenu({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close menu">
+      <Pressable className="flex-1" haptic="none" onPress={onClose} accessibilityLabel="Close menu">
         <View
           className="absolute right-3 min-w-[220px] rounded-[20px] bg-elevated p-1.5"
           style={{ top, boxShadow: "0px 8px 32px rgba(0, 0, 0, 0.22)" }}

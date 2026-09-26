@@ -5,12 +5,12 @@ import {
   Keyboard,
   Modal,
   PanResponder,
-  Pressable,
   StyleSheet,
   Text,
   View,
   type DimensionValue,
 } from "react-native";
+import { Pressable } from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "./keyboard";
@@ -161,7 +161,12 @@ export function Sheet({
             },
           ]}
         >
-          <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close sheet" />
+          <Pressable
+            className="flex-1"
+            haptic="none"
+            onPress={onClose}
+            accessibilityLabel="Close sheet"
+          />
         </Animated.View>
         {/* The Modal is its own window, so the screen's keyboard avoidance
             cannot reach the card: this one has to live in here. The card then

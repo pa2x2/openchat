@@ -23,3 +23,5 @@ export {
   type PaletteKey,
   type ResolvedPalette,
 } from "./theme";
+export { Pressable, type PressableProps } from "./Pressable";
+export { playHaptic, type Haptic } from "./haptics";

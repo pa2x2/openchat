@@ -6,7 +6,8 @@
  * choice applies to.
  */
 
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import type { ModelVariant } from "@/src/domain";
 import { Icon } from "@/src/ui/Icon";
 import { Sheet } from "@/src/ui/Sheet";

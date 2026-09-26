@@ -6,13 +6,8 @@
  */
 
 import { useCallback, useMemo, useState, type RefObject } from "react";
-import {
-  FlatList,
-  Pressable,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, Message } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";

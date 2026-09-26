@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";
 import { toolLabel, workItemIcon, workRow, type WorkBlock, type WorkItem } from "./replyLayout";

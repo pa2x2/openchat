@@ -6,7 +6,8 @@
  */
 
 import { useImperativeHandle, useRef, useState, type Ref } from "react";
-import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import { Keyboard, Text, TextInput, View } from "react-native";
+import { Pressable } from "@/src/ui/Pressable";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";

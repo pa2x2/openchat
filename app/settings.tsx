@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { updatesSupported } from "@/src/features/updates/installer";
@@ -11,9 +11,11 @@ import {
   type UpdateChannel,
 } from "@/src/stores/settings";
 import { useUpdatesStore, type UpdateStatus } from "@/src/stores/updates";
+import { playHaptic } from "@/src/ui/haptics";
 import { Group, GroupLabel, Row } from "@/src/ui/ListGroup";
 import { Segmented } from "@/src/ui/Segmented";
 import { dynamicColorsSupported } from "@/src/ui/systemPalettes";
+import { useAppTheme } from "@/src/ui/theme";
 
 const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "system", label: "System" },
@@ -105,6 +107,37 @@ function UpdatesSection() {
   );
 }
 
+function HapticsRow() {
+  const { colors } = useAppTheme();
+  const haptics = useSettingsStore((state) => state.haptics);
+  const setHaptics = useSettingsStore((state) => state.setHaptics);
+
+  function handleChange(next: boolean) {
+    setHaptics(next);
+    // Played after the change, so switching on is felt and switching off is not.
+    playHaptic("toggle-on");
+  }
+
+  return (
+    <Row
+      icon="vibrate"
+      title="Haptic feedback"
+      haptic="none"
+      onPress={() => handleChange(!haptics)}
+      trailing={
+        <Switch
+          value={haptics}
+          onValueChange={handleChange}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          accessibilityLabel="Haptic feedback"
+          testID="haptics-switch"
+        />
+      }
+      testID="haptics"
+    />
+  );
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const appearance = useSettingsStore((state) => state.appearance);
@@ -142,6 +175,11 @@ export default function SettingsScreen() {
             />
           </>
         ) : null}
+
+        <GroupLabel>Interaction</GroupLabel>
+        <Group>
+          <HapticsRow />
+        </Group>
 
         {updatesSupported ? <UpdatesSection /> : null}
 
