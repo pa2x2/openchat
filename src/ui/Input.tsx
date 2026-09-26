@@ -1,9 +1,10 @@
-import { forwardRef } from "react";
+import type { Ref } from "react";
 import { TextInput, View, Text } from "react-native";
 import { cn } from "@/src/lib/cn";
 import { useAppTheme } from "./theme";
 
 export interface InputProps {
+  ref?: Ref<TextInput>;
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
@@ -17,22 +18,20 @@ export interface InputProps {
   testID?: string;
 }
 
-export const Input = forwardRef<TextInput, InputProps>(function Input(
-  {
-    value,
-    onChangeText,
-    placeholder,
-    label,
-    error,
-    secureTextEntry,
-    multiline,
-    autoCapitalize,
-    autoCorrect,
-    className,
-    testID,
-  },
+export function Input({
   ref,
-) {
+  value,
+  onChangeText,
+  placeholder,
+  label,
+  error,
+  secureTextEntry,
+  multiline,
+  autoCapitalize,
+  autoCorrect,
+  className,
+  testID,
+}: InputProps) {
   const { colors } = useAppTheme();
 
   return (
@@ -63,4 +62,4 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
       ) : null}
     </View>
   );
-});
+}
