@@ -46,6 +46,8 @@ Today it talks to [OpenCode](https://opencode.ai) servers. The app keeps each ba
 
    Tags are listed on the [releases page](https://github.com/pa2x2/openchat/releases) under `server-opencode-*`. See [docker/opencode](docker/opencode/README.md) for Compose, volumes and config.
 
+   You can also use [example docker-compose.yml](https://github.com/pa2x2/openchat/blob/main/docker/opencode/docker-compose.yml)
+
 3. In the app, open Settings and enter the server URL (for example `http://192.168.1.10:4096`) and the password.
 
 You can also run plain `opencode serve` instead of the image. In that case, start it from an empty directory so the app's chats stay apart from your other OpenCode sessions.
