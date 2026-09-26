@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -119,12 +119,19 @@ export function Sheet({
     });
   }, [visible, progress, drag]);
 
-  if (!mounted) return null;
-
-  const translateY = Animated.add(
-    progress.interpolate({ inputRange: [0, 1], outputRange: [OFFSCREEN, 0] }),
-    drag,
+  // Built once: each new node would be attached to the native driver again on
+  // every render of the screen that owns the sheet.
+  const translateY = useMemo(
+    () =>
+      Animated.add(progress.interpolate({ inputRange: [0, 1], outputRange: [OFFSCREEN, 0] }), drag),
+    [progress, drag],
   );
+  const scrimOpacity = useMemo(
+    () => progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
+    [progress],
+  );
+
+  if (!mounted) return null;
 
   return (
     <Modal
@@ -142,7 +149,7 @@ export function Sheet({
             StyleSheet.absoluteFill,
             {
               backgroundColor: colors.overlay,
-              opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
+              opacity: scrimOpacity,
             },
           ]}
         >
