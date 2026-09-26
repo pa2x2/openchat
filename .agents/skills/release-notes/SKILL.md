@@ -45,7 +45,6 @@ description: Generate OpenChat app release notes in CHANGELOG.md. Use when asked
 5. Use a Keep a Changelog-compatible section named `[X.Y.Z]` (or `[X.Y.Z-prerelease]`) with
    the current date for a numbered release, or an undated `[Unreleased]` section for
    pending changes. Use only the applicable decorated category headings from this mapping:
-
    - `✨ Added` - for new features.
    - `🔄 Changed` - for changes in existing functionality.
    - `🧩 Improved` - for enhancement in existing functionality.
