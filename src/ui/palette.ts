@@ -25,13 +25,23 @@ export const palette = {
   /** Grouped rows, inputs, search fields — one step above the canvas. */
   surface: { light: "#f4f4f4", dark: "#212121" },
   /** Pressed state for surfaces. */
-  surfaceHover: { light: "#ececec", dark: "#2c2c2c" },
+  surfaceHover: { light: "#ececec", dark: "#2e2e2e" },
   /** Floating chrome: header buttons, the composer, sheets and menus. */
-  elevated: { light: "#ffffff", dark: "#242424" },
+  elevated: { light: "#ffffff", dark: "#262626" },
+  /**
+   * Cards, tiles and pressed rows *inside* `elevated` chrome (sheet cards,
+   * menu rows, composer chips). In light mode that is just `surface`, but in
+   * dark mode elevation gets lighter, so `surface` would vanish on a sheet.
+   */
+  raised: { light: "#f4f4f4", dark: "#333333" },
+  /** Pressed state for `raised`. */
+  raisedHover: { light: "#ececec", dark: "#3f3f3f" },
+  /** The chosen option's thumb in a segmented control on a `surface` card. */
+  selected: { light: "#ffffff", dark: "#3a3a3a" },
   /** Scrim behind modals and sheets. */
   overlay: { light: "#000000", dark: "#000000" },
   /** Hairlines and card outlines. */
-  border: { light: "#e5e5e5", dark: "#2f2f2f" },
+  border: { light: "#e5e5e5", dark: "#3d3d3d" },
   /** Primary body text. */
   text: { light: "#0d0d0d", dark: "#ececec" },
   /** Secondary text: timestamps, hints, section labels. */

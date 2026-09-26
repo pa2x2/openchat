@@ -62,10 +62,15 @@ export function UpdateSheet() {
       {release?.notes ? (
         <ScrollView
           style={{ flexGrow: 0, maxHeight: 320 }}
-          className="mb-3 rounded-[20px] bg-surface"
+          className="mb-3 rounded-[20px] bg-raised"
         >
           <View className="px-4 py-2">
-            <MarkdownContent text={release.notes} role="assistant" streaming={false} />
+            <MarkdownContent
+              text={release.notes}
+              role="assistant"
+              streaming={false}
+              backdrop="raised"
+            />
           </View>
         </ScrollView>
       ) : null}

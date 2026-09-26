@@ -147,7 +147,7 @@ function HeaderMenu({
               key={item.label}
               accessibilityRole="button"
               accessibilityLabel={item.label}
-              className="flex-row items-center gap-3 rounded-[14px] px-3 py-3 active:bg-surface"
+              className="flex-row items-center gap-3 rounded-[14px] px-3 py-3 active:bg-raised"
               onPress={() => {
                 onClose();
                 item.onPress();

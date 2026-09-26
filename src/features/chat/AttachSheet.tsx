@@ -41,7 +41,7 @@ export function AttachSheet({ visible, onClose, onPick }: AttachSheetProps) {
             accessibilityRole="button"
             accessibilityLabel={option.title}
             accessibilityHint={option.hint}
-            className="h-[88px] flex-1 items-center justify-center gap-2 rounded-[20px] bg-surface active:bg-surface-hover"
+            className="h-[88px] flex-1 items-center justify-center gap-2 rounded-[20px] bg-raised active:bg-raised-hover"
             onPress={() => onPick(option.source)}
             testID={`attach-${option.source}`}
           >

@@ -16,7 +16,7 @@ export interface ButtonProps {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-primary active:bg-primary/80",
-  secondary: "bg-surface active:bg-surface-hover",
+  secondary: "bg-raised active:bg-raised-hover",
   danger: "bg-danger active:bg-danger/80",
   ghost: "bg-transparent active:bg-surface-hover",
 };

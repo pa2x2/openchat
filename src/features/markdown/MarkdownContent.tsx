@@ -7,7 +7,7 @@ import { useCallback, useMemo } from "react";
 import { Linking, Text, View } from "react-native";
 import { useAppTheme } from "@/src/ui/theme";
 import { projectMarkdown } from "./streamProjection";
-import { getMarkdownStyles } from "./styles";
+import { getMarkdownStyles, type MarkdownBackdrop } from "./styles";
 
 const markdownParser = createMarkdownIt();
 const disabledImageHandlers: string[] = [];
@@ -16,6 +16,8 @@ export interface MarkdownContentProps {
   text: string;
   role: "user" | "assistant";
   streaming: boolean;
+  /** Defaults to the page; pass `"raised"` when rendering inside a sheet card. */
+  backdrop?: MarkdownBackdrop;
   testID?: string;
 }
 
@@ -28,10 +30,16 @@ function isSafeLink(url: string): boolean {
  * are parsed as markdown; the current block remains lossless plain text until
  * it reaches a safe boundary.
  */
-export function MarkdownContent({ text, role, streaming, testID }: MarkdownContentProps) {
+export function MarkdownContent({
+  text,
+  role,
+  streaming,
+  backdrop = "page",
+  testID,
+}: MarkdownContentProps) {
   const { scheme, colors } = useAppTheme();
   const projection = useMemo(() => projectMarkdown(text, streaming), [text, streaming]);
-  const styles = useMemo(() => getMarkdownStyles(role, colors), [role, colors]);
+  const styles = useMemo(() => getMarkdownStyles(role, colors, backdrop), [role, colors, backdrop]);
   const textColor = role === "user" ? colors.userBubbleText : colors.text;
   const markdownSource = useMemo(
     () => (streaming ? projection.stable : sealIncompleteMarkdown(projection.stable)),

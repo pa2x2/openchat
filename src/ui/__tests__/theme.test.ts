@@ -7,10 +7,26 @@ import {
   paletteKeys,
   resolvePalette,
   themeForScheme,
+  type PaletteKey,
 } from "../theme";
 
 /** Every colour the navigation theme may pass to a React Navigation option. */
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/** WCAG contrast ratio between two hex colours. */
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = hexToTriplet(hex)
+      .split(" ")
+      .map((channel) => {
+        const c = Number(channel) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 describe("theme", () => {
   it("provides a light and dark theme", () => {
@@ -71,6 +87,36 @@ describe("theme", () => {
       expect(theme.navigationTheme.colors.card).toBe(theme.colors.background);
       expect(theme.navigationTheme.colors.text).toBe(theme.colors.text);
       expect(theme.navigationTheme.colors.border).toBe(theme.colors.border);
+    }
+  });
+
+  it("keeps every stacked layer distinguishable from the one beneath it", () => {
+    // [top, bottom]: pairs the UI actually paints on top of each other. Dark
+    // mode once had `surface` and `elevated` 3 levels apart, which made the
+    // segmented thumb and every card inside a sheet invisible. (`elevated` on
+    // `background` is left out: in light mode it is white on white by design,
+    // separated by a shadow.)
+    const stacks: [PaletteKey, PaletteKey][] = [
+      ["surface", "background"],
+      ["surfaceHover", "surface"],
+      ["selected", "surface"],
+      ["border", "surface"],
+      ["raised", "elevated"],
+      ["raisedHover", "raised"],
+      ["border", "raised"],
+      ["border", "elevated"],
+    ];
+    for (const scheme of ["light", "dark"] as const) {
+      const colors = resolvePalette(scheme);
+      for (const [top, bottom] of stacks) {
+        const ratio = contrast(colors[top], colors[bottom]);
+        expect({ scheme, top, bottom, ok: ratio >= 1.07 }).toEqual({
+          scheme,
+          top,
+          bottom,
+          ok: true,
+        });
+      }
     }
   });
 

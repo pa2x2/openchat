@@ -33,7 +33,7 @@ export function Segmented<T extends string>({
             accessibilityState={{ checked: active }}
             className={cn(
               "h-10 flex-1 items-center justify-center rounded-2xl",
-              active ? "bg-elevated" : "active:bg-surface-hover",
+              active ? "bg-selected" : "active:bg-surface-hover",
             )}
             onPress={() => onChange(option.value)}
             testID={testIDPrefix ? `${testIDPrefix}-${option.value}` : undefined}

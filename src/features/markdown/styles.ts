@@ -1,6 +1,9 @@
 import type { MarkdownStyleMap } from "@ronradtke/react-native-markdown-display";
 import type { ResolvedPalette } from "@/src/ui/theme";
 
+/** What the markdown is drawn on: the page itself, or a `raised` card in a sheet. */
+export type MarkdownBackdrop = "page" | "raised";
+
 /**
  * Markdown renders with real React Native styles rather than NativeWind
  * classes, so it reads the resolved palette instead of the CSS variables.
@@ -13,16 +16,21 @@ import type { ResolvedPalette } from "@/src/ui/theme";
 export function getMarkdownStyles(
   role: "user" | "assistant",
   palette: ResolvedPalette,
+  backdrop: MarkdownBackdrop = "page",
 ): MarkdownStyleMap {
   const isUser = role === "user";
+  // Quotes, inline code and table headers are panels one step off whatever
+  // the text sits on. On a `raised` card `surface` would blend in, so they
+  // step the other way, to `elevated`.
+  const panel = backdrop === "raised" ? palette.elevated : palette.surface;
   // The user's side sits on the tinted bubble, so it takes the bubble's own
   // text colour; everything else is the page palette.
   const foreground = isUser ? palette.userBubbleText : palette.text;
   const muted = isUser ? palette.userBubbleText : palette.textMuted;
-  const quoteBackground = isUser ? "transparent" : palette.surface;
+  const quoteBackground = isUser ? "transparent" : panel;
   const quoteBorder = isUser ? palette.userBubbleText : palette.border;
-  const inlineCodeBackground = isUser ? palette.background : palette.surface;
-  const tableHeader = palette.surface;
+  const inlineCodeBackground = isUser ? palette.background : panel;
+  const tableHeader = panel;
   const tableRow = palette.background;
   const linkColor = isUser ? palette.userBubbleText : palette.primary;
 

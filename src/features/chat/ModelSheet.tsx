@@ -103,7 +103,11 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
             return (
               <View
                 className={cn(
-                  "overflow-hidden bg-surface",
+                  "overflow-hidden bg-raised",
+                  // Each row is its own view, and fractional row heights can
+                  // leave a sub-pixel gap that shows the sheet through as a
+                  // full-width seam. Overlapping by 1dp closes it.
+                  !first && "-mt-px",
                   first && "rounded-t-[20px]",
                   last && "rounded-b-[20px]",
                 )}
@@ -114,7 +118,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
                   accessibilityRole="button"
                   accessibilityLabel={`${item.label}, ${item.ref.provider}`}
                   accessibilityState={{ selected: active }}
-                  className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-hover"
+                  className="flex-row items-center gap-3 px-4 py-3 active:bg-raised-hover"
                   testID={`model-option-${item.ref.provider}-${item.ref.id}`}
                 >
                   <View className="flex-1">

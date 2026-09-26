@@ -72,6 +72,8 @@ export function AttachmentChip({
   const source = attachmentUri(attachment);
   const preview = isImageAttachment(attachment) && source.length > 0;
   const side = size === "large" ? 150 : 64;
+  // Small chips sit inside the composer (elevated chrome), large ones on the page.
+  const tile = size === "large" ? "bg-surface" : "bg-raised";
 
   return (
     <View testID={`attachment-chip-${attachment.name}`}>
@@ -80,13 +82,14 @@ export function AttachmentChip({
           accessibilityLabel={attachment.name}
           source={{ uri: source }}
           style={{ width: side, height: side }}
-          className={cn("bg-surface", size === "large" ? "rounded-[18px]" : "rounded-[14px]")}
+          className={cn(tile, size === "large" ? "rounded-[18px]" : "rounded-[14px]")}
           testID={`attachment-image-${attachment.name}`}
         />
       ) : (
         <View
           className={cn(
-            "flex-row items-center gap-2.5 bg-surface pl-2.5 pr-3.5",
+            "flex-row items-center gap-2.5 pl-2.5 pr-3.5",
+            tile,
             size === "large" ? "h-16 rounded-2xl" : "h-16 rounded-[14px]",
           )}
         >

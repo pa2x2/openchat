@@ -77,7 +77,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             accessibilityHint="Attaches a photo or a file to your message"
             accessibilityLabel="Add attachment"
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-raised"
             onPress={onAttach}
             testID="composer-attach"
           >
@@ -118,7 +118,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             accessibilityState={{ disabled: sendDisabled }}
             className={cn(
               "m-0.5 h-10 w-10 items-center justify-center rounded-full",
-              sendDisabled ? "bg-surface-hover" : "bg-primary active:opacity-80",
+              sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
             )}
             disabled={sendDisabled}
             onPress={() => void handleSend()}
