@@ -6,10 +6,10 @@ minimumReleaseAgeExclude:
   - "@opencode/client@2.0.7"
   - "@opencode/protocol@2.0.7"
   - "@opencode/schema@2.0.7"
-patchedDependencies:
-  "@ronradtke/react-native-markdown-display@9.0.3": patches/@ronradtke__react-native-markdown-display@9.0.3.patch
 packageExtensions:
-  # The patch above imports RNGH's ScrollView into the markdown library.
-  "@ronradtke/react-native-markdown-display@9.0.3":
-    peerDependencies:
-      react-native-gesture-handler: "*"
+  # Its math renderer needs this native module; OpenChat only uses the
+  # headless parser, so keep it out of the install and the app build.
+  react-native-nitro-markdown:
+    peerDependenciesMeta:
+      ratex-react-native:
+        optional: true

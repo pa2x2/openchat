@@ -100,7 +100,7 @@ export function Composer({
         className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"
         testID="composer-input"
       />
-      <View className="flex-row items-center gap-1">
+      <View className="mx-2 mb-1 flex-row items-center gap-1">
         {showAttach ? (
           <Pressable
             accessibilityHint="Attaches a photo or a file to your message"

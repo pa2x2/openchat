@@ -7,7 +7,7 @@ module.exports = {
     "^@opencode/client$": "<rootDir>/node_modules/@opencode/client/dist/promise/index.js",
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@opencode|@ronradtke))",
+    "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@opencode))",
     "/node_modules/react-native-reanimated/plugin/",
     "/node_modules/@react-native/babel-preset/",
   ],

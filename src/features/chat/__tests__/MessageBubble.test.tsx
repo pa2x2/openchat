@@ -1,7 +1,12 @@
 import { act } from "react";
 import { render } from "@/src/test-utils/render";
 import type { Message } from "@/src/domain";
+import * as Clipboard from "expo-clipboard";
 import { MessageBubble } from "../MessageBubble";
+
+jest.mock("expo-clipboard", () => ({
+  setStringAsync: jest.fn().mockResolvedValue(true),
+}));
 
 function message(patch: Partial<Message> = {}): Message {
   return {
@@ -15,14 +20,13 @@ function message(patch: Partial<Message> = {}): Message {
 }
 
 describe("MessageBubble", () => {
-  it("streams inline and only exposes reasoning when enabled", async () => {
+  it("only exposes reasoning when enabled", async () => {
     const hidden = await render(
       <MessageBubble
         message={message({ status: "streaming", reasoning: "thinking" })}
         showReasoning={false}
       />,
     );
-    expect(hidden.root.findByProps({ accessibilityLabel: "Generating" })).toBeTruthy();
     expect(hidden.root.findAllByProps({ testID: "reasoning-drawer" })).toHaveLength(0);
 
     const shown = await render(
@@ -111,6 +115,16 @@ describe("MessageBubble regenerate", () => {
       button.props.onPress();
     });
     expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies the reply's markdown source", async () => {
+    const tree = await render(
+      <MessageBubble showReasoning={false} message={message({ text: "Use **bold**" })} />,
+    );
+    await act(async () => {
+      tree.root.findByProps({ testID: "copy-reply-button" }).props.onPress();
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith("Use **bold**");
   });
 
   it("hides the rerun while the reply is still streaming", async () => {

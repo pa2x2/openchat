@@ -262,7 +262,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           />
         </View>
 
-        <View className="px-3 pt-1" style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}>
+        <View
+          className="mb-2 px-3 pt-1"
+          style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}
+        >
           {turnError ? (
             <Text className="px-2 pb-2 text-sm text-danger" testID="turn-error">
               {turnError}

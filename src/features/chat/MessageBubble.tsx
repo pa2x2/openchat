@@ -1,4 +1,5 @@
-import { memo } from "react";
+import * as Clipboard from "expo-clipboard";
+import { memo, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Message } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
@@ -29,6 +30,39 @@ function statusFor(message: Message): string | undefined {
     default:
       return undefined;
   }
+}
+
+const COPIED_MS = 1500;
+
+function CopyReplyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  function handleCopy() {
+    void Clipboard.setStringAsync(text).catch(() => undefined);
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), COPIED_MS);
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={copied ? "Copied" : "Copy reply"}
+      accessibilityRole="button"
+      className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+      onPress={handleCopy}
+      testID="copy-reply-button"
+    >
+      <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
+    </Pressable>
+  );
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -100,17 +134,25 @@ export const MessageBubble = memo(function MessageBubble({
           {status}
         </Text>
       ) : null}
-      {!streaming && onRegenerate ? (
-        <Pressable
-          accessibilityHint="Runs this reply again and replaces it"
-          accessibilityLabel="Regenerate reply"
-          accessibilityRole="button"
-          className="-ml-2 mt-1 h-9 w-9 items-center justify-center rounded-full active:bg-surface"
-          onPress={onRegenerate}
-          testID="regenerate-button"
-        >
-          <Icon name="refresh" size={19} tone="textMuted" />
-        </Pressable>
+      {streaming ? (
+        // Holds the action row's place so the reply doesn't jump when it ends.
+        <View className="mt-1 h-9" />
+      ) : hasText || onRegenerate ? (
+        <View className="-ml-2 mt-1 flex-row">
+          {hasText ? <CopyReplyButton text={message.text} /> : null}
+          {onRegenerate ? (
+            <Pressable
+              accessibilityHint="Runs this reply again and replaces it"
+              accessibilityLabel="Regenerate reply"
+              accessibilityRole="button"
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+              onPress={onRegenerate}
+              testID="regenerate-button"
+            >
+              <Icon name="refresh" size={19} tone="textMuted" />
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </Bubble>
   );
