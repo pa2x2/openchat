@@ -2,6 +2,20 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha04] - 2026-09-26
+
+### ✨ Added
+
+- Replies keep working on Android when you leave the app. An ongoing note stays up while they run, and you get a notification when a reply finishes, fails, or needs an answer. Tapping it opens the chat.
+- Delete several chats at once. Long press a chat in the sidebar to select more, then use select all or the trash button. Closing the sidebar or pressing back clears the selection.
+- Haptic feedback, on by default. Buttons and gestures answer with a light tap. Turn it off in Settings under Interaction.
+- You can copy messages you sent from the button next to your text.
+
+### 🧩 Improved
+
+- Replies show their work while they run. A live row says what the reply does, like Thinking or Reading files, and opens for detail. Finished replies fold earlier steps behind a Worked for label, with Thought kept as its own row.
+- Opening a chat with a run still going attaches to it live, even if the run started on another client or before a restart.
+
 ## [1.0.0-alpha03] - 2026-09-26
 
 ### ✨ Added
@@ -74,6 +88,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.0.0-alpha04]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha04
 [1.0.0-alpha03]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha03
 [1.0.0-alpha02]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha02
 [1.0.0-alpha01]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha01
