@@ -12,6 +12,11 @@ import { useSettingsStore } from "@/src/stores/settings";
 import { useSystemPalettesSync } from "@/src/ui/systemPalettes";
 import { useAppTheme } from "@/src/ui/theme";
 
+// Applied before the first render as well as on change: from the effect
+// alone, a launch with a forced scheme would draw its first frame in the
+// system one.
+colorScheme.set(useSettingsStore.getState().appearance);
+
 export default function RootLayout() {
   const { scheme, vars, navigationTheme } = useAppTheme();
   const appearance = useSettingsStore((state) => state.appearance);
