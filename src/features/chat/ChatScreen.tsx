@@ -18,7 +18,7 @@ import { Composer, type ComposerHandle } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
-import { EmptyChat, SuggestionChips } from "./EmptyChat";
+import { EmptyChat } from "./EmptyChat";
 import { AttachmentSource, pickFiles, pickImages } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
@@ -337,13 +337,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             <Text className="px-2 pb-2 text-sm text-danger" testID="chat-banner">
               {banner}
             </Text>
-          ) : null}
-          {empty && connected && !hasDraft && attachments.length === 0 ? (
-            <View className="-mx-3">
-              <SuggestionChips
-                onPick={(suggestion) => composer.current?.insert(suggestion.draft)}
-              />
-            </View>
           ) : null}
           <Composer
             ref={composer}

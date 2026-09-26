@@ -23,7 +23,7 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
-  /** Reports whether the field has text, e.g. to hide suggestions. */
+  /** Reports whether the field has text. */
   onDraftChange?: (hasText: boolean) => void;
   /** Focuses the field on mount. */
   autoFocus?: boolean;

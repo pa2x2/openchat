@@ -63,7 +63,7 @@ export const palette = {
   codeText: { light: "#0d0d0d", dark: "#ececec" },
   /** Markdown code chrome: language label, copy button. */
   codeMuted: { light: "#6b6b6b", dark: "#a1a1aa" },
-  /** Decorative icon tints, e.g. the new-chat suggestion chips. */
+  /** Decorative icon tints. */
   tintViolet: { light: "#c061cb", dark: "#dc8add" },
   tintAmber: { light: "#e5a50a", dark: "#f6d32d" },
   tintGreen: { light: "#2ec27e", dark: "#57e389" },
