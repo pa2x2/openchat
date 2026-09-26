@@ -34,7 +34,7 @@ function statusFor(message: Message): string | undefined {
 
 const COPIED_MS = 1500;
 
-function CopyReplyButton({ text }: { text: string }) {
+function CopyButton({ text, label, testID }: { text: string; label: string; testID: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,11 +54,11 @@ function CopyReplyButton({ text }: { text: string }) {
 
   return (
     <Pressable
-      accessibilityLabel={copied ? "Copied" : "Copy reply"}
+      accessibilityLabel={copied ? "Copied" : label}
       accessibilityRole="button"
       className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
       onPress={handleCopy}
-      testID="copy-reply-button"
+      testID={testID}
     >
       <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
     </Pressable>
@@ -96,6 +96,11 @@ export const MessageBubble = memo(function MessageBubble({
               testID={`markdown-${message.id}`}
             />
           </Bubble>
+        ) : null}
+        {hasText ? (
+          <View className="-mr-2 mt-1 flex-row self-end px-4">
+            <CopyButton label="Copy message" testID="copy-message-button" text={message.text} />
+          </View>
         ) : null}
       </View>
     );
@@ -139,7 +144,9 @@ export const MessageBubble = memo(function MessageBubble({
         <View className="mt-1 h-9" />
       ) : hasText || onRegenerate ? (
         <View className="-ml-2 mt-1 flex-row">
-          {hasText ? <CopyReplyButton text={message.text} /> : null}
+          {hasText ? (
+            <CopyButton label="Copy reply" testID="copy-reply-button" text={message.text} />
+          ) : null}
           {onRegenerate ? (
             <Pressable
               accessibilityHint="Runs this reply again and replaces it"
