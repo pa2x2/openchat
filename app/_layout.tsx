@@ -36,7 +36,6 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShadowVisible: false }}>
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
-            <Stack.Screen name="ui-demo" options={{ title: "Design primitives" }} />
           </Stack>
           {/* Here rather than in a screen, so a launch check can offer an
               update over whichever screen is open. */}
