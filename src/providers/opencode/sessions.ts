@@ -3,7 +3,7 @@
  */
 
 import type { ModelRef as OpenCodeModelRef, SessionInfo } from "@opencode/client";
-import type { ChatId, ChatSummary, ModelRef } from "@/src/domain";
+import { UNTITLED_CHAT, type ChatId, type ChatSummary, type ModelRef } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
 
 /**
@@ -67,7 +67,7 @@ export async function switchModel(
 export function toChatSummary(session: SessionInfo): ChatSummary {
   return {
     id: session.id,
-    title: session.title && session.title.length > 0 ? session.title : "Untitled chat",
+    title: session.title && session.title.length > 0 ? session.title : UNTITLED_CHAT,
     updatedAt: session.time?.updated ?? 0,
     model: session.model ? fromWireModel(session.model) : undefined,
   };

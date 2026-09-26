@@ -7,6 +7,7 @@ import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colorScheme } from "nativewind";
+import { watchTurns } from "@/src/features/notifications/turnNotifications";
 import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
 import { useUpdateChecks } from "@/src/features/updates/useUpdateChecks";
 import { useSettingsStore } from "@/src/stores/settings";
@@ -24,6 +25,8 @@ export default function RootLayout() {
   const appearance = useSettingsStore((state) => state.appearance);
   useUpdateChecks();
   useSystemPalettesSync();
+
+  useEffect(watchTurns, []);
 
   useEffect(() => {
     colorScheme.set(appearance);

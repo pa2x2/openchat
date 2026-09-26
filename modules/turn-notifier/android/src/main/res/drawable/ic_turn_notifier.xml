@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app glyph (assets/icon/glyph.svg), cropped to the bubble, with the
+     ">_" strokes outlined so they cut out as even-odd holes. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="47"
+    android:viewportHeight="47">
+  <group android:translateX="-30" android:translateY="-30">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M47.45,69.42 A20.24,20.24 0 1,0 37.66,59.63 Q35.82,66.99 33,75 Q41.93,71.26 47.45,69.42 Z M47.51,42.09 L54.87,49.45 A2.3,2.3 0 0,1 54.87,52.71 L47.51,60.07 A2.3,2.3 0 0,1 44.25,56.81 L49.98,51.08 L44.25,45.35 A2.3,2.3 0 0,1 47.51,42.09 Z M57.84,56.14 L67.04,56.14 A2.3,2.3 0 0,1 67.04,60.74 L57.84,60.74 A2.3,2.3 0 0,1 57.84,56.14 Z" />
+  </group>
+</vector>

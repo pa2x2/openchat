@@ -221,6 +221,8 @@ export interface Message {
   completedAt?: number;
 }
 
+export const UNTITLED_CHAT = "Untitled chat";
+
 export interface ChatSummary {
   id: ChatId;
   title: string;

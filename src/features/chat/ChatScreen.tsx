@@ -14,6 +14,7 @@ import { discardTemporaryChat } from "./temporaryChats";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
+import { dismissTurnNotification } from "@/src/features/notifications/turnNotifications";
 import {
   answerForm,
   discardPendingRegenerate,
@@ -121,6 +122,16 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       cancelled = true;
       subscription.remove();
     };
+  }, [chatId, isDraft]);
+
+  // The chat's notification is stale once the user is looking at the chat.
+  useEffect(() => {
+    if (isDraft) return;
+    dismissTurnNotification(chatId);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") dismissTurnNotification(chatId);
+    });
+    return () => subscription.remove();
   }, [chatId, isDraft]);
 
   // A rerun that was staged on the server but never delivered would make the

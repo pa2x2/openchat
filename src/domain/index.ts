@@ -25,3 +25,4 @@ export type {
   TurnActivity,
   UserMessage,
 } from "./types";
+export { UNTITLED_CHAT } from "./types";

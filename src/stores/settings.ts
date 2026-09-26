@@ -3,7 +3,8 @@
  *
  * Holds the last model picked per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
- * appearance and colour preferences, and the update channel.
+ * appearance and colour preferences, the update channel, and whether the
+ * notification permission was already asked for.
  */
 
 import Constants from "expo-constants";
@@ -36,6 +37,8 @@ interface SettingsStoreState {
   setColorSource: (colorSource: ColorSource) => void;
   updateChannel: UpdateChannel;
   setUpdateChannel: (channel: UpdateChannel) => void;
+  notificationsAsked: boolean;
+  markNotificationsAsked: () => void;
 }
 
 export function createSettingsStore(
@@ -52,6 +55,8 @@ export function createSettingsStore(
         setColorSource: (colorSource) => set({ colorSource }),
         updateChannel: defaultUpdateChannel(appVersion),
         setUpdateChannel: (updateChannel) => set({ updateChannel }),
+        notificationsAsked: false,
+        markNotificationsAsked: () => set({ notificationsAsked: true }),
         setLastModel: (providerId, model) =>
           set((state) => ({
             lastModels: { ...state.lastModels, [providerId]: model },
