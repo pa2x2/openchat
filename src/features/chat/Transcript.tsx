@@ -24,6 +24,17 @@ import { MessageBubble } from "./MessageBubble";
 /** How far up the transcript the "jump to latest" button appears. */
 const SCROLL_BUTTON_OFFSET = 300;
 
+/** Within this many px of the newest message, the list follows a streaming reply. */
+const FOLLOW_OFFSET = 8;
+
+// The list is inverted, so a reply growing at index 0 pushes everything above
+// it up while the offset stays put: at the bottom that follows the stream, but
+// scrolled away it drags the content out from under the reader. Anchoring to
+// index 1 (never the streaming reply itself: Android anchors on the first
+// partly visible cell, whose top in inverted space doesn't move as it grows)
+// makes the native side shift the offset by the growth in the same layout pass.
+const HOLD_POSITION = { minIndexForVisible: 1 };
+
 export interface TranscriptProps {
   chatId: ChatId;
   listRef: RefObject<FlatList<Message> | null>;
@@ -44,6 +55,7 @@ export function Transcript({
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [following, setFollowing] = useState(true);
 
   const reversed = useMemo(() => [...(transcript ?? [])].reverse(), [transcript]);
 
@@ -67,8 +79,11 @@ export function Transcript({
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     // The list is inverted: offset 0 is the newest message.
-    const away = event.nativeEvent.contentOffset.y > SCROLL_BUTTON_OFFSET;
+    const offset = event.nativeEvent.contentOffset.y;
+    const away = offset > SCROLL_BUTTON_OFFSET;
     if (away !== showScrollButton) setShowScrollButton(away);
+    const atLatest = offset <= FOLLOW_OFFSET;
+    if (atLatest !== following) setFollowing(atLatest);
   }
 
   return (
@@ -80,8 +95,11 @@ export function Transcript({
         keyExtractor={(message) => message.id}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={following ? undefined : HOLD_POSITION}
         onScroll={handleScroll}
-        scrollEventThrottle={100}
+        // Frequent enough that a drag away from the bottom stops following
+        // before the stream moves the content under it.
+        scrollEventThrottle={16}
         // Inverted: the header component sits at the bottom, the footer
         // at the top, under the floating header.
         ListHeaderComponent={<View className="h-3" />}
