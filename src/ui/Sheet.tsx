@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Keyboard,
   Modal,
   PanResponder,
   Pressable,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
+import { SeededKeyboardAvoidingView, useKeyboardOpen } from "./keyboard";
 import { useAppTheme } from "./theme";
 
 export interface SheetProps {
@@ -41,7 +43,8 @@ const DISMISS_VELOCITY = 0.5;
  * the RN Modal so it needs no native module. The scrim fades while the card
  * slides; both run on the native driver. Dragging the card down dismisses it;
  * scrollable content keeps its own vertical gestures, so lists are dismissed
- * from the grabber and title.
+ * from the grabber and title. A sheet with a field in it rises above the
+ * keyboard, and takes the keyboard down when it closes.
  */
 export function Sheet({
   visible,
@@ -55,11 +58,15 @@ export function Sheet({
 }: SheetProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
+  const keyboardOpen = useKeyboardOpen();
   // Stays mounted through the closing animation, then unmounts the Modal.
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
   // Finger offset while dragging the card down; added to the open/close slide.
   const drag = useRef(new Animated.Value(0)).current;
+  // Whether the sheet was open on the previous pass, so that one which mounts
+  // closed is not mistaken for one on its way down.
+  const wasVisible = useRef(visible);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -85,6 +92,8 @@ export function Sheet({
   ).current;
 
   useEffect(() => {
+    const closing = wasVisible.current && !visible;
+    wasVisible.current = visible;
     if (visible) {
       drag.setValue(0);
       setMounted(true);
@@ -96,6 +105,11 @@ export function Sheet({
       }).start();
       return;
     }
+    // A closing sheet takes the keyboard down with it: the field that raised it
+    // is going away, and an unmounted input leaves the keyboard up on iOS. Only
+    // on the way down, never on the way in: a screen renders its sheets closed,
+    // and dismissing there would take the composer down mid-sentence.
+    if (closing) Keyboard.dismiss();
     Animated.timing(progress, {
       toValue: 0,
       duration: 200,
@@ -123,7 +137,7 @@ export function Sheet({
       onRequestClose={onClose}
       testID={testID}
     >
-      <View className="flex-1 justify-end">
+      <View className="flex-1">
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
@@ -135,34 +149,46 @@ export function Sheet({
         >
           <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close sheet" />
         </Animated.View>
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={{
-            transform: [{ translateY }],
-            marginBottom: insets.bottom + 8,
-            marginHorizontal: 8,
-            maxHeight: "85%",
-            height,
-          }}
+        {/* The Modal is its own window, so the screen's keyboard avoidance
+            cannot reach the card: this one has to live in here. The card then
+            shrinks into the space the keyboard leaves, instead of sitting
+            under it. */}
+        <SeededKeyboardAvoidingView
+          behavior="padding"
+          style={{ flex: 1, justifyContent: "flex-end" }}
         >
-          <View
-            className={cn(
-              "flex-shrink rounded-[28px] bg-elevated px-3 pb-4 pt-2",
-              height !== undefined && "flex-1",
-              className,
-            )}
+          <Animated.View
+            {...panResponder.panHandlers}
+            style={{
+              transform: [{ translateY }],
+              // The keyboard already covers the nav-bar inset, so it only
+              // counts towards the gap while it is down.
+              marginBottom: keyboardOpen ? 8 : insets.bottom + 8,
+              marginHorizontal: 8,
+              flexShrink: 1,
+              maxHeight: "85%",
+              height,
+            }}
           >
-            <View className="mb-3 mt-0.5 h-1 w-9 self-center rounded-full bg-border" />
-            {title ? (
-              <Text className="text-center text-lg font-semibold text-text">{title}</Text>
-            ) : null}
-            {subtitle ? (
-              <Text className="mt-0.5 text-center text-sm text-text-muted">{subtitle}</Text>
-            ) : null}
-            {title || subtitle ? <View className="h-3" /> : null}
-            {children}
-          </View>
-        </Animated.View>
+            <View
+              className={cn(
+                "flex-shrink rounded-[28px] bg-elevated px-3 pb-4 pt-2",
+                height !== undefined && "flex-1",
+                className,
+              )}
+            >
+              <View className="mb-3 mt-0.5 h-1 w-9 self-center rounded-full bg-border" />
+              {title ? (
+                <Text className="text-center text-lg font-semibold text-text">{title}</Text>
+              ) : null}
+              {subtitle ? (
+                <Text className="mt-0.5 text-center text-sm text-text-muted">{subtitle}</Text>
+              ) : null}
+              {title || subtitle ? <View className="h-3" /> : null}
+              {children}
+            </View>
+          </Animated.View>
+        </SeededKeyboardAvoidingView>
       </View>
     </Modal>
   );

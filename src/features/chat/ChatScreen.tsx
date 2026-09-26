@@ -3,11 +3,9 @@ import {
   AppState,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Pressable,
   Text,
   View,
-  type KeyboardEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -39,6 +37,7 @@ import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { Icon } from "@/src/ui/Icon";
+import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
@@ -391,39 +390,4 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       </SeededKeyboardAvoidingView>
     </View>
   );
-}
-
-/** Whether the soft keyboard is up, so the composer can drop the nav-bar inset. */
-function useKeyboardOpen(): boolean {
-  // Seeded from the current state: the show event may have fired before mount.
-  const [open, setOpen] = useState(() => Keyboard.isVisible());
-  useEffect(() => {
-    const shown = Keyboard.addListener("keyboardDidShow", () => setOpen(true));
-    const hidden = Keyboard.addListener("keyboardDidHide", () => setOpen(false));
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
-  return open;
-}
-
-/**
- * React Native's KeyboardAvoidingView learns about the keyboard only from
- * show/hide events, so one mounted while the keyboard is already up lays out
- * as if it were hidden and leaves the composer under the keyboard. Seed it
- * with the keyboard's current frame; its first layout pass picks that up.
- */
-class SeededKeyboardAvoidingView extends KeyboardAvoidingView {
-  componentDidMount() {
-    super.componentDidMount?.();
-    const endCoordinates = Keyboard.metrics();
-    if (!endCoordinates) return;
-    // `_keyboardEvent` is the component's own record of the last show event.
-    (this as unknown as { _keyboardEvent: KeyboardEvent })._keyboardEvent = {
-      duration: 0,
-      easing: "keyboard",
-      endCoordinates,
-    };
-  }
 }
