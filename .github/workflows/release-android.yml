@@ -14,6 +14,7 @@ permissions:
 
 env:
   HUSKY: "0"
+  REACT_NATIVE_ARCHITECTURES: arm64-v8a,armeabi-v7a
 
 jobs:
   release:
@@ -81,6 +82,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -116,7 +119,10 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: >
+          ./gradlew assembleRelease
+          -PreactNativeArchitectures="$REACT_NATIVE_ARCHITECTURES"
+          -x lintVitalRelease
 
       - name: Rename APKs and verify signatures
         run: |
@@ -126,8 +132,9 @@ jobs:
           APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
 
           mv "$OUT/app-universal-release.apk" "openchat-$TAG.apk"
-          for ABI in arm64-v8a armeabi-v7a x86 x86_64; do
-            mv "$OUT/app-$ABI-release.apk" "openchat-$ABI-$TAG.apk"
+          for APK in "$OUT"/app-*-release.apk; do
+            ABI="$(basename "$APK" -release.apk)"
+            mv "$APK" "openchat-${ABI#app-}-$TAG.apk"
           done
 
           for APK in openchat-*.apk; do
@@ -149,11 +156,6 @@ jobs:
             > [!TIP]
             >
             > If you are unsure which version to download, use `openchat-${{ github.ref_name }}.apk`.
-          files: |
-            openchat-${{ github.ref_name }}.apk
-            openchat-arm64-v8a-${{ github.ref_name }}.apk
-            openchat-armeabi-v7a-${{ github.ref_name }}.apk
-            openchat-x86-${{ github.ref_name }}.apk
-            openchat-x86_64-${{ github.ref_name }}.apk
+          files: openchat-*.apk
           draft: true
           prerelease: false

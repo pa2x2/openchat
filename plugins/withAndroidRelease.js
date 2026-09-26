@@ -1,9 +1,5 @@
 const { withAppBuildGradle } = require("expo/config-plugins");
 
-// Release signing and per-ABI APKs for android/app/build.gradle, which prebuild regenerates.
-// Signing reads ANDROID_KEYSTORE_FILE / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS /
-// ANDROID_KEY_PASSWORD; without them release builds keep the template's debug signing.
-
 const MARKER = "// @generated openchat-android-release";
 
 const SIGNING_CONFIG = `
@@ -17,14 +13,13 @@ const SIGNING_CONFIG = `
             }
         }`;
 
-// Only release tasks split, so `pnpm android` still produces a single debug APK.
 const SPLITS = `    ${MARKER}
     splits {
         abi {
             enable gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
             universalApk true
             reset()
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            include(*(findProperty("reactNativeArchitectures") ?: "armeabi-v7a,arm64-v8a,x86,x86_64").split(","))
         }
     }
 `;

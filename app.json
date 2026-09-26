@@ -41,7 +41,8 @@
       "expo-secure-store",
       "expo-font",
       "@react-native-vector-icons/material-design-icons",
-      "./plugins/withAndroidRelease"
+      "./plugins/withAndroidRelease",
+      "./plugins/withAndroidGradlePerformance"
     ],
     "experiments": {
       "typedRoutes": true
