@@ -93,6 +93,8 @@ interface LiveTurn {
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
+/** Chats claimed by a rerun that is still being set up and has no live turn yet. */
+const startingTurns = new Set<ChatId>();
 
 function isCurrentTurn(turn: LiveTurn): boolean {
   return !turn.finished && liveTurns.get(turn.chatId) === turn;
@@ -255,7 +257,25 @@ function describe(error: unknown): string {
  * re-sent and the previous reply stays where it is.
  */
 export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome> {
+  // A repeated tap on the same rerun; the first one is already under way.
+  if (startingTurns.has(chatId)) return { ok: false };
   if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
+  // The rerun only goes live once the transcript is fetched and the rollback
+  // staged. Until then it holds the chat, so a second tap or a send cannot
+  // start a turn beside it and leave this one's reply "Thinking" forever.
+  startingTurns.add(chatId);
+  useMessagesStore.getState().setTurnActive(chatId, true);
+  try {
+    return await rerun(chatId);
+  } finally {
+    // Once live, the turn itself owns the chat; this only covers not starting.
+    if (startingTurns.delete(chatId) && !liveTurns.has(chatId)) {
+      useMessagesStore.getState().setTurnActive(chatId, false);
+    }
+  }
+}
+
+async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
   const provider = await getProvider();
   if (!provider) return { ok: false, error: "Not connected. Open Settings to connect." };
 
@@ -264,7 +284,6 @@ export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome
   // sent in this session are still local ones.
   const store = useMessagesStore.getState();
   await store.fetchMessages(chatId);
-  if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
 
   const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
   if (!target) return { ok: false, error: "There is nothing to regenerate yet." };
@@ -393,6 +412,7 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
     activity: null,
     lastDelta: null,
   };
+  startingTurns.delete(chatId);
   liveTurns.set(chatId, turn);
   const messages = useMessagesStore.getState();
   messages.setTurnActive(chatId, true);
@@ -900,7 +920,7 @@ function failTurn(turn: LiveTurn, error: unknown): void {
 }
 
 export function isTurnLive(chatId: ChatId): boolean {
-  return liveTurns.has(chatId);
+  return liveTurns.has(chatId) || startingTurns.has(chatId);
 }
 
 /**

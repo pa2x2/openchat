@@ -299,6 +299,34 @@ describe("regenerateReply", () => {
     expect(state().byChat.c21).toHaveLength(4);
   });
 
+  it("holds the chat while the rerun is set up, so a second tap cannot orphan it", async () => {
+    let releasePrepare!: () => void;
+    const provider = useProvider({
+      capabilities: { regenerate: true } as ChatProvider["capabilities"],
+      prepareRegenerate: jest.fn(() => new Promise<void>((resolve) => (releasePrepare = resolve))),
+      regenerate: jest.fn().mockResolvedValue(undefined),
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      events: scriptedEvents([{ events: [textDelta("second reply"), chatIdle()] }]),
+    });
+    state().setMessages("c24", serverTurn());
+
+    const first = regenerateReply("c24");
+    await flush();
+    // Nothing is live yet, but the screen must already treat the chat as busy.
+    expect(state().activeTurns.c24).toBe(true);
+    await expect(regenerateReply("c24")).resolves.toMatchObject({ ok: false });
+    releasePrepare();
+    await expect(first).resolves.toEqual({ ok: true });
+
+    expect(provider.prepareRegenerate).toHaveBeenCalledTimes(1);
+    expect(state().byChat.c24.map((m) => [m.text, m.status])).toEqual([
+      ["older", "complete"],
+      ["old reply", "complete"],
+      ["again", "complete"],
+      ["second reply", "complete"],
+    ]);
+  });
+
   it("re-sends app-side when the backend cannot rerun natively", async () => {
     const provider = useProvider({
       fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
