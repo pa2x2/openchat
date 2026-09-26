@@ -114,6 +114,7 @@ export default function MainLayout() {
         overlayStyle={{ backgroundColor: withAlpha(colors.overlay, 0.32) }}
         renderDrawerContent={() => (
           <ChatDrawer
+            open={open}
             activeChatId={id}
             onSelectChat={goToChat}
             onNewChat={startNewChat}

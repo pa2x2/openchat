@@ -35,7 +35,7 @@ interface ChatsStoreState {
   upsert: (chat: ChatSummary) => void;
   /** Moves a chat to the top of the list with a fresh timestamp. */
   touch: (id: ChatId, updatedAt?: number) => void;
-  remove: (id: ChatId) => void;
+  remove: (ids: ChatId[]) => void;
   markPendingRegenerate: (id: ChatId, messageId: string) => void;
   clearPendingRegenerate: (id: ChatId) => void;
   markTemporary: (id: ChatId) => void;
@@ -69,7 +69,8 @@ export function createChatsStore(storage = mmkvStorage) {
               state.chats.map((chat) => (chat.id === id ? { ...chat, updatedAt } : chat)),
             ),
           })),
-        remove: (id) => set((state) => ({ chats: state.chats.filter((chat) => chat.id !== id) })),
+        remove: (ids) =>
+          set((state) => ({ chats: state.chats.filter((chat) => !ids.includes(chat.id)) })),
         markPendingRegenerate: (id, messageId) =>
           set((state) => ({ pendingRegenerate: { ...state.pendingRegenerate, [id]: messageId } })),
         clearPendingRegenerate: (id) =>
