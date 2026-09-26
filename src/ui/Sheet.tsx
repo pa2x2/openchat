@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -59,17 +59,26 @@ export function Sheet({
   const { colors } = useAppTheme();
   const keyboardOpen = useKeyboardOpen();
   // Stays mounted through the closing animation, then unmounts the Modal.
+  // Mounting happens here rather than in the effect, so opening does not cost
+  // an extra empty render.
   const [mounted, setMounted] = useState(visible);
-  const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  if (visible && !mounted) setMounted(true);
+  const [progress] = useState(() => new Animated.Value(visible ? 1 : 0));
   // Finger offset while dragging the card down; added to the open/close slide.
-  const drag = useRef(new Animated.Value(0)).current;
+  const [drag] = useState(() => new Animated.Value(0));
   // Whether the sheet was open on the previous pass, so that one which mounts
   // closed is not mistaken for one on its way down.
   const wasVisible = useRef(visible);
+  // The responder is built once, so it reads the latest onClose from here.
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
-  const panResponder = useRef(
+  // Built once: a new responder mid-drag would lose its gesture state. The
+  // ref is only read when a gesture ends, never during render.
+  // eslint-disable-next-line react-hooks/refs
+  const [panResponder] = useState(() =>
     PanResponder.create({
       // Claim touches on the card's own surface (grabber, title, padding) and
       // take over vertical drags that start on rows. Bubble phase only, so
@@ -88,14 +97,13 @@ export function Sheet({
         Animated.spring(drag, { toValue: 0, bounciness: 0, useNativeDriver: true }).start();
       },
     }),
-  ).current;
+  );
 
   useEffect(() => {
     const closing = wasVisible.current && !visible;
     wasVisible.current = visible;
     if (visible) {
       drag.setValue(0);
-      setMounted(true);
       Animated.timing(progress, {
         toValue: 1,
         duration: 280,

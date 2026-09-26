@@ -66,6 +66,16 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
     if (visible) void refresh();
   }, [visible, refresh]);
 
+  // Keys the browser, so each opening starts fresh: empty search, the opening
+  // tab, the selected model scrolled into view. The Sheet unmounts it after
+  // closing anyway; this covers a reopen while the close is still animating.
+  const [opening, setOpening] = useState(0);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) setOpening(opening + 1);
+  }
+
   function handleSelect(model: ModelInfo) {
     onSelect(model);
     onClose();
@@ -108,24 +118,17 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
           />
         </View>
       ) : (
-        <ModelBrowser
-          visible={visible}
-          models={models}
-          selected={selected}
-          onSelect={handleSelect}
-        />
+        <ModelBrowser key={opening} models={models} selected={selected} onSelect={handleSelect} />
       )}
     </Sheet>
   );
 }
 
 function ModelBrowser({
-  visible,
   models,
   selected,
   onSelect,
 }: {
-  visible: boolean;
   models: ModelInfo[];
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
@@ -149,19 +152,11 @@ function ModelBrowser({
     return groups[0]?.id ?? FAVORITES;
   }
 
+  // Null until the user picks one. The opening tab is resolved on render, so
+  // a catalog that arrives after opening still lands on the right provider.
   const [tab, setTab] = useState<string | null>(null);
   const listRef = useRef<SectionList<ModelInfo, Section>>(null);
-  // Set on open; the list scrolls the selected model into view once it lays out.
-  const pendingScroll = useRef(false);
-
-  // Each opening starts fresh. The tab is resolved on render, so a catalog
-  // that arrives after opening still lands on the right provider.
-  useEffect(() => {
-    if (!visible) return;
-    setQuery("");
-    setTab(null);
-    pendingScroll.current = true;
-  }, [visible]);
+  const scrollRetries = useRef(0);
 
   // A provider that left the catalog falls back like a fresh opening.
   const activeTab =
@@ -186,20 +181,35 @@ function ModelBrowser({
 
   const labelOf = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
 
+  // Runs on every content size change: the list renders its rows in batches,
+  // and a scroll made before the batch holding the selected row has landed
+  // stops short at the end of the content rendered so far.
   function scrollToSelected() {
-    if (!pendingScroll.current) return;
-    pendingScroll.current = false;
     if (!selected || searching) return;
     const index = sections[0]?.data.findIndex((model) => sameModelRef(model.ref, selected)) ?? -1;
     // Rows near the top are already in view.
     if (index < 4) return;
     // In a SectionList, item 0 is the section header.
+    scrollToRow(index + 1);
+  }
+
+  function scrollToRow(itemIndex: number) {
     listRef.current?.scrollToLocation({
       sectionIndex: 0,
-      itemIndex: index + 1,
+      itemIndex,
       viewPosition: 0.5,
       animated: false,
     });
+  }
+
+  // The first content size change comes before any row is measured, so that
+  // scroll fails; retry once rows have laid out. Capped, as a list that never
+  // measures would otherwise retry every frame.
+  function retryScroll({ index }: { index: number }) {
+    if (scrollRetries.current >= 5) return;
+    scrollRetries.current += 1;
+    // With a single section, the flat index the list reports is the item index.
+    requestAnimationFrame(() => scrollToRow(index));
   }
 
   const emptyText = searching
@@ -232,7 +242,7 @@ function ModelBrowser({
           initialNumToRender={20}
           keyExtractor={(model) => modelKey(model.ref)}
           onContentSizeChange={scrollToSelected}
-          onScrollToIndexFailed={() => {}}
+          onScrollToIndexFailed={retryScroll}
           // Search mixes providers, so each group is named; otherwise the
           // rail already says which list this is.
           renderSectionHeader={({ section }) =>

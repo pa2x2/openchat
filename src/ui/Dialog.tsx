@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { create } from "zustand";
 import { Button, type ButtonVariant } from "./Button";
@@ -18,7 +17,12 @@ export interface DialogRequest {
   actions?: DialogAction[];
 }
 
-export const useDialogStore = create<{ current: DialogRequest | null }>(() => ({ current: null }));
+// Closing only clears `open`: the request stays so the Modal can fade out
+// with its content still on screen.
+const useDialogStore = create<{ request: DialogRequest | null; open: boolean }>(() => ({
+  request: null,
+  open: false,
+}));
 
 /**
  * Themed stand-in for `Alert.alert`, callable from outside React. The system
@@ -26,7 +30,7 @@ export const useDialogStore = create<{ current: DialogRequest | null }>(() => ({
  * theme. A second call replaces whatever is showing.
  */
 export function showDialog(request: DialogRequest) {
-  useDialogStore.setState({ current: request });
+  useDialogStore.setState({ request, open: true });
 }
 
 const variantFor: Record<NonNullable<DialogAction["style"]>, ButtonVariant> = {
@@ -38,15 +42,12 @@ const variantFor: Record<NonNullable<DialogAction["style"]>, ButtonVariant> = {
 /** Mounted once, at the root, inside the view that seeds the theme variables. */
 export function DialogHost() {
   const { colors } = useAppTheme();
-  const current = useDialogStore((state) => state.current);
-  // Keeps the content on screen while the Modal fades out.
-  const last = useRef<DialogRequest | null>(null);
-  if (current) last.current = current;
-  const shown = current ?? last.current;
+  const shown = useDialogStore((state) => state.request);
+  const open = useDialogStore((state) => state.open);
 
   function close(action?: DialogAction) {
-    // Cleared first, so an action that opens another dialog keeps it.
-    useDialogStore.setState({ current: null });
+    // Closed first, so an action that opens another dialog keeps it open.
+    useDialogStore.setState({ open: false });
     action?.onPress?.();
   }
 
@@ -55,7 +56,7 @@ export function DialogHost() {
 
   return (
     <Modal
-      visible={current !== null}
+      visible={open}
       transparent
       animationType="fade"
       navigationBarTranslucent

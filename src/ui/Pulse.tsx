@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Animated, Easing } from "react-native";
 
 /**
@@ -6,7 +6,7 @@ import { Animated, Easing } from "react-native";
  * "Thinking…" and the dot that trails a streaming reply.
  */
 export function Pulse({ children }: { children: ReactNode }) {
-  const opacity = useRef(new Animated.Value(1)).current;
+  const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     const loop = Animated.loop(
