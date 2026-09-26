@@ -61,10 +61,15 @@ export default function MainLayout() {
   // which beats a native ScrollView's 8dp touch slop and would steal swipes
   // from code blocks and chips once the zone is full-width. While closed,
   // only a rightward move can open it, so let leftward ones fail and wait
-  // past the slop: an overflowing horizontal scroller claims the touch
-  // first (which cancels this pan), anywhere else opens the sidebar. The
-  // vertical limit is loosened to match so a slightly diagonal swipe still
-  // counts; the chat list claims clearly vertical ones at its own slop.
+  // past the slop. The vertical limit is loosened to match so a slightly
+  // diagonal swipe still counts; the chat list claims clearly vertical ones
+  // at its own slop.
+  // Horizontal scrollers must be RNGH's ScrollView (the markdown library's
+  // code block is patched for this): RNGH offers a touch to a child's
+  // handlers before this pan, so an overflowing scroller claims the swipe
+  // and cancels the pan. A plain ScrollView only claims after RNGH has
+  // handled the event, so when one move crosses both thresholds the pan
+  // wins and the sidebar opens mid-scroll.
   // The library still builds a legacy Gesture.Pan() but types the hook with
   // gesture-handler 3's new PanGesture, hence the cast.
   const configureSwipe = useCallback(

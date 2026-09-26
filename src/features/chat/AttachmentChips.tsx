@@ -6,7 +6,9 @@
  * outgrow the width).
  */
 
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
+// RNGH's ScrollView, so a sideways swipe scrolls the chips instead of opening the sidebar.
+import { ScrollView } from "react-native-gesture-handler";
 import type { Attachment } from "@/src/domain";
 import { attachmentUri, formatBytes, isImageAttachment } from "@/src/lib/attachments";
 import { cn } from "@/src/lib/cn";

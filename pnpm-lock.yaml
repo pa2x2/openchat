@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-51shlTeLTaiRQHguIOshe/S4eGCNQBboecI+bey/7d0=
+
+patchedDependencies:
+  '@ronradtke/react-native-markdown-display@9.0.3': e251cdcadcfa69a066ac3c1c08bd7c7419ee34d6bc98c29384c976f3cc5aeb7c
+
 importers:
 
   .:
@@ -16,7 +21,7 @@ importers:
         version: 13.1.4(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
       '@ronradtke/react-native-markdown-display':
         specifier: 9.0.3
-        version: 9.0.3(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
+        version: 9.0.3(patch_hash=e251cdcadcfa69a066ac3c1c08bd7c7419ee34d6bc98c29384c976f3cc5aeb7c)(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native-gesture-handler@3.3.0(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
       '@types/jest':
         specifier: 29.5.14
         version: 29.5.14
@@ -1407,6 +1412,7 @@ packages:
     peerDependencies:
       react: '>=16.2.0'
       react-native: '>=0.50.4'
+      react-native-gesture-handler: '*'
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -7048,7 +7054,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
 
-  '@ronradtke/react-native-markdown-display@9.0.3(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)':
+  '@ronradtke/react-native-markdown-display@9.0.3(patch_hash=e251cdcadcfa69a066ac3c1c08bd7c7419ee34d6bc98c29384c976f3cc5aeb7c)(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native-gesture-handler@3.3.0(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)':
     dependencies:
       '@react-native-vector-icons/material-design-icons': 13.1.4(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
       css-to-react-native: 3.2.0
@@ -7058,6 +7064,7 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1)
       react-native-fit-image: 1.5.5
+      react-native-gesture-handler: 3.3.0(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
     transitivePeerDependencies:
       - '@expo/config-plugins'
       - '@react-native-vector-icons/get-image'
