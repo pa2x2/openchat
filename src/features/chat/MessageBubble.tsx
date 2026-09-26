@@ -1,12 +1,11 @@
-import * as Clipboard from "expo-clipboard";
-import { memo, useEffect, useRef, useState } from "react";
-import { Pressable, Share, Text, View } from "react-native";
+import { memo } from "react";
+import { Pressable, Text, View } from "react-native";
 import type { Message } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { ReasoningDrawer } from "@/src/features/markdown/ReasoningDrawer";
 import { AttachmentStrip } from "./AttachmentChips";
 import { Bubble } from "@/src/ui";
-import { Icon, type IconName } from "@/src/ui/Icon";
+import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";
 
 export interface MessageBubbleProps {
@@ -101,86 +100,19 @@ export const MessageBubble = memo(function MessageBubble({
           {status}
         </Text>
       ) : null}
-      {!streaming ? <MessageActions text={message.text} onRegenerate={onRegenerate} /> : null}
+      {!streaming && onRegenerate ? (
+        <Pressable
+          accessibilityHint="Runs this reply again and replaces it"
+          accessibilityLabel="Regenerate reply"
+          accessibilityRole="button"
+          className="-ml-2 mt-1 h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+          onPress={onRegenerate}
+          testID="regenerate-button"
+        >
+          <Icon name="refresh" size={19} tone="textMuted" />
+        </Pressable>
+      ) : null}
     </Bubble>
   );
 });
 
-function MessageActions({ text, onRegenerate }: { text: string; onRegenerate?: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  function handleCopy() {
-    try {
-      void Clipboard.setStringAsync(text).catch(() => undefined);
-    } catch {
-      // Clipboard support can be unavailable on web or in a restricted host.
-    }
-    setCopied(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), 1500);
-  }
-
-  return (
-    <View className="-ml-2 mt-1 flex-row">
-      {text ? (
-        <>
-          <ActionButton
-            icon={copied ? "check" : "content-copy"}
-            label={copied ? "Copied" : "Copy reply"}
-            onPress={handleCopy}
-            testID="copy-button"
-          />
-          <ActionButton
-            icon="share-variant-outline"
-            label="Share reply"
-            onPress={() => void Share.share({ message: text }).catch(() => undefined)}
-            testID="share-button"
-          />
-        </>
-      ) : null}
-      {onRegenerate ? (
-        <ActionButton
-          icon="refresh"
-          label="Regenerate reply"
-          hint="Runs this reply again and replaces it"
-          onPress={onRegenerate}
-          testID="regenerate-button"
-        />
-      ) : null}
-    </View>
-  );
-}
-
-function ActionButton({
-  icon,
-  label,
-  hint,
-  onPress,
-  testID,
-}: {
-  icon: IconName;
-  label: string;
-  hint?: string;
-  onPress: () => void;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      accessibilityHint={hint}
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
-      onPress={onPress}
-      testID={testID}
-    >
-      <Icon name={icon} size={19} tone="textMuted" />
-    </Pressable>
-  );
-}

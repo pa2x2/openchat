@@ -24,8 +24,6 @@ describe("MessageBubble", () => {
     );
     expect(hidden.root.findByProps({ accessibilityLabel: "Generating" })).toBeTruthy();
     expect(hidden.root.findAllByProps({ testID: "reasoning-drawer" })).toHaveLength(0);
-    // Reply actions wait for the reply to finish.
-    expect(hidden.root.findAllByProps({ testID: "copy-button" })).toHaveLength(0);
 
     const shown = await render(
       <MessageBubble
@@ -42,12 +40,6 @@ describe("MessageBubble", () => {
     );
     expect(tree.root.findByProps({ testID: "thinking-indicator" })).toBeTruthy();
     expect(tree.root.findAllByProps({ testID: "markdown-assistant-1" })).toHaveLength(0);
-  });
-
-  it("offers copy and share on a finished reply", async () => {
-    const tree = await render(<MessageBubble message={message()} showReasoning={false} />);
-    expect(tree.root.findByProps({ accessibilityLabel: "Copy reply" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Share reply" })).toBeTruthy();
   });
 
   it("uses a terminal status after interruption", async () => {
