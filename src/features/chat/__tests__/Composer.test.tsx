@@ -127,6 +127,20 @@ describe("Composer attachments", () => {
 
     expect(onSend).toHaveBeenCalledWith("look at this", [attachment]);
   });
+
+  it("gives the text back when the message did not go out", async () => {
+    const tree = await render(<Composer onSend={jest.fn().mockResolvedValue(false)} />);
+    const input = () => tree.root.findByProps({ testID: "composer-input" });
+
+    await act(async () => {
+      input().props.onChangeText("keep me");
+    });
+    await act(async () => {
+      tree.root.findByProps({ testID: "composer-send" }).props.onPress();
+    });
+
+    expect(input().props.value).toBe("keep me");
+  });
 });
 
 describe("Composer reasoning chip", () => {

@@ -5,7 +5,7 @@
  * site.
  */
 
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
@@ -14,7 +14,12 @@ import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
 
 export interface ComposerProps {
-  onSend: (text: string, attachments: Attachment[]) => void | Promise<void>;
+  ref?: Ref<ComposerHandle>;
+  /**
+   * The field clears as soon as the user sends. Resolve to `false` when the
+   * message did not go out, and the text comes back.
+   */
+  onSend: (text: string, attachments: Attachment[]) => void | boolean | Promise<void | boolean>;
   /** Present while a turn is live; replaces the send button. */
   onStop?: () => void;
   /** Present when the backend accepts attachments; shows the attach button. */
@@ -27,32 +32,46 @@ export interface ComposerProps {
   autoFocus?: boolean;
 }
 
+const NO_ATTACHMENTS: Attachment[] = [];
+
 export interface ComposerHandle {
   /** Replaces the draft with `text` and focuses the field. */
   insert: (text: string) => void;
 }
 
-export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, reasoning, autoFocus },
+export function Composer({
   ref,
-) {
+  onSend,
+  onStop,
+  onAttach,
+  attachments = NO_ATTACHMENTS,
+  onRemoveAttachment,
+  reasoning,
+  autoFocus,
+}: ComposerProps) {
   const [text, setText] = useState("");
   const input = useRef<TextInput>(null);
   const streaming = Boolean(onStop);
   const { colors, floatingShadow } = useAppTheme();
 
-  useImperativeHandle(ref, () => ({
-    insert: (next) => {
-      setText(next);
-      input.current?.focus();
-    },
-  }));
+  useImperativeHandle(
+    ref,
+    () => ({
+      insert: (next) => {
+        setText(next);
+        input.current?.focus();
+      },
+    }),
+    [],
+  );
 
   async function handleSend() {
     const trimmed = text.trim();
     if ((!trimmed && attachments.length === 0) || streaming) return;
     setText("");
-    await onSend(trimmed, attachments);
+    const sent = await onSend(trimmed, attachments);
+    // Anything typed while the send was in flight wins over the old draft.
+    if (sent === false) setText((current) => current || text);
   }
 
   const sendDisabled = text.trim().length === 0 && attachments.length === 0;
@@ -150,4 +169,4 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       </View>
     </View>
   );
-});
+}

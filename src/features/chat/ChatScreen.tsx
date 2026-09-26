@@ -1,23 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AppState,
-  FlatList,
-  Keyboard,
-  Pressable,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, FlatList, Keyboard, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MessageBubble } from "./MessageBubble";
 import { Composer, type ComposerHandle } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
 import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
 import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
+import { Transcript } from "./Transcript";
 import { AttachmentSource, pickFiles, pickImages } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
@@ -36,15 +27,10 @@ import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/model
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
-import { Icon } from "@/src/ui/Icon";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
-import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
 export const NEW_CHAT = "new";
-
-/** How far up the transcript the "jump to latest" button appears. */
-const SCROLL_BUTTON_OFFSET = 300;
 
 /**
  * Conversation screen: the transcript under a floating header, with the
@@ -59,22 +45,18 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
   const connected = useConnectionStore((state) => state.profile !== null);
   const list = useRef<FlatList<Message>>(null);
   const composer = useRef<ComposerHandle>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
   const keyboardOpen = useKeyboardOpen();
   // A screen that mounts under an open keyboard (the draft becoming a chat on
   // first send, "new chat" from the header) takes over the typing.
   const [focusOnMount] = useState(() => Keyboard.isVisible());
 
   const chat = useChatsStore((state) => state.chats.find((candidate) => candidate.id === chatId));
-  // The empty-array fallback lives outside the selector: a fresh `[]` per
-  // render would make zustand's identity check re-render forever on empty
-  // chats.
-  const transcript = useMessagesStore((state) => state.byChat[chatId]);
-  const messages = transcript ?? [];
+  // Only whether there is a transcript: the transcript itself changes on
+  // every streamed frame, and only `Transcript` should re-render for that.
+  const empty = useMessagesStore((state) => (state.byChat[chatId]?.length ?? 0) === 0);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
 
@@ -136,8 +118,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void discardPendingRegenerate(chatId);
   }, [chatId, isDraft]);
 
-  async function handleSend(text: string, files: Attachment[]) {
-    if (busy.current) return;
+  /** Resolves to false when nothing was sent, so the composer keeps the draft. */
+  async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
+    if (busy.current) return false;
     busy.current = true;
     setBanner(null);
     setAttachments([]);
@@ -148,7 +131,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (!provider) {
         setAttachments(files);
         setBanner("Not connected. Open Settings to connect to a server.");
-        return;
+        return false;
       }
       if (isDraft) {
         // Lazy chat creation: the session exists only once something is said.
@@ -162,9 +145,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       } else {
         await sendMessage(chatId, text, files);
       }
+      return true;
     } catch (error) {
       setAttachments(files);
       setBanner(error instanceof Error && error.message ? error.message : "Could not send.");
+      return false;
     } finally {
       busy.current = false;
     }
@@ -187,10 +172,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
-  const handleRegenerate = useCallback(async () => {
+  const handleRegenerate = useCallback(() => {
     setBanner(null);
-    const outcome = await regenerateReply(chatId);
-    if (!outcome.ok && outcome.error) setBanner(outcome.error);
+    void regenerateReply(chatId).then((outcome) => {
+      if (!outcome.ok && outcome.error) setBanner(outcome.error);
+    });
   }, [chatId]);
 
   function handleSelectModel(model: ModelInfo) {
@@ -223,13 +209,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
-  // A rerun always targets the newest turn, so the action belongs on the last
-  // reply only — and only while no turn is live (the server refuses to roll a
-  // running session back).
-  const lastMessage = messages[messages.length - 1];
-  const regenerableId =
-    canRegenerate && !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
-
   const modelSelection = capabilities?.modelSelection === true;
   const menuItems: HeaderMenuItem[] = [];
   if (!isDraft && capabilities?.deleteChat) {
@@ -253,26 +232,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     router.replace({ pathname: "/chat/[id]", params: { id: NEW_CHAT } });
   }
 
-  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    // The list is inverted: offset 0 is the newest message.
-    const away = event.nativeEvent.contentOffset.y > SCROLL_BUTTON_OFFSET;
-    if (away !== showScrollButton) setShowScrollButton(away);
-  }
-
-  const reversed = useMemo(() => [...(transcript ?? [])].reverse(), [transcript]);
-  const empty = messages.length === 0;
-
-  const renderMessage = useCallback(
-    ({ item }: { item: Message }) => (
-      <MessageBubble
-        message={item}
-        showReasoning={showReasoning}
-        onRegenerate={item.id === regenerableId ? () => void handleRegenerate() : undefined}
-      />
-    ),
-    [showReasoning, regenerableId, handleRegenerate],
-  );
-
   return (
     <View className="flex-1 bg-background">
       <SeededKeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
@@ -282,20 +241,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               <EmptyChat connected={connected} onOpenSettings={() => router.push("/settings")} />
             </View>
           ) : (
-            <FlatList
-              ref={list}
-              inverted
-              data={reversed}
-              keyExtractor={(message) => message.id}
-              keyboardDismissMode="interactive"
-              keyboardShouldPersistTaps="handled"
-              onScroll={handleScroll}
-              scrollEventThrottle={100}
-              // Inverted: the header component sits at the bottom, the footer
-              // at the top, under the floating header.
-              ListHeaderComponent={<View className="h-3" />}
-              ListFooterComponent={<View style={{ height: insets.top + HEADER_HEIGHT + 4 }} />}
-              renderItem={renderMessage}
+            <Transcript
+              chatId={chatId}
+              listRef={list}
+              showReasoning={showReasoning}
+              canRegenerate={canRegenerate}
+              onRegenerate={handleRegenerate}
             />
           )}
 
@@ -309,26 +260,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onPressTitle={modelSelection ? () => setSheetOpen(true) : undefined}
             menuItems={menuItems}
           />
-
-          {/* Fade the transcript out into the composer. */}
-          <View
-            pointerEvents="none"
-            className="absolute bottom-0 left-0 right-0 h-5"
-            style={{
-              experimental_backgroundImage: `linear-gradient(to bottom, ${withAlpha(colors.background, 0)}, ${colors.background})`,
-            }}
-          />
-          {showScrollButton && !empty ? (
-            <Pressable
-              accessibilityLabel="Scroll to latest"
-              accessibilityRole="button"
-              className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full border border-border bg-elevated"
-              onPress={() => list.current?.scrollToOffset({ offset: 0, animated: true })}
-              testID="scroll-to-latest"
-            >
-              <Icon name="arrow-down" size={18} />
-            </Pressable>
-          ) : null}
         </View>
 
         <View className="px-3 pt-1" style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}>
