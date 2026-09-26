@@ -40,7 +40,12 @@ export interface ConnectionInfo {
  * unauthorized (the server refused access), server-error (5xx), unknown.
  */
 export type ConnectionErrorCode =
-  "invalid-url" | "unreachable" | "timeout" | "unauthorized" | "server-error" | "unknown";
+  | "invalid-url"
+  | "unreachable"
+  | "timeout"
+  | "unauthorized"
+  | "server-error"
+  | "unknown";
 
 export class ConnectionError extends Error {
   readonly code: ConnectionErrorCode;
@@ -69,7 +74,10 @@ export interface ChatProvider {
   /** Fire-and-forget prompt delivery; streaming arrives via events(). */
   send(chatId: ChatId, msg: UserMessage): Promise<void>;
   interrupt(chatId: ChatId): Promise<void>;
-  /** Switches the model of an existing chat. No variant support in v1. */
+  /**
+   * Switches the model of an existing chat, variant included: a ref without
+   * a variant puts the chat back on the model's default.
+   */
   setChatModel(chatId: ChatId, model: ModelRef): Promise<void>;
 
   /**

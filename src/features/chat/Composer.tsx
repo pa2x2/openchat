@@ -3,11 +3,13 @@
  * send button — which becomes stop while a reply is streaming. Stop renders
  * only when the caller passes `onStop` (gated by the provider's interrupt
  * capability at the call site), and the attach button only when the caller
- * passes `onAttach` (gated by the provider's attachments capability).
+ * passes `onAttach` (gated by the provider's attachments capability). The
+ * reasoning chip next to it shows when the caller passes `reasoning`, which
+ * it does for models that offer variants.
  */
 
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
@@ -23,6 +25,8 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
+  /** Present when the model offers variants: the current level and a way to change it. */
+  reasoning?: { label: string; onPress: () => void };
   /** Focuses the field on mount. */
   autoFocus?: boolean;
 }
@@ -33,7 +37,7 @@ export interface ComposerHandle {
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, autoFocus },
+  { onSend, onStop, onAttach, attachments = [], onRemoveAttachment, reasoning, autoFocus },
   ref,
 ) {
   const [text, setText] = useState("");
@@ -56,6 +60,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   }
 
   const sendDisabled = text.trim().length === 0 && attachments.length === 0;
+  // Like attach, the chip steps aside while a reply streams.
+  const showAttach = Boolean(onAttach) && !streaming;
+  const showReasoning = Boolean(reasoning) && !streaming;
 
   return (
     <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
@@ -67,7 +74,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         />
       ) : null}
       <View className="flex-row items-end">
-        {onAttach && !streaming ? (
+        {showAttach ? (
           <Pressable
             accessibilityHint="Attaches a photo or a file to your message"
             accessibilityLabel="Add attachment"
@@ -78,6 +85,24 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           >
             <Icon name="plus" size={26} />
           </Pressable>
+        ) : null}
+        {showReasoning && reasoning ? (
+          <View className={cn("h-11 justify-center", !showAttach && "pl-1.5")}>
+            <Pressable
+              accessibilityHint="Chooses how much the model thinks before answering"
+              accessibilityLabel={`Reasoning: ${reasoning.label}`}
+              accessibilityRole="button"
+              className="h-8 flex-row items-center gap-1 rounded-full bg-raised pl-2 pr-1.5 active:bg-raised-hover"
+              onPress={reasoning.onPress}
+              testID="composer-reasoning"
+            >
+              <Icon name="lightbulb-outline" size={17} tone="textMuted" />
+              <Text className="text-[14px] font-medium text-text" numberOfLines={1}>
+                {reasoning.label}
+              </Text>
+              <Icon name="chevron-down" size={16} tone="textMuted" />
+            </Pressable>
+          </View>
         ) : null}
         <TextInput
           ref={input}
@@ -90,7 +115,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           accessibilityLabel="Message"
           className={cn(
             "max-h-36 min-h-11 flex-1 py-2.5 text-base leading-[22px] text-text",
-            onAttach && !streaming ? "px-1" : "px-3",
+            showReasoning ? "px-2" : showAttach ? "px-1" : "px-3",
           )}
           testID="composer-input"
         />

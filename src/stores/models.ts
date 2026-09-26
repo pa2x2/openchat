@@ -7,7 +7,7 @@
  * else never reaches the picker.
  */
 
-import type { ModelInfo } from "@/src/domain";
+import type { ModelInfo, ModelRef } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
@@ -29,6 +29,16 @@ export function sameModelRef(
   b: { provider: string; id: string },
 ): boolean {
   return a.provider === b.provider && a.id === b.id;
+}
+
+/**
+ * The ref to run `model` with, keeping `variant` only when the model offers
+ * it. The server accepts any variant for any model, so a variant carried
+ * over from a different model has to be dropped here.
+ */
+export function refWithVariant(model: ModelInfo, variant: string | undefined): ModelRef {
+  const offered = variant !== undefined && model.variants?.some((each) => each.id === variant);
+  return offered ? { ...model.ref, variant } : { provider: model.ref.provider, id: model.ref.id };
 }
 
 export function createModelsStore(storage = mmkvStorage) {

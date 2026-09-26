@@ -4,10 +4,11 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { ModelSheet } from "@/src/features/chat/ModelSheet";
+import { AUTO_LABEL, ReasoningSheet } from "@/src/features/chat/ReasoningSheet";
 import { updatesSupported } from "@/src/features/updates/installer";
 import { formatTimestamp } from "@/src/lib/time";
 import { useProviderCapabilities } from "@/src/lib/providerFactory";
-import { sameModelRef, useModelsStore } from "@/src/stores/models";
+import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import {
   useSettingsStore,
   type Appearance,
@@ -128,16 +129,25 @@ export default function SettingsScreen() {
   const setAppearance = useSettingsStore((state) => state.setAppearance);
   const colorSource = useSettingsStore((state) => state.colorSource);
   const setColorSource = useSettingsStore((state) => state.setColorSource);
-  const defaultLabel = useModelsStore((state) =>
-    defaultModel
-      ? (state.models.find((model) => sameModelRef(model.ref, defaultModel))?.label ?? null)
-      : null,
+  const defaultInfo = useModelsStore((state) =>
+    defaultModel ? state.models.find((model) => sameModelRef(model.ref, defaultModel)) : undefined,
   );
+  const defaultVariants = defaultInfo?.variants ?? [];
+  const defaultVariantLabel = defaultModel?.variant
+    ? (defaultVariants.find((variant) => variant.id === defaultModel.variant)?.label ??
+      defaultModel.variant)
+    : AUTO_LABEL;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
 
   function handleSelectDefault(model: ModelInfo) {
     if (!providerId) return;
-    setDefaultModel(providerId, model.ref);
+    setDefaultModel(providerId, refWithVariant(model, defaultModel?.variant));
+  }
+
+  function handleSelectDefaultVariant(variant: string | undefined) {
+    if (!providerId || !defaultInfo) return;
+    setDefaultModel(providerId, refWithVariant(defaultInfo, variant));
   }
 
   return (
@@ -158,12 +168,24 @@ export default function SettingsScreen() {
                 icon="cube-outline"
                 title="Default model"
                 subtitle="For new chats"
-                value={defaultLabel ?? defaultModel?.id ?? "Choose"}
+                value={defaultInfo?.label ?? defaultModel?.id ?? "Choose"}
                 chevron
                 accessibilityLabel="Choose default model"
                 onPress={() => setSheetOpen(true)}
                 testID="default-model-button"
               />
+              {defaultVariants.length > 0 ? (
+                <Row
+                  icon="lightbulb-outline"
+                  title="Reasoning"
+                  subtitle="For new chats with this model"
+                  value={defaultVariantLabel}
+                  chevron
+                  accessibilityLabel={`Default reasoning: ${defaultVariantLabel}. Choose reasoning level`}
+                  onPress={() => setReasoningSheetOpen(true)}
+                  testID="default-reasoning-button"
+                />
+              ) : null}
             </Group>
           </>
         ) : null}
@@ -206,6 +228,16 @@ export default function SettingsScreen() {
           onClose={() => setSheetOpen(false)}
           selected={defaultModel ?? null}
           onSelect={handleSelectDefault}
+          subtitle="Default for new chats"
+        />
+      ) : null}
+      {capabilities?.modelSelection === true && defaultVariants.length > 0 ? (
+        <ReasoningSheet
+          visible={reasoningSheetOpen}
+          onClose={() => setReasoningSheetOpen(false)}
+          variants={defaultVariants}
+          selected={defaultModel?.variant}
+          onSelect={handleSelectDefaultVariant}
           subtitle="Default for new chats"
         />
       ) : null}

@@ -352,21 +352,75 @@ describe("OpenCodeProvider", () => {
     ]);
   });
 
-  it("switches the chat model through the client", async () => {
-    let captured: unknown;
+  it("switches the chat model and its variant through the client", async () => {
+    const captured: unknown[] = [];
     const client = stubClient({
       session: {
         ...stubClient().session,
         switchModel: (async (input: unknown) => {
-          captured = input;
+          captured.push(input);
         }) as never,
       },
     } as Partial<OpenCodeClient>);
     const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(client));
-    await provider.setChatModel("ses_a", { provider: "opencode", id: "big-pickle" });
-    expect(captured).toEqual({
-      sessionID: "ses_a",
-      model: { providerID: "opencode", id: "big-pickle" },
+    await provider.setChatModel("ses_a", {
+      provider: "opencode",
+      id: "claude-sonnet-5",
+      variant: "high",
     });
+    // No variant resets the chat to the model's default.
+    await provider.setChatModel("ses_a", { provider: "opencode", id: "big-pickle" });
+    expect(captured).toEqual([
+      {
+        sessionID: "ses_a",
+        model: { providerID: "opencode", id: "claude-sonnet-5", variant: "high" },
+      },
+      { sessionID: "ses_a", model: { providerID: "opencode", id: "big-pickle" } },
+    ]);
+  });
+
+  it("lists models with their variants in the server's order", async () => {
+    // Trimmed from a real /api/model response.
+    const client = stubClient({
+      model: {
+        list: async () => ({
+          location: {},
+          data: [
+            {
+              id: "gpt-6-sol",
+              providerID: "opencode",
+              name: "GPT-6 Sol",
+              enabled: true,
+              capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
+              limit: { context: 1050000, output: 128000 },
+              variants: [
+                { id: "none", settings: { reasoningEffort: "none" } },
+                { id: "xhigh", settings: { reasoningEffort: "xhigh" } },
+                { id: "max", settings: { reasoningEffort: "max" } },
+              ],
+            },
+            {
+              id: "big-pickle",
+              providerID: "opencode",
+              name: "Big Pickle",
+              enabled: true,
+              capabilities: { tools: true, input: ["text"], output: ["text"] },
+              limit: { context: 200000, output: 32000 },
+              variants: [],
+            },
+          ],
+        }),
+      },
+    } as unknown as Partial<OpenCodeClient>);
+    const provider = new OpenCodeProvider({ baseUrl: "http://srv" }, factoryOf(client));
+    const models = await provider.listModels();
+    expect(models.map((model) => model.variants)).toEqual([
+      [
+        { id: "none", label: "Off" },
+        { id: "xhigh", label: "Extra high" },
+        { id: "max", label: "Max" },
+      ],
+      [],
+    ]);
   });
 });

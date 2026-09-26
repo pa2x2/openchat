@@ -7,6 +7,7 @@ import { ChatDrawer } from "@/src/features/drawer/ChatDrawer";
 import { DrawerContext } from "@/src/features/drawer/DrawerContext";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
+import { useModelsStore } from "@/src/stores/models";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Horizontal travel (dp) before a swipe opens the sidebar; above ScrollView's touch slop. */
@@ -22,16 +23,19 @@ export default function MainLayout() {
   const { width } = useWindowDimensions();
   const { colors } = useAppTheme();
   const refreshChats = useChatsStore((state) => state.refresh);
+  const refreshModels = useModelsStore((state) => state.refresh);
   const [open, setOpen] = useState(false);
 
   // Startup: warm the provider from the persisted profile, then reconcile
-  // the chat list against the server.
+  // the chat list and the model catalog against the server. The composer's
+  // reasoning chip reads the catalog, so it must not wait for the model
+  // picker to be opened.
   useEffect(() => {
     void (async () => {
       await getProvider();
-      await refreshChats();
+      await Promise.all([refreshChats(), refreshModels()]);
     })();
-  }, [refreshChats]);
+  }, [refreshChats, refreshModels]);
 
   // Keep the list fresh whenever the sidebar is opened.
   useEffect(() => {

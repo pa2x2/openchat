@@ -8,6 +8,7 @@ export type {
   MessageStatus,
   ModelInfo,
   ModelRef,
+  ModelVariant,
   ProviderId,
   StreamEvent,
   TokenUsage,

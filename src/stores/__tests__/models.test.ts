@@ -4,7 +4,7 @@
 
 import { getProvider } from "@/src/lib/providerFactory";
 import type { ChatProvider } from "@/src/providers/types";
-import { createModelsStore, createMemoryStorage } from "@/src/stores";
+import { createModelsStore, createMemoryStorage, refWithVariant } from "@/src/stores";
 
 jest.mock("@/src/lib/providerFactory", () => ({
   getProvider: jest.fn(),
@@ -92,5 +92,34 @@ describe("models store", () => {
       { ref: { provider: "p", id: "m" }, label: "Cached" },
     ]);
     expect(second.getState().loading).toBe(false);
+  });
+});
+
+describe("refWithVariant", () => {
+  const withEfforts = {
+    ref: { provider: "opencode", id: "claude-sonnet-5" },
+    label: "Claude Sonnet 5",
+    variants: [
+      { id: "low", label: "Low" },
+      { id: "high", label: "High" },
+    ],
+  };
+
+  it("keeps a variant the model offers", () => {
+    expect(refWithVariant(withEfforts, "high")).toEqual({
+      provider: "opencode",
+      id: "claude-sonnet-5",
+      variant: "high",
+    });
+  });
+
+  it("drops a variant the model does not offer", () => {
+    // The server accepts any variant, so a carried-over one would stick.
+    expect(refWithVariant(withEfforts, "xhigh")).toEqual({
+      provider: "opencode",
+      id: "claude-sonnet-5",
+    });
+    const plain = { ref: { provider: "opencode", id: "big-pickle" }, label: "Big Pickle" };
+    expect(refWithVariant(plain, "high")).toEqual({ provider: "opencode", id: "big-pickle" });
   });
 });

@@ -128,3 +128,26 @@ describe("Composer attachments", () => {
     expect(onSend).toHaveBeenCalledWith("look at this", [attachment]);
   });
 });
+
+describe("Composer reasoning chip", () => {
+  it("shows the level only when the caller passes one, and hides it while streaming", async () => {
+    const without = await render(<Composer onSend={jest.fn()} />);
+    expect(without.root.findAllByProps({ testID: "composer-reasoning" })).toHaveLength(0);
+
+    const onPress = jest.fn();
+    const idle = await render(
+      <Composer onSend={jest.fn()} reasoning={{ label: "High", onPress }} />,
+    );
+    const chip = idle.root.findByProps({ testID: "composer-reasoning" });
+    expect(chip.props.accessibilityLabel).toBe("Reasoning: High");
+    await act(async () => {
+      chip.props.onPress();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    const streaming = await render(
+      <Composer onSend={jest.fn()} onStop={jest.fn()} reasoning={{ label: "High", onPress }} />,
+    );
+    expect(streaming.root.findAllByProps({ testID: "composer-reasoning" })).toHaveLength(0);
+  });
+});

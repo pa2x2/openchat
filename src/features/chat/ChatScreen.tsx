@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageBubble } from "./MessageBubble";
 import { Composer, type ComposerHandle } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
+import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
 import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
@@ -33,10 +34,10 @@ import {
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
-import { sameModelRef, useModelsStore } from "@/src/stores/models";
+import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
-import type { Attachment, Message, ModelInfo } from "@/src/domain";
+import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { Icon } from "@/src/ui/Icon";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
@@ -80,8 +81,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
-  const [draftModel, setDraftModel] = useState<ModelInfo["ref"] | null>(null);
+  const [draftModel, setDraftModel] = useState<ModelRef | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
@@ -95,11 +97,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const currentModel = isDraft
     ? (draftModel ?? defaultModel ?? null)
     : (chat?.model ?? defaultModel ?? null);
-  const currentLabel = useModelsStore((state) =>
-    currentModel
-      ? (state.models.find((model) => sameModelRef(model.ref, currentModel))?.label ?? null)
-      : null,
+  const currentInfo = useModelsStore((state) =>
+    currentModel ? state.models.find((model) => sameModelRef(model.ref, currentModel)) : undefined,
   );
+  const currentLabel = currentInfo?.label ?? null;
+  const variants = currentInfo?.variants ?? [];
+  const variantLabel = currentModel?.variant
+    ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
+      currentModel.variant)
+    : AUTO_LABEL;
 
   // Cold open: reconcile the transcript from the server (cache first),
   // then bury streams this app instance is not going to continue.
@@ -189,9 +195,18 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (!outcome.ok && outcome.error) setBanner(outcome.error);
   }, [chatId]);
 
-  async function handleSelectModel(model: ModelInfo) {
+  function handleSelectModel(model: ModelInfo) {
+    // The reasoning level carries over when the new model offers it too.
+    void applyModel(refWithVariant(model, currentModel?.variant));
+  }
+
+  function handleSelectVariant(variant: string | undefined) {
+    if (currentInfo) void applyModel(refWithVariant(currentInfo, variant));
+  }
+
+  async function applyModel(model: ModelRef) {
     if (isDraft) {
-      setDraftModel(model.ref);
+      setDraftModel(model);
       return;
     }
     try {
@@ -200,9 +215,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         setBanner("Not connected. Open Settings to connect to a server.");
         return;
       }
-      await provider.setChatModel(chatId, model.ref);
+      await provider.setChatModel(chatId, model);
       const current = useChatsStore.getState().chats.find((candidate) => candidate.id === chatId);
-      if (current) useChatsStore.getState().upsert({ ...current, model: model.ref });
+      if (current) useChatsStore.getState().upsert({ ...current, model });
     } catch (error) {
       setBanner(
         error instanceof Error && error.message ? error.message : "Could not switch model.",
@@ -347,6 +362,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
+            reasoning={
+              modelSelection && variants.length > 0
+                ? { label: variantLabel, onPress: () => setReasoningSheetOpen(true) }
+                : undefined
+            }
           />
         </View>
 
@@ -363,6 +383,16 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onClose={() => setSheetOpen(false)}
             selected={currentModel}
             onSelect={handleSelectModel}
+            subtitle={isDraft ? "For this new chat" : "For this chat"}
+          />
+        ) : null}
+        {modelSelection && variants.length > 0 ? (
+          <ReasoningSheet
+            visible={reasoningSheetOpen}
+            onClose={() => setReasoningSheetOpen(false)}
+            variants={variants}
+            selected={currentModel?.variant}
+            onSelect={handleSelectVariant}
             subtitle={isDraft ? "For this new chat" : "For this chat"}
           />
         ) : null}

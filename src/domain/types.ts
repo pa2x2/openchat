@@ -12,10 +12,22 @@ export type ProviderId = string;
 /** Provider-native chat identifier; opaque to the app. */
 export type ChatId = string;
 
-/** Identifies a model on a backend: which provider serves it and its model id. */
+/**
+ * Identifies a model on a backend: which provider serves it and its model id,
+ * plus the variant (e.g. a reasoning effort) it runs with. No variant means
+ * the model's own default.
+ */
 export interface ModelRef {
   provider: string;
   id: string;
+  variant?: string;
+}
+
+/** A named preset of a model, such as a reasoning effort level. */
+export interface ModelVariant {
+  id: string;
+  /** Human-facing label, e.g. "Extra high". */
+  label: string;
 }
 
 export interface ModelInfo {
@@ -23,8 +35,8 @@ export interface ModelInfo {
   /** Human-facing label, e.g. "GLM-5.3-Flash". */
   label: string;
   contextWindow?: number;
-  /** Hint for the composer/reasoning drawer; false when unknown. */
-  reasoning?: boolean;
+  /** Variants the model can run with, in the backend's order; empty when it has none. */
+  variants?: ModelVariant[];
 }
 
 /** A file attached to a message. */

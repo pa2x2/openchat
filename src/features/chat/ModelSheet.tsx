@@ -18,6 +18,14 @@ import { Icon } from "@/src/ui/Icon";
 import { GroupLabel } from "@/src/ui/ListGroup";
 import { Sheet } from "@/src/ui/Sheet";
 
+/** A context window as a short size, e.g. 200000 → "200K", 1048576 → "1M". */
+export function formatContextWindow(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${Number((tokens / 1_000_000).toFixed(1))}M`;
+  }
+  return `${Math.round(tokens / 1_000)}K`;
+}
+
 export interface ModelSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -126,7 +134,9 @@ export function ModelSheet({ visible, onClose, selected, onSelect, subtitle }: M
                       {item.label}
                     </Text>
                     <Text className="mt-0.5 text-[13px] text-text-muted" numberOfLines={1}>
-                      {item.ref.id}
+                      {item.contextWindow
+                        ? `${item.ref.id} · ${formatContextWindow(item.contextWindow)} context`
+                        : item.ref.id}
                     </Text>
                   </View>
                   {active ? (
