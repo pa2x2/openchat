@@ -12,7 +12,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, SectionList, Text, TextInput, View } from "react-native";
+import { ScrollView, SectionList, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { ModelInfo, ModelRef } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
@@ -21,7 +22,8 @@ import { Button } from "@/src/ui/Button";
 import { Icon } from "@/src/ui/Icon";
 import { GroupLabel } from "@/src/ui/ListGroup";
 import { Sheet } from "@/src/ui/Sheet";
-import { useAppTheme } from "@/src/ui/theme";
+import { Spinner } from "@/src/ui/Spinner";
+import { TextInput } from "@/src/ui/TextInput";
 import { favoriteModels, groupByProvider, monogram, searchGroups } from "./modelPicker";
 
 /** A context window as a short size, e.g. 200000 → "200K", 1048576 → "1M". */
@@ -77,7 +79,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
     <Sheet visible={visible} onClose={onClose} height="80%" testID="model-sheet">
       {loading && models.length === 0 ? (
         <View className="flex-1 items-center justify-center" testID="model-loading">
-          <ActivityIndicator accessibilityLabel="Loading models" />
+          <Spinner accessibilityLabel="Loading models" />
         </View>
       ) : error && models.length === 0 ? (
         <View className="flex-1 items-center justify-center gap-3 px-8">
@@ -278,7 +280,6 @@ function SearchField({
   value: string;
   onChangeText: (text: string) => void;
 }) {
-  const { colors } = useAppTheme();
   return (
     <View className="mt-2 h-11 flex-row items-center gap-2 rounded-full bg-raised pl-3.5 pr-1">
       <Icon name="magnify" size={20} tone="textMuted" />
@@ -286,7 +287,6 @@ function SearchField({
         value={value}
         onChangeText={onChangeText}
         placeholder="Search models"
-        placeholderTextColor={colors.textFaint}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"

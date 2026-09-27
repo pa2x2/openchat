@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Button } from "@/src/ui/Button";
 
 export function EmptyChat({

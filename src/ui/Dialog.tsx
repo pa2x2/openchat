@@ -1,4 +1,6 @@
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./Text";
+import { Modal } from "./Modal";
 import { Pressable } from "./Pressable";
 import { create } from "zustand";
 import { Button, type ButtonVariant } from "./Button";
@@ -56,14 +58,7 @@ export function DialogHost() {
   const dismiss = () => close(actions.find((action) => action.style === "cancel"));
 
   return (
-    <Modal
-      visible={open}
-      transparent
-      animationType="fade"
-      navigationBarTranslucent
-      statusBarTranslucent
-      onRequestClose={dismiss}
-    >
+    <Modal visible={open} animationType="fade" onRequestClose={dismiss}>
       <View className="flex-1 items-center justify-center px-8">
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: 0.4 }]}

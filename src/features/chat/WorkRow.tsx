@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";

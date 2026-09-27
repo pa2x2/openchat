@@ -6,7 +6,8 @@
  */
 
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Button } from "@/src/ui/Button";
 import { Input } from "@/src/ui/Input";
 import { loadPassword, savePassword } from "@/src/lib/secrets";

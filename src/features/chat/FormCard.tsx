@@ -6,7 +6,8 @@
  */
 
 import { useState } from "react";
-import { Linking, ScrollView, Text, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { ChatForm, FormAnswer, FormField, FormOption } from "@/src/domain";
 import { cn } from "@/src/lib/cn";

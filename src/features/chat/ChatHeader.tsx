@@ -6,7 +6,9 @@
  */
 
 import { useState } from "react";
-import { Modal, Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
+import { Modal } from "@/src/ui/Modal";
 import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
@@ -147,14 +149,7 @@ function HeaderMenu({
   top: number;
 }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      navigationBarTranslucent
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close menu">
         <View
           className="absolute right-3 min-w-[220px] rounded-[20px] bg-elevated p-1.5"

@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
-import { ActivityIndicator, ScrollView, Switch, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { updatesSupported } from "@/src/features/updates/installer";
@@ -14,8 +15,9 @@ import { useUpdatesStore, type UpdateStatus } from "@/src/stores/updates";
 import { playHaptic } from "@/src/ui/haptics";
 import { Group, GroupLabel, Row } from "@/src/ui/ListGroup";
 import { Segmented } from "@/src/ui/Segmented";
+import { Spinner } from "@/src/ui/Spinner";
+import { Switch } from "@/src/ui/Switch";
 import { dynamicColorsSupported } from "@/src/ui/systemPalettes";
-import { useAppTheme } from "@/src/ui/theme";
 
 const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "system", label: "System" },
@@ -97,7 +99,7 @@ function UpdatesSection() {
           icon="update"
           title={release && status !== "upToDate" ? "Update available" : "Check for updates"}
           subtitle={subtitle}
-          trailing={status === "checking" ? <ActivityIndicator size="small" /> : undefined}
+          trailing={status === "checking" ? <Spinner size="small" /> : undefined}
           chevron={release !== null}
           onPress={() => (release ? openSheet() : void check())}
           testID="check-updates"
@@ -108,7 +110,6 @@ function UpdatesSection() {
 }
 
 function HapticsRow() {
-  const { colors } = useAppTheme();
   const haptics = useSettingsStore((state) => state.haptics);
   const setHaptics = useSettingsStore((state) => state.setHaptics);
 
@@ -127,7 +128,6 @@ function HapticsRow() {
         <Switch
           value={haptics}
           onValueChange={handleChange}
-          trackColor={{ false: colors.border, true: colors.primary }}
           accessibilityLabel="Haptic feedback"
           testID="haptics-switch"
         />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, FlatList, Keyboard, Text, View } from "react-native";
+import { AppState, FlatList, Keyboard, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";

@@ -3,14 +3,14 @@ import {
   Animated,
   Easing,
   Keyboard,
-  Modal,
   PanResponder,
   StyleSheet,
-  Text,
   View,
   type DimensionValue,
 } from "react-native";
+import { Modal } from "./Modal";
 import { Pressable } from "./Pressable";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "./keyboard";
@@ -142,15 +142,7 @@ export function Sheet({
   if (!mounted) return null;
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="none"
-      navigationBarTranslucent
-      statusBarTranslucent
-      onRequestClose={onClose}
-      testID={testID}
-    >
+    <Modal visible animationType="none" onRequestClose={onClose} testID={testID}>
       <View className="flex-1">
         <Animated.View
           style={[

@@ -7,7 +7,9 @@
  */
 
 import { useState } from "react";
-import { Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
+import { Text } from "@/src/ui/Text";
+import { Modal } from "@/src/ui/Modal";
 import { Pressable } from "@/src/ui/Pressable";
 // RNGH's ScrollView, so a sideways swipe scrolls the chips instead of opening the sidebar.
 import { ScrollView } from "react-native-gesture-handler";
@@ -161,14 +163,7 @@ export function AttachmentChip({
 function ImageViewer({ name, uri, onClose }: { name: string; uri: string; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      navigationBarTranslucent
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
+    <Modal visible animationType="fade" onRequestClose={onClose}>
       <Pressable
         accessibilityLabel="Close image"
         className="flex-1 bg-black"

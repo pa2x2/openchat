@@ -6,7 +6,8 @@
  */
 
 import { memo, type ReactNode } from "react";
-import { Linking, Text, View, type TextStyle } from "react-native";
+import { Linking, View, type TextStyle } from "react-native";
+import { Text } from "@/src/ui/Text";
 import {
   blockGap,
   keyedBlocks,

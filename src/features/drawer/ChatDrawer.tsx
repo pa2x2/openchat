@@ -8,7 +8,8 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, FlatList, RefreshControl, Text, TextInput, View } from "react-native";
+import { BackHandler, FlatList, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
@@ -19,7 +20,8 @@ import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { showDialog } from "@/src/ui/Dialog";
 import { Icon } from "@/src/ui/Icon";
-import { useAppTheme } from "@/src/ui/theme";
+import { RefreshControl } from "@/src/ui/RefreshControl";
+import { TextInput } from "@/src/ui/TextInput";
 
 export interface ChatDrawerProps {
   open: boolean;
@@ -110,7 +112,6 @@ export function ChatDrawer({
   onDeletedActive,
 }: ChatDrawerProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
   const allChats = useChatsStore((state) => state.chats);
   const temporary = useChatsStore((state) => state.temporary);
   const refreshChats = useChatsStore((state) => state.refresh);
@@ -269,7 +270,6 @@ export function ChatDrawer({
               value={query}
               onChangeText={setQuery}
               placeholder="Search"
-              placeholderTextColor={colors.textFaint}
               accessibilityLabel="Search chats"
               className="h-11 flex-1 text-base text-text"
               returnKeyType="search"
@@ -290,13 +290,7 @@ export function ChatDrawer({
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="px-2 pb-3"
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void handleRefresh()}
-            colors={[colors.primary]}
-            progressBackgroundColor={colors.elevated}
-            tintColor={colors.textMuted}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />
         }
         ListHeaderComponent={
           <>

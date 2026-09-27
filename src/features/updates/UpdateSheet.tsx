@@ -4,7 +4,8 @@
  * launch check or from Settings; all state lives in the updates store.
  */
 
-import { Linking, ScrollView, Text, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useUpdatesStore } from "@/src/stores/updates";
 import { Button } from "@/src/ui/Button";

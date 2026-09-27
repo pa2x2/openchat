@@ -5,7 +5,8 @@
  * provider's attachments capability).
  */
 
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { AttachmentSource } from "./pickAttachments";
 import { Icon, type IconName } from "@/src/ui/Icon";

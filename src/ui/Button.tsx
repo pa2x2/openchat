@@ -1,4 +1,4 @@
-import { Text } from "react-native";
+import { Text } from "./Text";
 import { Pressable } from "./Pressable";
 import { cn } from "@/src/lib/cn";
 

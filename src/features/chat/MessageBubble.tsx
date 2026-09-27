@@ -1,6 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Message, TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";

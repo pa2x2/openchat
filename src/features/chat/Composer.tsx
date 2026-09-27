@@ -6,11 +6,13 @@
  */
 
 import { useImperativeHandle, useRef, useState, type Ref } from "react";
-import { Keyboard, Text, TextInput, View } from "react-native";
+import { Keyboard, View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
+import { TextInput, type TextInputHandle } from "@/src/ui/TextInput";
 import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
 
@@ -53,9 +55,9 @@ export function Composer({
   placeholder = "Ask anything",
 }: ComposerProps) {
   const [text, setText] = useState("");
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputHandle>(null);
   const streaming = Boolean(onStop);
-  const { colors, floatingShadow } = useAppTheme();
+  const { floatingShadow } = useAppTheme();
 
   useImperativeHandle(
     ref,
@@ -97,7 +99,6 @@ export function Composer({
         value={text}
         onChangeText={setText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textFaint}
         multiline
         accessibilityLabel="Message"
         className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"

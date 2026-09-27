@@ -1,6 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { memo, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 // RNGH's ScrollView claims a sideways swipe before the drawer's pan can, so
 // the code scrolls instead of the sidebar opening.
