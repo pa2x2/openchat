@@ -155,7 +155,7 @@ function HeaderMenu({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1" haptic="none" onPress={onClose} accessibilityLabel="Close menu">
+      <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close menu">
         <View
           className="absolute right-3 min-w-[220px] rounded-[20px] bg-elevated p-1.5"
           style={{ top, boxShadow: "0px 8px 32px rgba(0, 0, 0, 0.22)" }}

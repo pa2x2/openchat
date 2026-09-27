@@ -67,7 +67,6 @@ export function DialogHost() {
       <View className="flex-1 items-center justify-center px-8">
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: 0.4 }]}
-          haptic="none"
           onPress={dismiss}
           accessibilityLabel="Close dialog"
         />

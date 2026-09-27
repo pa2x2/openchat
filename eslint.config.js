@@ -14,7 +14,7 @@ module.exports = defineConfig([
             {
               name: "react-native",
               importNames: ["Pressable"],
-              message: "Use Pressable from @/src/ui/Pressable, which plays haptic feedback.",
+              message: "Use Pressable from @/src/ui/Pressable, which supports haptic feedback.",
             },
           ],
           patterns: [

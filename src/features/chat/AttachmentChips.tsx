@@ -171,7 +171,6 @@ function ImageViewer({ name, uri, onClose }: { name: string; uri: string; onClos
     >
       <Pressable
         accessibilityLabel="Close image"
-        haptic="none"
         className="flex-1 bg-black"
         onPress={onClose}
         testID="attachment-viewer"

@@ -161,12 +161,7 @@ export function Sheet({
             },
           ]}
         >
-          <Pressable
-            className="flex-1"
-            haptic="none"
-            onPress={onClose}
-            accessibilityLabel="Close sheet"
-          />
+          <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close sheet" />
         </Animated.View>
         {/* The Modal is its own window, so the screen's keyboard avoidance
             cannot reach the card: this one has to live in here. The card then

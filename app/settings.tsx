@@ -122,7 +122,6 @@ function HapticsRow() {
     <Row
       icon="vibrate"
       title="Haptic feedback"
-      haptic="none"
       onPress={() => handleChange(!haptics)}
       trailing={
         <Switch
