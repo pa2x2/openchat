@@ -1,6 +1,5 @@
 import Constants from "expo-constants";
 import { ScrollView, View } from "react-native";
-import { Text } from "@/src/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { updatesSupported } from "@/src/features/updates/installer";
@@ -28,7 +27,7 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
 
 const COLOR_SOURCES: { value: ColorSource; label: string }[] = [
   { value: "default", label: "Default" },
-  { value: "dynamic", label: "Dynamic" },
+  { value: "dynamic", label: "Material You" },
 ];
 
 const CHAT_MODES: { value: ChatMode; label: string }[] = [
