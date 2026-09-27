@@ -7,4 +7,4 @@ export type {
   ProviderDescriptor,
 } from "./types";
 export { ConnectionError } from "./types";
-export { getProviderDescriptor, listProviderDescriptors, openCodeDescriptor } from "./registry";
+export { getProviderDescriptor, listProviderDescriptors } from "./registry";

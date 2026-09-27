@@ -42,15 +42,15 @@ export function sameModelRef(
   return a.provider === b.provider && a.id === b.id;
 }
 
-/** Identifies a model regardless of variant, e.g. "opencode/big-pickle". */
+/** Identifies a model regardless of variant, e.g. "anthropic/claude-sonnet-5". */
 export function modelKey(ref: { provider: string; id: string }): string {
   return `${ref.provider}/${ref.id}`;
 }
 
 /**
  * The ref to run `model` with, keeping `variant` only when the model offers
- * it. The server accepts any variant for any model, so a variant carried
- * over from a different model has to be dropped here.
+ * it. A backend need not reject a variant the model lacks, so a variant
+ * carried over from a different model has to be dropped here.
  */
 export function refWithVariant(model: ModelInfo, variant: string | undefined): ModelRef {
   const offered = variant !== undefined && model.variants?.some((each) => each.id === variant);

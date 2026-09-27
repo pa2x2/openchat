@@ -11,13 +11,15 @@ import { Text } from "@/src/ui/Text";
 import { Button } from "@/src/ui/Button";
 import { Input } from "@/src/ui/Input";
 import { loadPassword, savePassword } from "@/src/lib/secrets";
-import { openCodeDescriptor } from "@/src/providers/registry";
+import { useProviderDescriptor } from "@/src/lib/providerFactory";
+import { listProviderDescriptors } from "@/src/providers/registry";
 import type { ConnectionConfig } from "@/src/providers/types";
 import { useConnectionStore } from "@/src/stores/connection";
 
-const descriptor = openCodeDescriptor;
-
 export function ConnectionCard() {
+  // Only one backend ships, so an unconnected app offers the first one
+  // rather than a picker.
+  const descriptor = useProviderDescriptor() ?? listProviderDescriptors()[0];
   const profile = useConnectionStore((state) => state.profile);
   const connectionState = useConnectionStore((state) => state.state);
   const markConnecting = useConnectionStore((state) => state.markConnecting);
@@ -33,7 +35,7 @@ export function ConnectionCard() {
   const statusLabel =
     connectionState === "connected"
       ? profile?.serverVersion
-        ? `Connected — OpenCode v${profile.serverVersion}`
+        ? `Connected — ${descriptor.label} v${profile.serverVersion}`
         : "Connected"
       : connectionState === "connecting"
         ? "Connecting…"

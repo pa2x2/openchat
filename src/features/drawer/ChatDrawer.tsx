@@ -14,7 +14,11 @@ import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
-import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
+import {
+  getProvider,
+  useProviderCapabilities,
+  useProviderDescriptor,
+} from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
@@ -122,6 +126,7 @@ export function ChatDrawer({
   const temporary = useChatsStore((state) => state.temporary);
   const refreshChats = useChatsStore((state) => state.refresh);
   const capabilities = useProviderCapabilities();
+  const providerLabel = useProviderDescriptor()?.label ?? "Server";
   const profile = useConnectionStore((state) => state.profile);
   const chatsError = useChatsStore((state) => state.error);
   const chatsLoading = useChatsStore((state) => state.loading);
@@ -359,7 +364,7 @@ export function ChatDrawer({
             <Icon name="server-outline" size={19} tone="primaryForeground" />
           </View>
           <View className="flex-1">
-            <Text className="text-[15.5px] font-medium text-text">OpenCode</Text>
+            <Text className="text-[15.5px] font-medium text-text">{providerLabel}</Text>
             <View className="flex-row items-center gap-1.5">
               <View className={cn("h-2 w-2 rounded-full", statusTone)} />
               <Text className="flex-1 text-[13px] text-text-muted" numberOfLines={1}>

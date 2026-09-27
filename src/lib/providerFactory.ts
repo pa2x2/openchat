@@ -8,7 +8,7 @@
  */
 
 import type { Capabilities } from "@/src/domain";
-import type { ChatProvider, ConnectionConfig } from "@/src/providers/types";
+import type { ChatProvider, ConnectionConfig, ProviderDescriptor } from "@/src/providers/types";
 import { getProviderDescriptor } from "@/src/providers/registry";
 import { useConnectionStore, type ConnectionProfile } from "@/src/stores/connection";
 import { loadPassword } from "./secrets";
@@ -45,8 +45,13 @@ export function resetProviderCache(): void {
   cached = null;
 }
 
+/** The descriptor of the saved profile's provider; null when unconnected. */
+export function useProviderDescriptor(): ProviderDescriptor | null {
+  const providerId = useConnectionStore((state) => state.profile?.providerId);
+  return providerId ? (getProviderDescriptor(providerId) ?? null) : null;
+}
+
 /** The capabilities of the active provider, for capabilities-driven UI. */
 export function useProviderCapabilities(): Capabilities | null {
-  const providerId = useConnectionStore((state) => state.profile?.providerId);
-  return providerId ? (getProviderDescriptor(providerId)?.capabilities ?? null) : null;
+  return useProviderDescriptor()?.capabilities ?? null;
 }

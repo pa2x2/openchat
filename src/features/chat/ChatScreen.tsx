@@ -37,7 +37,7 @@ import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 
-/** Route id for the not-yet-created chat; the session is made lazily. */
+/** Route id for the not-yet-created chat; the backend chat is made lazily. */
 export const NEW_CHAT = "new";
 
 function stageDraftTurn(text: string, attachments: Attachment[]): void {
@@ -108,7 +108,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
   const canAttach = capabilities?.attachments === true;
-  const canRegenerate = capabilities?.regenerate === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
@@ -210,7 +209,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         return false;
       }
       if (isDraft) {
-        // Lazy chat creation: the session exists only once something is said.
+        // Lazy chat creation: the backend chat exists only once something is said.
         stageDraftTurn(text, files);
         let created;
         try {
@@ -334,7 +333,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               chatId={chatId}
               listRef={list}
               showReasoning={showReasoning}
-              canRegenerate={canRegenerate}
               onRegenerate={handleRegenerate}
             />
           )}

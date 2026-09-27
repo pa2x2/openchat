@@ -16,11 +16,7 @@ export interface MessageBubbleProps {
   showReasoning: boolean;
   /** What the live turn is doing; only the reply being written receives it. */
   activity?: TurnActivity | null;
-  /**
-   * When set, the reply offers a regenerate action. The screen passes it
-   * only for a reply that can actually be re-run (gated by the provider's
-   * regenerate capability and no live turn).
-   */
+  /** Set only on the newest reply while no turn is live. */
   onRegenerate?: () => void;
 }
 

@@ -27,7 +27,7 @@ interface ChatsStoreState {
    */
   pendingRegenerate: Record<ChatId, string>;
   /**
-   * Temporary chats: real sessions on the server, kept out of the sidebar and
+   * Temporary chats: real chats on the server, kept out of the sidebar and
    * deleted once the user leaves them. Persisted so a chat left behind by a
    * killed app stays hidden and is deleted on the next launch.
    */

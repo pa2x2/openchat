@@ -47,17 +47,10 @@ export interface TranscriptProps {
   chatId: ChatId;
   listRef: RefObject<FlatList<Message> | null>;
   showReasoning: boolean;
-  canRegenerate: boolean;
   onRegenerate: () => void;
 }
 
-export function Transcript({
-  chatId,
-  listRef,
-  showReasoning,
-  canRegenerate,
-  onRegenerate,
-}: TranscriptProps) {
+export function Transcript({ chatId, listRef, showReasoning, onRegenerate }: TranscriptProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
@@ -69,11 +62,10 @@ export function Transcript({
   const reversed = useMemo(() => [...(transcript ?? [])].reverse(), [transcript]);
 
   // A rerun always targets the newest turn, so the action belongs on the last
-  // reply only — and only while no turn is live (the server refuses to roll a
-  // running session back).
+  // reply only, and only while no turn is live: a run cannot be rolled back
+  // while it is still going.
   const lastMessage = reversed[0];
-  const regenerableId =
-    canRegenerate && !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  const regenerableId = !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const replyPending =

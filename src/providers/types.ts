@@ -125,7 +125,12 @@ export interface ChatProvider {
 
   /** Normalized event stream for one chat. Pass a signal to stop it. */
   events(chatId: ChatId, signal?: AbortSignal): AsyncIterable<StreamEvent>;
-  /** Reconciliation / cold open source of truth. */
+  /**
+   * Reconciliation / cold open source of truth. Every message has a terminal
+   * status: a reply the transcript shows unfinished is `interrupted`, since a
+   * transcript cannot tell a live run from a dead one. Whether it still runs
+   * is for `isRunning` to say.
+   */
   fetchMessages(chatId: ChatId): Promise<Message[]>;
 }
 

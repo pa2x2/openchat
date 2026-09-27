@@ -46,9 +46,15 @@ const MAX_BACKOFF_MS = 15_000;
 const STALL_MS = 45_000;
 const WATCHDOG_TICK_MS = 5_000;
 
-/** Local id for optimistic messages; server-assigned ids arrive later. */
-function localId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+/**
+ * Optimistic messages carry a local id until the server-assigned one arrives.
+ * The prefix is how the app tells them apart: backends format their own ids
+ * however they like.
+ */
+const LOCAL_ID_PREFIX = "local-";
+
+function localId(kind: "user" | "assistant"): string {
+  return `${LOCAL_ID_PREFIX}${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export interface RegenerateOutcome {
@@ -297,7 +303,7 @@ async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
   }
 
   const native = provider.capabilities.regenerate && typeof provider.regenerate === "function";
-  if (native && !target.user.id.startsWith(MESSAGE_ID_PREFIX)) {
+  if (native && target.user.id.startsWith(LOCAL_ID_PREFIX)) {
     return { ok: false, error: "The server transcript is not available yet. Try again." };
   }
 
@@ -334,9 +340,6 @@ async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
   }
   return { ok: true };
 }
-
-/** Backend message ids are prefixed; locally generated ones are not. */
-const MESSAGE_ID_PREFIX = "msg_";
 
 interface TurnTarget {
   user: Message;
@@ -442,7 +445,7 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
   const last = (messages.byChat[chatId] ?? []).at(-1);
   let draft: Message;
   if (last?.role === "assistant") {
-    // The server reports an unfinished reply as interrupted; it is not.
+    // fetchMessages reports an unfinished reply as interrupted; this one runs.
     draft = { ...last, status: "streaming" };
     messages.patchMessage(chatId, draft.id, { status: "streaming" });
   } else {

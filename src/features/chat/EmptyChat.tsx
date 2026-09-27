@@ -26,7 +26,7 @@ export function EmptyChat({
         <>
           <Text className="text-center text-[26px] font-medium text-text">Connect a server</Text>
           <Text className="mb-6 mt-2 text-center text-[15px] leading-[22px] text-text-muted">
-            OpenChat talks to your own OpenCode server. Add its address to start chatting.
+            OpenChat talks to your own server. Add its address to start chatting.
           </Text>
           <Button label="Open settings" onPress={onOpenSettings} testID="empty-open-settings" />
         </>

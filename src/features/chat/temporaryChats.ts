@@ -1,5 +1,5 @@
 /**
- * Temporary chats are ordinary server sessions that the app hides from the
+ * Temporary chats are ordinary server chats that the app hides from the
  * sidebar and deletes when the user leaves them. If the delete cannot happen
  * then (offline, app killed), the chat stays marked, and so hidden, until
  * `purgeTemporaryChats` succeeds on a later launch.

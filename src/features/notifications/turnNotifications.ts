@@ -103,8 +103,8 @@ function endedBody(chatId: ChatId): string | null {
 }
 
 /**
- * A lone question is shown itself: forms from the agent's question tool are
- * all titled "Questions" and carry the question in the field description.
+ * A form with one visible field is shown by that field: a form title can be
+ * as generic as "Questions", while the field carries the actual question.
  */
 function formBody(form: ChatForm): string {
   const shown = form.fields.filter((field) => !field.hidden && field.type !== "link");

@@ -9,7 +9,7 @@
 import type { ConnectionConfig, ProviderDescriptor } from "./types";
 import { OpenCodeProvider, openCodeCapabilities } from "./opencode/provider";
 
-export const openCodeDescriptor: ProviderDescriptor = {
+const openCodeDescriptor: ProviderDescriptor = {
   id: "opencode",
   label: "OpenCode",
   fields: [
