@@ -29,6 +29,8 @@ interface ConnectionStoreState {
   }) => void;
   markConnecting: () => void;
   markDisconnected: (error?: string | null) => void;
+  /** Drops the saved server; the password is the caller's to clear. */
+  forget: () => void;
 }
 
 export function createConnectionStore(storage = mmkvStorage) {
@@ -41,6 +43,7 @@ export function createConnectionStore(storage = mmkvStorage) {
         saveProfile: (profile) => set({ profile, state: "connected", error: null }),
         markConnecting: () => set({ state: "connecting", error: null }),
         markDisconnected: (error = null) => set({ state: "disconnected", error }),
+        forget: () => set({ profile: null, state: "disconnected", error: null }),
       }),
       {
         name: "connection",

@@ -5,7 +5,7 @@ import { Spinner } from "./Spinner";
 import type { PaletteKey } from "./theme";
 import { cn } from "@/src/lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost" | "dangerGhost";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps {
@@ -25,6 +25,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary: "bg-raised active:bg-raised-hover",
   danger: "bg-danger active:bg-danger/80",
   ghost: "bg-transparent active:bg-surface-hover",
+  dangerGhost: "bg-transparent active:bg-danger/10",
 };
 
 const variantTextClasses: Record<ButtonVariant, string> = {
@@ -32,6 +33,7 @@ const variantTextClasses: Record<ButtonVariant, string> = {
   secondary: "text-text",
   danger: "text-primary-foreground",
   ghost: "text-primary",
+  dangerGhost: "text-danger",
 };
 
 const variantSpinnerTones: Record<ButtonVariant, PaletteKey> = {
@@ -39,6 +41,7 @@ const variantSpinnerTones: Record<ButtonVariant, PaletteKey> = {
   secondary: "text",
   danger: "primaryForeground",
   ghost: "primary",
+  dangerGhost: "danger",
 };
 
 const sizeClasses: Record<ButtonSize, { button: string; text: string }> = {
