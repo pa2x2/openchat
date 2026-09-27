@@ -248,4 +248,5 @@ export interface Capabilities {
   regenerate: boolean;
   modelSelection: boolean;
   deleteChat: boolean;
+  renameChat: boolean;
 }

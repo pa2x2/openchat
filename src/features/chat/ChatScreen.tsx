@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState, FlatList, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
@@ -12,8 +13,9 @@ import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
 import { discardTemporaryChat } from "./temporaryChats";
+import { conversationMarkdown } from "./conversationText";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
-import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
+import { confirmDeleteChat, promptRenameChat } from "@/src/features/drawer/chatActions";
 import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import { dismissTurnNotification } from "@/src/features/notifications/turnNotifications";
 import {
@@ -300,6 +302,27 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
 
   const menuItems: MenuItem[] = [];
+  if (!isDraft && !temporary && capabilities?.renameChat) {
+    menuItems.push({
+      label: "Rename",
+      icon: "pencil-outline",
+      onPress: () => promptRenameChat({ id: chatId, title: chat?.title ?? "" }),
+      testID: "menu-rename",
+    });
+  }
+  if (!empty) {
+    menuItems.push({
+      label: "Copy conversation",
+      icon: "text-box-multiple-outline",
+      onPress: () => {
+        const messages = useMessagesStore.getState().byChat[chatId] ?? [];
+        void Clipboard.setStringAsync(conversationMarkdown(chat?.title ?? "Chat", messages)).catch(
+          () => undefined,
+        );
+      },
+      testID: "menu-copy-conversation",
+    });
+  }
   if (!isDraft && temporary) {
     menuItems.push({
       label: "Keep this chat",

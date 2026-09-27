@@ -49,6 +49,10 @@ export async function deleteChat(client: OpenCodeClient, id: ChatId): Promise<vo
   await client.session.remove({ sessionID: id });
 }
 
+export async function renameChat(client: OpenCodeClient, id: ChatId, title: string): Promise<void> {
+  await client.session.update({ sessionID: id, title });
+}
+
 export async function isRunning(client: OpenCodeClient, id: ChatId): Promise<boolean> {
   // Lists only the sessions that are running right now.
   const active = await client.session.active();

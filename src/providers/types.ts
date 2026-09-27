@@ -73,6 +73,8 @@ export interface ChatProvider {
   /** Creates a backend chat. `title` may be ignored by the backend. */
   createChat(opts?: { model?: ModelRef; title?: string }): Promise<ChatSummary>;
   deleteChat(id: ChatId): Promise<void>;
+  /** Only present when `capabilities.renameChat` is true. */
+  renameChat?(id: ChatId, title: string): Promise<void>;
 
   /** Fire-and-forget prompt delivery; streaming arrives via events(). */
   send(chatId: ChatId, msg: UserMessage): Promise<void>;

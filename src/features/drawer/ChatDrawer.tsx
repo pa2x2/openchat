@@ -14,21 +14,17 @@ import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
-import {
-  getProvider,
-  useProviderCapabilities,
-  useProviderDescriptor,
-} from "@/src/lib/providerFactory";
+import { useProviderCapabilities, useProviderDescriptor } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
-import { showDialog } from "@/src/ui/Dialog";
 import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import { RefreshControl } from "@/src/ui/RefreshControl";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { Spinner } from "@/src/ui/Spinner";
 import { TextInput } from "@/src/ui/TextInput";
+import { confirmDeleteSelected } from "./chatActions";
 
 export interface ChatDrawerProps {
   open: boolean;
@@ -38,79 +34,6 @@ export interface ChatDrawerProps {
   onOpenSettings: () => void;
   /** Called after the active chat is deleted, so the screen can move on. */
   onDeletedActive: () => void;
-}
-
-/** Removes a chat on the server and locally, after asking. */
-export function confirmDeleteChat(chat: Pick<ChatSummary, "id" | "title">, onDeleted?: () => void) {
-  showDialog({
-    title: "Delete chat?",
-    message: `This will delete “${chat.title || "this chat"}”.`,
-    actions: [
-      { label: "Cancel", style: "cancel" },
-      {
-        label: "Delete",
-        style: "destructive",
-        onPress: () => void deleteChats([chat.id], () => onDeleted?.()),
-      },
-    ],
-  });
-}
-
-/**
- * Deletes on the server, then locally. A chat the server still has stays in
- * the list, since the next refresh would bring it back anyway. `onDeleted`
- * gets the chats that are gone, even when some others failed.
- */
-export async function deleteChats(
-  ids: ChatId[],
-  onDeleted?: (deleted: ChatId[]) => void,
-): Promise<void> {
-  const provider = await getProvider().catch(() => null);
-  if (!provider) {
-    showDialog({
-      title: ids.length === 1 ? "Could not delete chat" : "Could not delete chats",
-      message: "Not connected. Open Settings to connect to a server.",
-    });
-    return;
-  }
-  const chats = useChatsStore.getState();
-  chats.setDeleting(ids, true);
-  const results = await Promise.allSettled(ids.map((id) => provider.deleteChat(id)));
-  chats.setDeleting(ids, false);
-  const deleted = ids.filter((_, index) => results[index].status === "fulfilled");
-  if (deleted.length > 0) {
-    useChatsStore.getState().remove(deleted);
-    const messages = useMessagesStore.getState();
-    for (const id of deleted) messages.removeChat(id);
-    onDeleted?.(deleted);
-  }
-  const failure = results.find((result) => result.status === "rejected");
-  if (failure) {
-    const reason: unknown = failure.reason;
-    const failed = ids.length - deleted.length;
-    showDialog({
-      title:
-        ids.length === 1
-          ? "Could not delete chat"
-          : `Could not delete ${failed} of ${ids.length} chats`,
-      message: reason instanceof Error && reason.message ? reason.message : "Try again later.",
-    });
-  }
-}
-
-function confirmDeleteSelected(ids: ChatId[], onDeleted: (deleted: ChatId[]) => void) {
-  showDialog({
-    title: ids.length === 1 ? "Delete chat?" : `Delete ${ids.length} chats?`,
-    message: "This can't be undone.",
-    actions: [
-      { label: "Cancel", style: "cancel" },
-      {
-        label: "Delete",
-        style: "destructive",
-        onPress: () => void deleteChats(ids, onDeleted),
-      },
-    ],
-  });
 }
 
 export function ChatDrawer({

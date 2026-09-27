@@ -1,21 +1,27 @@
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Modal } from "./Modal";
 import { Pressable } from "./Pressable";
 import { create } from "zustand";
 import { Button, type ButtonVariant } from "./Button";
+import { SeededKeyboardAvoidingView } from "./keyboard";
+import { TextInput } from "./TextInput";
 import { useAppTheme } from "./theme";
 
 export interface DialogAction {
   label: string;
   /** `cancel` also runs when the dialog is dismissed with back or a tap outside. */
   style?: "default" | "cancel" | "destructive";
-  onPress?: () => void;
+  /** Receives the field's text when the dialog has one, and "" otherwise. */
+  onPress?: (value: string) => void;
 }
 
 export interface DialogRequest {
   title: string;
   message?: string;
+  /** A single-line text field, filled with `value`. */
+  input?: { value: string; placeholder?: string; label: string };
   /** Defaults to a single "OK". */
   actions?: DialogAction[];
 }
@@ -47,11 +53,18 @@ export function DialogHost() {
   const { colors } = useAppTheme();
   const shown = useDialogStore((state) => state.request);
   const open = useDialogStore((state) => state.open);
+  const [value, setValue] = useState("");
+  // Each request starts from its own value, not what was typed into the last one.
+  const [valueFor, setValueFor] = useState<DialogRequest | null>(null);
+  if (shown !== valueFor) {
+    setValueFor(shown);
+    setValue(shown?.input?.value ?? "");
+  }
 
   function close(action?: DialogAction) {
     // Closed first, so an action that opens another dialog keeps it open.
     useDialogStore.setState({ open: false });
-    action?.onPress?.();
+    action?.onPress?.(value);
   }
 
   const actions = shown?.actions ?? [{ label: "OK" }];
@@ -59,7 +72,11 @@ export function DialogHost() {
 
   return (
     <Modal visible={open} animationType="fade" onRequestClose={dismiss}>
-      <View className="flex-1 items-center justify-center px-8">
+      {/* The Modal is its own window, so it has to rise above the keyboard itself. */}
+      <SeededKeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}
+      >
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: 0.4 }]}
           onPress={dismiss}
@@ -77,6 +94,22 @@ export function DialogHost() {
                 {shown.message}
               </Text>
             ) : null}
+            {shown.input ? (
+              <TextInput
+                autoFocus
+                selectTextOnFocus
+                value={value}
+                onChangeText={setValue}
+                placeholder={shown.input.placeholder}
+                accessibilityLabel={shown.input.label}
+                returnKeyType="done"
+                onSubmitEditing={() =>
+                  close(actions.find((action) => (action.style ?? "default") === "default"))
+                }
+                className="mt-4 rounded-2xl border border-border bg-background px-4 py-3 text-base focus:border-primary"
+                testID="dialog-input"
+              />
+            ) : null}
             <View className="mt-6 flex-row flex-wrap justify-end gap-2">
               {actions.map((action) => (
                 <Button
@@ -92,7 +125,7 @@ export function DialogHost() {
             </View>
           </View>
         ) : null}
-      </View>
+      </SeededKeyboardAvoidingView>
     </Modal>
   );
 }

@@ -27,7 +27,7 @@ import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
-import { createChat, deleteChat, isRunning, listChats, switchModel } from "./sessions";
+import { createChat, deleteChat, isRunning, listChats, renameChat, switchModel } from "./sessions";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
@@ -38,6 +38,7 @@ export const openCodeCapabilities: Capabilities = {
   regenerate: true,
   modelSelection: true,
   deleteChat: true,
+  renameChat: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -87,6 +88,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   deleteChat(id: ChatId): Promise<void> {
     return deleteChat(this.client(), id);
+  }
+
+  renameChat(id: ChatId, title: string): Promise<void> {
+    return renameChat(this.client(), id, title);
   }
 
   setChatModel(id: ChatId, model: ModelRef): Promise<void> {
