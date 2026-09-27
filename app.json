@@ -51,7 +51,8 @@
       "@react-native-vector-icons/material-design-icons",
       "./plugins/withAndroidRelease",
       "./plugins/withAndroidGradleProperties",
-      "./plugins/withAndroidProguard"
+      "./plugins/withAndroidProguard",
+      "./plugins/withAndroidDaemonJvm"
     ],
     "experiments": {
       "typedRoutes": true
