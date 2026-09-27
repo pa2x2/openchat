@@ -49,6 +49,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
+      # The Gradle build cache doesn't cover the native (CMake) builds, which are most of the
+      # build time. Release runs restore this cache but don't save to it.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: android
+          evict-old-files: job
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -68,9 +76,18 @@ jobs:
         run: pnpm exec expo prebuild --platform android --clean --no-install
 
       # No keystore env is set, so the release build falls back to the debug key.
+      # The React Native plugin bakes the host's IP into a resource unless reactNativeDevServerIp
+      # is set; every runner has a different IP, which made R8 and the resource tasks miss the
+      # build cache. The launcher variables route every module's CMake build through ccache.
       - name: Build app
         working-directory: android
-        run: ./gradlew assembleRelease -PreactNativeArchitectures="$REACT_NATIVE_ARCHITECTURES"
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        run: >
+          ./gradlew assembleRelease
+          -PreactNativeArchitectures="$REACT_NATIVE_ARCHITECTURES"
+          -PreactNativeDevServerIp=localhost
 
       - name: Upload APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

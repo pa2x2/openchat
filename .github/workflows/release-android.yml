@@ -80,10 +80,16 @@ jobs:
           java-version: 21
           distribution: temurin
 
+      # Read-only (the default off main): a tag run can only read its own caches and main's,
+      # and every release has a new tag, so anything saved here would never be restored.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
-          cache-read-only: false
+          key: android
+          save: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -112,9 +118,13 @@ jobs:
       - name: Generate native project
         run: pnpm exec expo prebuild --platform android --clean --no-install
 
+      # Keep the flags and launcher env in sync with build.yml, or this build misses the caches
+      # that runs on main leave behind.
       - name: Build
         working-directory: android
         env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ALIAS }}
@@ -122,6 +132,7 @@ jobs:
         run: >
           ./gradlew assembleRelease
           -PreactNativeArchitectures="$REACT_NATIVE_ARCHITECTURES"
+          -PreactNativeDevServerIp=localhost
           -x lintVitalRelease
 
       - name: Rename APKs and verify signatures
