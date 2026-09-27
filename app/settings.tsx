@@ -9,6 +9,7 @@ import {
   useSettingsStore,
   type Appearance,
   type ColorSource,
+  type StartupChat,
   type UpdateChannel,
 } from "@/src/stores/settings";
 import { useUpdatesStore, type UpdateStatus } from "@/src/stores/updates";
@@ -28,6 +29,11 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
 const COLOR_SOURCES: { value: ColorSource; label: string }[] = [
   { value: "default", label: "Default" },
   { value: "dynamic", label: "Dynamic" },
+];
+
+const STARTUP_CHATS: { value: StartupChat; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "temporary", label: "Temporary" },
 ];
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
@@ -143,6 +149,8 @@ export default function SettingsScreen() {
   const setAppearance = useSettingsStore((state) => state.setAppearance);
   const colorSource = useSettingsStore((state) => state.colorSource);
   const setColorSource = useSettingsStore((state) => state.setColorSource);
+  const startupChat = useSettingsStore((state) => state.startupChat);
+  const setStartupChat = useSettingsStore((state) => state.setStartupChat);
 
   return (
     <View className="flex-1 bg-background">
@@ -174,6 +182,14 @@ export default function SettingsScreen() {
             />
           </>
         ) : null}
+
+        <GroupLabel>Startup chat</GroupLabel>
+        <Segmented
+          options={STARTUP_CHATS}
+          value={startupChat}
+          onChange={setStartupChat}
+          testIDPrefix="startup-chat"
+        />
 
         <GroupLabel>Interaction</GroupLabel>
         <Group>

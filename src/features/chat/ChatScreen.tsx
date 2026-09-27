@@ -70,7 +70,13 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
  * (the `new` route); from then on the transcript reconciles from the
  * server on open and foreground.
  */
-export function ChatScreen({ chatId }: { chatId: string }) {
+export function ChatScreen({
+  chatId,
+  startTemporary = false,
+}: {
+  chatId: string;
+  startTemporary?: boolean;
+}) {
   const isDraft = chatId === NEW_CHAT;
   const router = useRouter();
   const { openDrawer } = useDrawer();
@@ -97,9 +103,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [draftTemporary, setDraftTemporary] = useState(false);
+  const [temporaryToggle, setTemporaryToggle] = useState(startTemporary);
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
-  const temporary = isDraft ? draftTemporary : markedTemporary;
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
@@ -107,6 +112,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const canRegenerate = capabilities?.regenerate === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
+  // The startup setting can turn the toggle on for a server that cannot delete.
+  const draftTemporary = temporaryToggle && canTemporary;
+  const temporary = isDraft ? draftTemporary : markedTemporary;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const lastModel = useSettingsStore((state) =>
     providerId ? state.lastModels[providerId] : undefined,
@@ -334,7 +342,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             menuItems={menuItems}
             temporary={
               isDraft && canTemporary
-                ? { on: draftTemporary, onToggle: () => setDraftTemporary((on) => !on) }
+                ? { on: draftTemporary, onToggle: () => setTemporaryToggle((on) => !on) }
                 : undefined
             }
           />
