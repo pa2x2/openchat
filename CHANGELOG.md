@@ -2,6 +2,23 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha05] - 2026-09-27
+
+### 🔄 Changed
+
+- Haptic feedback now answers only toggles and long presses. Ordinary buttons stay quiet, as they do on Android and iOS.
+
+### 🧩 Improved
+
+- Question cards show one question at a time. Back and Next keep your answers until you submit. The composer locks while a question waits and points to the card above. Multi-selects accept a typed answer, and background notifications quote the actual question.
+
+### 🐛 Fixed
+
+- Opening a chat whose reply finished just before the app attached no longer leaves it thinking forever. It settles on the finished reply.
+- Tables that follow text without a blank line render as tables instead of pipe-filled text.
+- The navigation bar keeps the app theme after a relaunch on Android.
+- Reading older messages while a reply taller than the screen streams no longer drags the list on Android.
+
 ## [1.0.0-alpha04] - 2026-09-26
 
 ### ✨ Added
@@ -88,6 +105,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.0.0-alpha05]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha05
 [1.0.0-alpha04]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha04
 [1.0.0-alpha03]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha03
 [1.0.0-alpha02]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha02
