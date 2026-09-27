@@ -244,7 +244,7 @@ export const MessageBubble = memo(function MessageBubble({
         // Holds the action row's place so the reply doesn't jump when it ends.
         <View className="mt-1 h-9" />
       ) : failed ? (
-        // Retry sits in the error card; copy only when there is text to copy.
+        // Retry sits in the error card.
         layout.answer ? (
           <View className="-ml-2 mt-1 flex-row">
             <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />

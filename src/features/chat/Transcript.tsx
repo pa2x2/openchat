@@ -50,7 +50,6 @@ export interface TranscriptProps {
   onRegenerate: () => void;
   /** Present when the backend can edit a sent message. */
   onEditMessage?: (message: Message) => void;
-  /** The message being edited in the composer, if any. */
   editingId?: string | null;
 }
 

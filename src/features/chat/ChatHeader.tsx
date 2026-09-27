@@ -36,7 +36,6 @@ export interface ChatHeaderProps {
   menuItems: MenuItem[];
   /** Present on a chat not yet started; replaces the new chat button. */
   temporary?: { on: boolean; onToggle: () => void };
-  /** Marks the chat as temporary under the title. */
   temporaryLabel?: boolean;
 }
 
