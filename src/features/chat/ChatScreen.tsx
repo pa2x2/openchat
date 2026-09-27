@@ -39,6 +39,29 @@ import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 /** Route id for the not-yet-created chat; the session is made lazily. */
 export const NEW_CHAT = "new";
 
+function stageDraftTurn(text: string, attachments: Attachment[]): void {
+  const messages = useMessagesStore.getState();
+  const now = Date.now();
+  messages.setMessages(NEW_CHAT, [
+    {
+      id: "draft-user",
+      role: "user",
+      text,
+      ...(attachments.length > 0 ? { attachments } : {}),
+      status: "complete",
+      createdAt: now,
+    },
+    {
+      id: "draft-assistant",
+      role: "assistant",
+      text: "",
+      parts: [],
+      status: "pending",
+      createdAt: now + 1,
+    },
+  ]);
+}
+
 /**
  * Conversation screen: the transcript under a floating header, with the
  * composer pinned to the bottom.
@@ -145,6 +168,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void discardPendingRegenerate(chatId);
   }, [chatId, isDraft]);
 
+  // A turn staged on the draft persists like any transcript; one left behind
+  // by a kill mid-creation must not greet the next draft.
+  useEffect(() => {
+    if (isDraft) useMessagesStore.getState().removeChat(NEW_CHAT);
+  }, [isDraft]);
+
   // Leaving a temporary chat deletes it. Read at unmount rather than render,
   // so a chat deleted some other way meanwhile is not deleted twice.
   useEffect(() => {
@@ -171,9 +200,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       }
       if (isDraft) {
         // Lazy chat creation: the session exists only once something is said.
-        const created = await provider.createChat(
-          currentModel ? { model: currentModel } : undefined,
-        );
+        stageDraftTurn(text, files);
+        let created;
+        try {
+          created = await provider.createChat(currentModel ? { model: currentModel } : undefined);
+        } finally {
+          useMessagesStore.getState().removeChat(NEW_CHAT);
+        }
         if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
         useChatsStore.getState().upsert(created);
         const streaming = sendMessage(created.id, text, files);
