@@ -1,4 +1,4 @@
-import { View, useWindowDimensions } from "react-native";
+import { AppState, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
 import { Icon, type IconName } from "./Icon";
@@ -27,10 +27,32 @@ export interface MenuAnchor {
 const ITEM_HEIGHT = 47;
 const MENU_PADDING = 12;
 const EDGE_MARGIN = 16;
+/** Longest wait for the menu's window to go before the chosen item runs anyway. */
+const CLOSE_TIMEOUT_MS = 400;
+
+/**
+ * Runs `action` once the app window has focus back from the menu's own. The
+ * Modal is a separate Android window: an item that focuses a field (edit)
+ * or opens another Modal while the menu's window is still closing would lose
+ * the keyboard or the new window's focus to it. AppState reports "focus"
+ * when the app window gets it back.
+ */
+function afterClose(action: () => void) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    subscription.remove();
+    clearTimeout(timeout);
+    action();
+  };
+  const subscription = AppState.addEventListener("focus", run);
+  const timeout = setTimeout(run, CLOSE_TIMEOUT_MS);
+}
 
 /**
  * Popover menu over a transparent backdrop; a tap outside or back closes it.
- * Choosing an item closes the menu before running the item.
+ * Choosing an item closes the menu, and the item runs once it is gone.
  */
 export function Menu({
   visible,
@@ -71,7 +93,7 @@ export function Menu({
               className="flex-row items-center gap-3 rounded-[14px] px-3 py-3 active:bg-raised"
               onPress={() => {
                 onClose();
-                item.onPress();
+                afterClose(item.onPress);
               }}
               testID={item.testID}
             >

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Modal } from "./Modal";
@@ -6,7 +6,7 @@ import { Pressable } from "./Pressable";
 import { create } from "zustand";
 import { Button, type ButtonVariant } from "./Button";
 import { SeededKeyboardAvoidingView } from "./keyboard";
-import { TextInput } from "./TextInput";
+import { TextInput, type TextInputHandle } from "./TextInput";
 import { useAppTheme } from "./theme";
 
 export interface DialogAction {
@@ -54,6 +54,7 @@ export function DialogHost() {
   const shown = useDialogStore((state) => state.request);
   const open = useDialogStore((state) => state.open);
   const [value, setValue] = useState("");
+  const input = useRef<TextInputHandle>(null);
   // Each request starts from its own value, not what was typed into the last one.
   const [valueFor, setValueFor] = useState<DialogRequest | null>(null);
   if (shown !== valueFor) {
@@ -71,7 +72,15 @@ export function DialogHost() {
   const dismiss = () => close(actions.find((action) => action.style === "cancel"));
 
   return (
-    <Modal visible={open} animationType="fade" onRequestClose={dismiss}>
+    <Modal
+      visible={open}
+      animationType="fade"
+      onRequestClose={dismiss}
+      // Not `autoFocus`, and not at once either: Android ignores the request to
+      // show the keyboard while the Modal's window has no input focus yet,
+      // which it only gets a moment after `onShow`.
+      onShow={() => setTimeout(() => input.current?.focus(), 150)}
+    >
       {/* The Modal is its own window, so it has to rise above the keyboard itself. */}
       <SeededKeyboardAvoidingView
         behavior="padding"
@@ -96,7 +105,7 @@ export function DialogHost() {
             ) : null}
             {shown.input ? (
               <TextInput
-                autoFocus
+                ref={input}
                 selectTextOnFocus
                 value={value}
                 onChangeText={setValue}

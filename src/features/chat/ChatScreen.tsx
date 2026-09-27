@@ -359,6 +359,14 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
 
   const menuItems: MenuItem[] = [];
+  if (!isDraft && temporary) {
+    menuItems.push({
+      label: "Keep this chat",
+      icon: "content-save-outline",
+      onPress: () => useChatsStore.getState().keepTemporary(chatId),
+      testID: "menu-keep",
+    });
+  }
   if (!isDraft && !temporary && capabilities?.renameChat) {
     menuItems.push({
       label: "Rename",
@@ -373,19 +381,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       icon: "text-box-multiple-outline",
       onPress: () => {
         const messages = useMessagesStore.getState().byChat[chatId] ?? [];
-        void Clipboard.setStringAsync(conversationMarkdown(chat?.title ?? "Chat", messages)).catch(
+        void Clipboard.setStringAsync(conversationMarkdown(chat?.title ?? "", messages)).catch(
           () => undefined,
         );
       },
       testID: "menu-copy-conversation",
-    });
-  }
-  if (!isDraft && temporary) {
-    menuItems.push({
-      label: "Keep this chat",
-      icon: "content-save-outline",
-      onPress: () => useChatsStore.getState().keepTemporary(chatId),
-      testID: "menu-keep",
     });
   }
   if (!isDraft && !temporary && capabilities?.deleteChat) {

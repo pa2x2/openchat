@@ -1,6 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { memo, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Message, TurnActivity } from "@/src/domain";
@@ -13,7 +14,8 @@ import { Bubble } from "@/src/ui";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
 import { Menu, type MenuItem } from "@/src/ui/Menu";
-import { Sheet } from "@/src/ui/Sheet";
+import { Modal } from "@/src/ui/Modal";
+import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 export interface MessageBubbleProps {
   message: Message;
@@ -83,9 +85,50 @@ function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => 
 }
 
 /**
+ * The message's text, selectable, over the whole screen. A full-screen view
+ * rather than a sheet: a sheet's drag-to-dismiss takes the long press that
+ * starts a selection.
+ */
+function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+        <View className="h-14 flex-row items-center gap-2 px-2">
+          <Pressable
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+            onPress={onClose}
+            testID="select-text-close"
+          >
+            <Icon name="close" size={22} />
+          </Pressable>
+          <Text className="text-lg font-medium text-text">Select text</Text>
+        </View>
+        <ScrollView
+          contentContainerClassName="px-5 pt-2"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        >
+          <Text
+            selectable
+            selectionColor={withAlpha(colors.primary, 0.35)}
+            className="text-base leading-6 text-text"
+            testID="select-text"
+          >
+            {text}
+          </Text>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+/**
  * The user's own text. A long press opens its menu: copy, select text (in a
- * sheet, since the bubble's text is not selectable in place) and, on the
- * message that allows it, edit.
+ * view of its own, since the bubble's text is not selectable in place) and,
+ * on the message that allows it, edit.
  */
 function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Message) => void }) {
   const [menuAt, setMenuAt] = useState<number | null>(null);
@@ -139,18 +182,7 @@ function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Me
         anchor={{ y: menuAt ?? 0, side: "right", inset: 16 }}
         testID="message-menu"
       />
-      <Sheet
-        visible={selecting}
-        onClose={() => setSelecting(false)}
-        title="Select text"
-        testID="select-text-sheet"
-      >
-        <ScrollView className="max-h-96 px-2">
-          <Text selectable className="text-base leading-6 text-text">
-            {message.text}
-          </Text>
-        </ScrollView>
-      </Sheet>
+      {selecting ? <SelectText text={message.text} onClose={() => setSelecting(false)} /> : null}
     </>
   );
 }
