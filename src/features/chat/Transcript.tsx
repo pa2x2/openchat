@@ -67,6 +67,7 @@ export function Transcript({
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const activity = useMessagesStore((state) => state.activity[chatId] ?? null);
+  const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [following, setFollowing] = useState(true);
 
@@ -98,6 +99,8 @@ export function Transcript({
         onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
         onEdit={item.id === editableId ? onEditMessage : undefined}
         dimmed={item.id === editingId}
+        // The store keeps the reason for the latest turn only.
+        error={item.id === lastMessage?.id ? turnError : null}
       />
     ),
     [
@@ -109,6 +112,8 @@ export function Transcript({
       editableId,
       onEditMessage,
       editingId,
+      lastMessage?.id,
+      turnError,
     ],
   );
 

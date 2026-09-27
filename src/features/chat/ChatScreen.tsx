@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState, FlatList, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
+import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
@@ -38,6 +39,7 @@ import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
+import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import type { MenuItem } from "@/src/ui/Menu";
 
@@ -96,6 +98,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const deleting = useChatsStore((state) => state.deleting[chatId] === true);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
+  // A failed reply shows its own error, with Retry; the banner is for the
+  // rest (a rerun that never started, a send the screen refused).
+  const replyFailed = useMessagesStore((state) => {
+    const last = state.byChat[chatId]?.at(-1);
+    return last?.role === "assistant" && last.status === "error";
+  });
   // One at a time, oldest first: a run waits on its forms in order.
   const form = useMessagesStore((state) => state.forms[chatId]?.[0] ?? null);
 
@@ -393,6 +401,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }
 
+  const shownError = banner ?? (turnError && !replyFailed ? turnError : null);
+
+  function dismissError() {
+    if (banner) setBanner(null);
+    else useMessagesStore.getState().setTurnError(chatId, null);
+  }
+
   function handleNewChat() {
     if (isDraft) {
       composer.current?.focus();
@@ -476,20 +491,35 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               onDismiss={() => dismissForm(chatId, form.id)}
             />
           ) : null}
-          {turnError ? (
-            <Text className="px-2 pb-2 text-sm text-danger" testID="turn-error">
-              {turnError}
-            </Text>
-          ) : null}
-          {banner ? (
-            <Text className="px-2 pb-2 text-sm text-danger" testID="chat-banner">
-              {banner}
-            </Text>
+          {shownError ? (
+            <View
+              accessibilityLiveRegion="polite"
+              className="mb-2 flex-row items-center gap-2.5 rounded-2xl bg-danger/10 py-1.5 pl-3 pr-1"
+              testID="chat-banner"
+            >
+              <Icon name="alert-circle-outline" size={18} tone="danger" />
+              <Text className="flex-1 py-1 text-sm leading-[19px] text-danger">{shownError}</Text>
+              <Pressable
+                accessibilityLabel="Dismiss"
+                accessibilityRole="button"
+                className="h-8 w-8 items-center justify-center rounded-full active:bg-danger/10"
+                onPress={dismissError}
+                testID="chat-banner-dismiss"
+              >
+                <Icon name="close" size={18} tone="textMuted" />
+              </Pressable>
+            </View>
           ) : null}
           <Composer
             ref={composer}
             autoFocus={focusOnMount}
-            locked={form !== null}
+            lockedReason={
+              !connected
+                ? "Connect a server to start chatting"
+                : form
+                  ? "Answer the question above"
+                  : undefined
+            }
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
             onAttach={canAttach && !editing ? () => setAttachSheetOpen(true) : undefined}

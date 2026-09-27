@@ -37,10 +37,11 @@ export interface ComposerProps {
   autoFocus?: boolean;
   placeholder?: string;
   /**
-   * Set while the backend waits on a form: nothing typed here could be sent,
-   * so the field takes no input. A draft already typed stays.
+   * Set while nothing typed here could be sent (no server, or the backend
+   * waits on a form): the field takes no input and shows this instead of the
+   * placeholder. A draft already typed stays.
    */
-  locked?: boolean;
+  lockedReason?: string;
 }
 
 const NO_ATTACHMENTS: Attachment[] = [];
@@ -63,7 +64,7 @@ export function Composer({
   editing,
   autoFocus,
   placeholder = "Ask anything",
-  locked = false,
+  lockedReason,
 }: ComposerProps) {
   const [text, setText] = useState("");
   const input = useRef<TextInputHandle>(null);
@@ -83,20 +84,21 @@ export function Composer({
     [text],
   );
 
+  const locked = lockedReason !== undefined;
   useEffect(() => {
     if (locked) input.current?.blur();
   }, [locked]);
 
   async function handleSend() {
     const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || streaming) return;
+    if ((!trimmed && attachments.length === 0) || streaming || locked) return;
     setText("");
     Keyboard.dismiss();
     const sent = await onSend(trimmed, attachments);
     if (sent === false) setText((current) => current || text);
   }
 
-  const sendDisabled = text.trim().length === 0 && attachments.length === 0;
+  const sendDisabled = (text.trim().length === 0 && attachments.length === 0) || locked;
   // Attach and the chip step aside while a reply streams.
   const showAttach = Boolean(onAttach) && !streaming;
   const showReasoning = Boolean(reasoning) && !streaming;
@@ -133,7 +135,7 @@ export function Composer({
         autoFocus={autoFocus}
         value={text}
         onChangeText={setText}
-        placeholder={locked ? "Answer the question above" : placeholder}
+        placeholder={lockedReason ?? placeholder}
         editable={!locked}
         multiline
         accessibilityLabel="Message"

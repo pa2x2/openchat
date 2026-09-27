@@ -26,18 +26,13 @@ export interface MessageBubbleProps {
   onEdit?: (message: Message) => void;
   /** The message is being edited in the composer. */
   dimmed?: boolean;
+  /** Why a failed reply failed, when it is known. */
+  error?: string | null;
 }
 
-/** A terminal outcome worth a line under the reply; live states show inline. */
+/** A terminal outcome worth a line under the message; live states show inline, errors in a card. */
 function statusFor(message: Message): string | undefined {
-  switch (message.status) {
-    case "error":
-      return "Something went wrong";
-    case "interrupted":
-      return "Stopped";
-    default:
-      return undefined;
-  }
+  return message.status === "interrupted" ? "Stopped" : undefined;
 }
 
 function CopyButton({ text, label, testID }: { text: string; label: string; testID: string }) {
@@ -52,6 +47,38 @@ function CopyButton({ text, label, testID }: { text: string; label: string; test
     >
       <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
     </Pressable>
+  );
+}
+
+function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => void }) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      className="mt-2.5 flex-row items-start gap-3 rounded-[18px] bg-surface px-3.5 py-3"
+      testID="reply-error"
+    >
+      <View className="pt-px">
+        <Icon name="alert-circle-outline" size={20} tone="danger" />
+      </View>
+      <View className="flex-1">
+        <Text className="text-[15px] font-medium text-text">The reply didn’t finish</Text>
+        {error ? (
+          <Text className="mt-0.5 text-[13.5px] leading-[18px] text-text-muted">{error}</Text>
+        ) : null}
+        {onRetry ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Runs this reply again and replaces it"
+            className="mt-2.5 h-9 flex-row items-center gap-1.5 self-start rounded-full bg-raised-hover px-3.5 active:opacity-80"
+            onPress={onRetry}
+            testID="reply-retry"
+          >
+            <Icon name="refresh" size={17} />
+            <Text className="text-sm font-medium text-text">Retry</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -135,6 +162,7 @@ export const MessageBubble = memo(function MessageBubble({
   onRegenerate,
   onEdit,
   dimmed = false,
+  error = null,
 }: MessageBubbleProps) {
   const streaming = message.status === "pending" || message.status === "streaming";
   const attachments = message.attachments ?? [];
@@ -163,6 +191,7 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   const status = statusFor(message);
+  const failed = message.status === "error";
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (
@@ -205,19 +234,22 @@ export const MessageBubble = memo(function MessageBubble({
       ) : null}
       {layout.blocks.map(renderBlock)}
       {/* The fold already says a stopped reply was stopped. */}
-      {status && !(layout.fold && message.status === "interrupted") ? (
-        <Text
-          accessibilityLabel={status}
-          className={
-            message.status === "error" ? "mt-1 text-sm text-danger" : "mt-1 text-sm text-text-muted"
-          }
-        >
+      {status && !layout.fold ? (
+        <Text accessibilityLabel={status} className="mt-1 text-sm text-text-muted">
           {status}
         </Text>
       ) : null}
+      {failed ? <ReplyError error={error} onRetry={onRegenerate} /> : null}
       {streaming ? (
         // Holds the action row's place so the reply doesn't jump when it ends.
         <View className="mt-1 h-9" />
+      ) : failed ? (
+        // Retry sits in the error card; copy only when there is text to copy.
+        layout.answer ? (
+          <View className="-ml-2 mt-1 flex-row">
+            <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
+          </View>
+        ) : null
       ) : layout.answer || onRegenerate ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
