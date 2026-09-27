@@ -373,7 +373,6 @@ export function ChatScreen({
           <Composer
             ref={composer}
             autoFocus={focusOnMount}
-            placeholder={temporary ? "Temporary chat" : undefined}
             locked={form !== null}
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}

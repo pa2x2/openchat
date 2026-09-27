@@ -134,10 +134,6 @@ export function ConnectionCard() {
           testID="connection-connect"
         />
       )}
-
-      <Text className="text-xs leading-[18px] text-text-muted">
-        Run a server with the config in docker/opencode, then enter its URL here.
-      </Text>
     </View>
   );
 }

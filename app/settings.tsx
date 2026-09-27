@@ -95,12 +95,7 @@ function UpdatesSection() {
         onChange={handleChannel}
         testIDPrefix="update-channel"
       />
-      <Text className="px-3 pb-3 pt-2 text-[13px] leading-[18px] text-text-muted">
-        {channel === "prerelease"
-          ? "Get new versions early. Pre-releases can be less stable."
-          : "Only get versions that are marked stable."}
-      </Text>
-      <Group>
+      <Group className="mt-2">
         <Row
           icon="update"
           title={release && status !== "upToDate" ? "Update available" : "Check for updates"}
