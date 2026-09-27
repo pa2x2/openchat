@@ -39,7 +39,8 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
   const [draft, setDraft] = useState<FormDraft>(() => initialDraft(form));
   // Errors show once a field has been edited, not while it is still empty.
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"submit" | "dismiss" | null>(null);
+  const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const keyboardOpen = useKeyboardOpen();
@@ -63,15 +64,15 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
     setPage(next);
   }
 
-  async function run(action: () => Promise<void>) {
+  async function run(kind: "submit" | "dismiss", action: () => Promise<void>) {
     if (busy) return;
-    setBusy(true);
+    setPending(kind);
     setError(null);
     try {
       await action();
     } catch (failure) {
       setError(failure instanceof Error && failure.message ? failure.message : "Could not send.");
-      setBusy(false);
+      setPending(null);
     }
   }
 
@@ -129,7 +130,8 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           variant="ghost"
           size="sm"
           disabled={busy}
-          onPress={() => void run(onDismiss)}
+          loading={pending === "dismiss"}
+          onPress={() => void run("dismiss", onDismiss)}
           testID="form-dismiss"
         />
         <View className="flex-1" />
@@ -148,7 +150,8 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
             label="Submit"
             size="sm"
             disabled={busy || !canSubmit(form, draft)}
-            onPress={() => void run(() => onSubmit(buildAnswer(form, draft)))}
+            loading={pending === "submit"}
+            onPress={() => void run("submit", () => onSubmit(buildAnswer(form, draft)))}
             testID="form-submit"
           />
         ) : (

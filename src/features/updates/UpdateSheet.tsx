@@ -9,6 +9,7 @@ import { Text } from "@/src/ui/Text";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useUpdatesStore } from "@/src/stores/updates";
 import { Button } from "@/src/ui/Button";
+import { LinearProgress } from "@/src/ui/LinearProgress";
 import { Sheet } from "@/src/ui/Sheet";
 
 export function formatSize(bytes: number): string {
@@ -18,12 +19,7 @@ export function formatSize(bytes: number): string {
 function ProgressBar({ progress }: { progress: number | null }) {
   return (
     <View className="gap-2" testID="update-progress">
-      <View className="h-1.5 overflow-hidden rounded-full bg-border">
-        <View
-          className="h-full rounded-full bg-primary"
-          style={{ width: `${Math.round((progress ?? 0) * 100)}%` }}
-        />
-      </View>
+      <LinearProgress progress={progress} immediate className="h-1.5" />
       <Text className="text-sm text-text-muted">
         {progress === null ? "Downloading…" : `Downloading… ${Math.round(progress * 100)}%`}
       </Text>
@@ -106,7 +102,7 @@ export function UpdateSheet() {
             testID="update-cancel"
           />
         ) : status === "installing" ? (
-          <Button label="Installing…" disabled testID="update-installing" />
+          <Button label="Installing" loading testID="update-installing" />
         ) : status === "needsPermission" ? (
           <Button label="Allow installs" onPress={requestInstallPermission} testID="update-allow" />
         ) : (

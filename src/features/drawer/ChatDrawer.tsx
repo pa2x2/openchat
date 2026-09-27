@@ -20,7 +20,10 @@ import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { showDialog } from "@/src/ui/Dialog";
 import { Icon } from "@/src/ui/Icon";
+import { LinearProgress } from "@/src/ui/LinearProgress";
 import { RefreshControl } from "@/src/ui/RefreshControl";
+import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
+import { Spinner } from "@/src/ui/Spinner";
 import { TextInput } from "@/src/ui/TextInput";
 
 export interface ChatDrawerProps {
@@ -66,7 +69,10 @@ export async function deleteChats(
     });
     return;
   }
+  const chats = useChatsStore.getState();
+  chats.setDeleting(ids, true);
   const results = await Promise.allSettled(ids.map((id) => provider.deleteChat(id)));
+  chats.setDeleting(ids, false);
   const deleted = ids.filter((_, index) => results[index].status === "fulfilled");
   if (deleted.length > 0) {
     useChatsStore.getState().remove(deleted);
@@ -118,6 +124,8 @@ export function ChatDrawer({
   const capabilities = useProviderCapabilities();
   const profile = useConnectionStore((state) => state.profile);
   const chatsError = useChatsStore((state) => state.error);
+  const chatsLoading = useChatsStore((state) => state.loading);
+  const deleting = useChatsStore((state) => state.deleting);
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<ChatId>>(new Set());
@@ -175,6 +183,7 @@ export function ChatDrawer({
 
   // Only chats still listed: one deleted elsewhere may linger in the set.
   const selectedIds = allChats.filter((chat) => selected.has(chat.id)).map((chat) => chat.id);
+  const deletingSelected = selectedIds.some((id) => deleting[id]);
   const allVisibleSelected = visible.length > 0 && visible.every((chat) => selected.has(chat.id));
 
   function toggleAllVisible() {
@@ -253,13 +262,20 @@ export function ChatDrawer({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Delete ${selectedIds.length} selected`}
-            accessibilityState={{ disabled: selectedIds.length === 0 }}
-            disabled={selectedIds.length === 0}
+            accessibilityState={{
+              disabled: selectedIds.length === 0 || deletingSelected,
+              busy: deletingSelected,
+            }}
+            disabled={selectedIds.length === 0 || deletingSelected}
             className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
             onPress={deleteSelected}
             testID="drawer-delete-selected"
           >
-            <Icon name="trash-can-outline" size={22} tone="danger" />
+            {deletingSelected ? (
+              <Spinner size="small" tone="danger" />
+            ) : (
+              <Icon name="trash-can-outline" size={22} tone="danger" />
+            )}
           </Pressable>
         </View>
       ) : (
@@ -283,6 +299,13 @@ export function ChatDrawer({
           </View>
         </View>
       )}
+
+      {/* Pull-to-refresh draws its own spinner, and a first load shows skeleton rows. */}
+      <View className="h-[3px] px-3">
+        {chatsLoading && !refreshing && allChats.length > 0 ? (
+          <LinearProgress testID="drawer-progress" />
+        ) : null}
+      </View>
 
       <FlatList
         data={visible}
@@ -311,9 +334,13 @@ export function ChatDrawer({
         }
         renderItem={renderChat}
         ListEmptyComponent={
-          <Text className="px-3 py-2 text-sm text-text-muted">
-            {query ? "No matching chats" : "No chats yet"}
-          </Text>
+          chatsLoading && !query ? (
+            <ChatListSkeleton />
+          ) : (
+            <Text className="px-3 py-2 text-sm text-text-muted">
+              {query ? "No matching chats" : "No chats yet"}
+            </Text>
+          )
         }
       />
 
@@ -363,15 +390,22 @@ const ChatRow = memo(function ChatRow({
 }) {
   // Per row, so a turn starting or ending re-renders only its own chat.
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
+  const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={chat.title || "Untitled"}
-      accessibilityState={selection === undefined ? { selected: active } : { checked: selection }}
+      accessibilityState={{
+        ...(selection === undefined ? { selected: active } : { checked: selection }),
+        busy: deleting,
+        disabled: deleting,
+      }}
       className={cn(
         "flex-row items-center gap-2 rounded-[14px] px-3 py-3",
         (selection ?? active) ? "bg-surface" : "active:bg-surface",
+        deleting && "opacity-50",
       )}
+      disabled={deleting}
       onPress={() => onPress(chat.id)}
       onLongPress={onLongPress ? () => onLongPress(chat.id) : undefined}
       testID={`chat-row-${chat.id}`}
@@ -390,6 +424,21 @@ const ChatRow = memo(function ChatRow({
       >
         {chat.title || "Untitled"}
       </Text>
+      {deleting ? <Spinner size="small" /> : null}
     </Pressable>
   );
 });
+
+const SKELETON_TITLE_WIDTHS = ["w-[72%]", "w-[54%]", "w-[80%]", "w-[46%]", "w-[64%]", "w-[58%]"];
+
+function ChatListSkeleton() {
+  return (
+    <SkeletonGroup label="Loading chats" testID="drawer-skeleton">
+      {SKELETON_TITLE_WIDTHS.map((width) => (
+        <View key={width} className="px-3 py-[15px]">
+          <Skeleton className={cn("h-3.5", width)} />
+        </View>
+      ))}
+    </SkeletonGroup>
+  );
+}

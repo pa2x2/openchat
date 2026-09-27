@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, Message } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
+import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 import { HEADER_HEIGHT } from "./ChatHeader";
 import { MessageBubble } from "./MessageBubble";
@@ -29,6 +30,18 @@ const FOLLOW_OFFSET = 8;
 // partly visible cell, whose top in inverted space doesn't move as it grows)
 // makes the native side shift the offset by the growth in the same layout pass.
 const HOLD_POSITION = { minIndexForVisible: 1 };
+
+// Stands in for the reply while a turn is starting but has no reply of its own
+// yet: a rerun holds the chat while it re-reads the transcript and has the
+// server roll the old turn back.
+const PENDING_REPLY: Message = {
+  id: "pending-reply",
+  role: "assistant",
+  text: "",
+  parts: [],
+  status: "pending",
+  createdAt: 0,
+};
 
 export interface TranscriptProps {
   chatId: ChatId;
@@ -63,6 +76,10 @@ export function Transcript({
     canRegenerate && !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  const replyPending =
+    lastMessage?.role === "assistant" &&
+    (lastMessage.status === "pending" || lastMessage.status === "streaming");
+  const starting = turnActive && !replyPending;
 
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
@@ -104,7 +121,14 @@ export function Transcript({
         scrollEventThrottle={16}
         // Inverted: the header component sits at the bottom, the footer
         // at the top, under the floating header.
-        ListHeaderComponent={<View className="h-3" />}
+        ListHeaderComponent={
+          <>
+            {starting ? (
+              <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
+            ) : null}
+            <View className="h-3" />
+          </>
+        }
         ListFooterComponent={<View style={{ height: insets.top + HEADER_HEIGHT + 4 }} />}
         renderItem={renderMessage}
       />
@@ -129,5 +153,28 @@ export function Transcript({
         </Pressable>
       ) : null}
     </>
+  );
+}
+
+export function TranscriptSkeleton() {
+  // Bottom-anchored like the inverted list, so the transcript lands where
+  // its placeholder was.
+  return (
+    <View className="flex-1 justify-end pb-3">
+      <SkeletonGroup label="Loading messages" className="px-4" testID="transcript-skeleton">
+        <Skeleton className="h-10 w-[58%] self-end rounded-[22px]" />
+        <View className="mt-9 gap-3">
+          <Skeleton className="h-3.5 w-[92%]" />
+          <Skeleton className="h-3.5 w-[84%]" />
+          <Skeleton className="h-3.5 w-[88%]" />
+          <Skeleton className="h-3.5 w-[46%]" />
+        </View>
+        <Skeleton className="mt-9 h-10 w-[42%] self-end rounded-[22px]" />
+        <View className="mt-9 gap-3">
+          <Skeleton className="h-3.5 w-[90%]" />
+          <Skeleton className="h-3.5 w-[64%]" />
+        </View>
+      </SkeletonGroup>
+    </View>
   );
 }

@@ -13,6 +13,8 @@ import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
 import { Icon, MenuGlyph, TemporaryChatGlyph, type IconName } from "@/src/ui/Icon";
+import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
+import { Spinner } from "@/src/ui/Spinner";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Height of the header below the status bar; the transcript pads by this. */
@@ -32,6 +34,11 @@ export interface ChatHeaderProps {
   /** Title in the middle. With `onPressTitle` it is the model picker. */
   title: string;
   onPressTitle?: () => void;
+  /**
+   * "placeholder" stands in for a title still loading; "busy" keeps the
+   * title but shows a request for it is in flight.
+   */
+  titleStatus?: "placeholder" | "busy";
   menuItems: HeaderMenuItem[];
   /** Present on a chat not yet started; replaces the new chat button. */
   temporary?: { on: boolean; onToggle: () => void };
@@ -42,6 +49,7 @@ export function ChatHeader({
   onNewChat,
   title,
   onPressTitle,
+  titleStatus,
   menuItems,
   temporary,
 }: ChatHeaderProps) {
@@ -81,10 +89,22 @@ export function ChatHeader({
         onPress={onPressTitle}
         testID="model-button"
       >
-        <Text className="text-[17px] font-medium text-text" numberOfLines={1}>
-          {title}
-        </Text>
-        {onPressTitle ? <Icon name="chevron-down" size={18} tone="textMuted" /> : null}
+        {titleStatus === "placeholder" ? (
+          <SkeletonGroup label="Loading model" testID="model-button-skeleton">
+            <Skeleton className="h-4 w-28" />
+          </SkeletonGroup>
+        ) : (
+          <Text className="text-[17px] font-medium text-text" numberOfLines={1}>
+            {title}
+          </Text>
+        )}
+        {titleStatus === "busy" ? (
+          <View className="ml-1">
+            <Spinner size="small" />
+          </View>
+        ) : onPressTitle ? (
+          <Icon name="chevron-down" size={18} tone="textMuted" />
+        ) : null}
       </Pressable>
 
       <View

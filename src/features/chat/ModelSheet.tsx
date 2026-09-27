@@ -21,8 +21,9 @@ import { modelKey, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { Button } from "@/src/ui/Button";
 import { Icon } from "@/src/ui/Icon";
 import { GroupLabel } from "@/src/ui/ListGroup";
+import { LinearProgress } from "@/src/ui/LinearProgress";
 import { Sheet } from "@/src/ui/Sheet";
-import { Spinner } from "@/src/ui/Spinner";
+import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { TextInput } from "@/src/ui/TextInput";
 import { favoriteModels, groupByProvider, monogram, searchGroups } from "./modelPicker";
 
@@ -78,9 +79,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
   return (
     <Sheet visible={visible} onClose={onClose} height="80%" testID="model-sheet">
       {loading && models.length === 0 ? (
-        <View className="flex-1 items-center justify-center" testID="model-loading">
-          <Spinner accessibilityLabel="Loading models" />
-        </View>
+        <ModelSheetSkeleton />
       ) : error && models.length === 0 ? (
         <View className="flex-1 items-center justify-center gap-3 px-8">
           <Text className="text-center text-sm text-danger" testID="model-error">
@@ -89,6 +88,7 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
           <Button
             label="Retry"
             variant="secondary"
+            loading={loading}
             onPress={() => void refresh()}
             testID="model-retry"
           />
@@ -101,14 +101,53 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
           <Button
             label="Retry"
             variant="secondary"
+            loading={loading}
             onPress={() => void refresh()}
             testID="model-retry"
           />
         </View>
       ) : (
-        <ModelBrowser key={opening} models={models} selected={selected} onSelect={handleSelect} />
+        <>
+          {/* Reserved even when idle, so the list does not jump when a refresh starts. */}
+          <View className="mb-2 h-[3px]">
+            {loading ? <LinearProgress testID="model-progress" /> : null}
+          </View>
+          <ModelBrowser key={opening} models={models} selected={selected} onSelect={handleSelect} />
+        </>
       )}
     </Sheet>
+  );
+}
+
+const SKELETON_ROWS = ["w-[62%]", "w-[48%]", "w-[70%]", "w-[54%]", "w-[66%]", "w-[44%]"];
+
+function ModelSheetSkeleton() {
+  return (
+    <SkeletonGroup
+      label="Loading models"
+      className="flex-row gap-2 pt-[11px]"
+      testID="model-loading"
+    >
+      <View className="w-[60px] items-center gap-3">
+        {[0, 1, 2, 3].map((index) => (
+          <View key={index} className="items-center gap-1.5">
+            <Skeleton className="h-10 w-10 rounded-xl bg-raised" />
+            <Skeleton className="h-2 w-9 bg-raised" />
+          </View>
+        ))}
+      </View>
+      <View className="flex-1 overflow-hidden rounded-[20px] bg-raised">
+        {SKELETON_ROWS.map((width, index) => (
+          <View key={width}>
+            {index > 0 ? <View className="mx-3.5 h-px bg-border" /> : null}
+            <View className="min-h-[60px] justify-center gap-2 py-2.5 pl-3.5">
+              <Skeleton className={cn("h-3.5 bg-raised-hover", width)} />
+              <Skeleton className="h-2.5 w-[36%] bg-raised-hover" />
+            </View>
+          </View>
+        ))}
+      </View>
+    </SkeletonGroup>
   );
 }
 

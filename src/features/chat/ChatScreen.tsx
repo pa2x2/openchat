@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState, FlatList, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { useRouter } from "expo-router";
@@ -10,7 +10,7 @@ import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
-import { Transcript } from "./Transcript";
+import { Transcript, TranscriptSkeleton } from "./Transcript";
 import { discardTemporaryChat } from "./temporaryChats";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat } from "@/src/features/drawer/ChatDrawer";
@@ -35,6 +35,7 @@ import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
+import { LinearProgress } from "@/src/ui/LinearProgress";
 
 /** Route id for the not-yet-created chat; the session is made lazily. */
 export const NEW_CHAT = "new";
@@ -93,6 +94,8 @@ export function ChatScreen({
   // Only whether there is a transcript: the transcript itself changes on
   // every streamed frame, and only `Transcript` should re-render for that.
   const empty = useMessagesStore((state) => (state.byChat[chatId]?.length ?? 0) === 0);
+  const transcriptLoading = useMessagesStore((state) => state.loading[chatId] ?? false);
+  const deleting = useChatsStore((state) => state.deleting[chatId] === true);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
   // One at a time, oldest first: a run waits on its forms in order.
@@ -104,6 +107,7 @@ export function ChatScreen({
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [temporaryToggle, setTemporaryToggle] = useState(startTemporary);
+  const [switchingModel, setSwitchingModel] = useState(false);
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
@@ -124,6 +128,7 @@ export function ChatScreen({
     currentModel ? state.models.find((model) => sameModelRef(model.ref, currentModel)) : undefined,
   );
   const currentLabel = currentInfo?.label ?? null;
+  const modelsLoading = useModelsStore((state) => state.loading);
   const variants = currentInfo?.variants ?? [];
   const variantLabel = currentModel?.variant
     ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
@@ -132,8 +137,10 @@ export function ChatScreen({
 
   // Cold open: reconcile the transcript from the server (cache first), bury
   // streams this app instance is not going to continue, and pick up a run
-  // that is still going on the server.
-  useEffect(() => {
+  // that is still going on the server. A layout effect, so the fetch is
+  // marked loading before the first paint: otherwise an uncached chat flashes
+  // the empty-chat greeting before its skeleton.
+  useLayoutEffect(() => {
     if (isDraft || isTurnLive(chatId)) return;
     let cancelled = false;
     const messagesStore = useMessagesStore.getState();
@@ -270,6 +277,7 @@ export function ChatScreen({
     // New chats start with whatever was picked last, in any chat.
     if (providerId) useSettingsStore.getState().setLastModel(providerId, model);
     if (isDraft) return;
+    setSwitchingModel(true);
     try {
       const provider = await getProvider();
       if (!provider) {
@@ -283,6 +291,8 @@ export function ChatScreen({
       setBanner(
         error instanceof Error && error.message ? error.message : "Could not switch model.",
       );
+    } finally {
+      setSwitchingModel(false);
     }
   }
 
@@ -313,7 +323,9 @@ export function ChatScreen({
     <View className="flex-1 bg-background">
       <SeededKeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View className="flex-1">
-          {empty ? (
+          {empty && transcriptLoading && !isDraft ? (
+            <TranscriptSkeleton />
+          ) : empty ? (
             <View className="flex-1" style={{ paddingTop: insets.top + HEADER_HEIGHT }}>
               <EmptyChat
                 connected={connected}
@@ -339,6 +351,15 @@ export function ChatScreen({
             onNewChat={handleNewChat}
             title={modelSelection ? (currentLabel ?? "Choose model") : "OpenChat"}
             onPressTitle={modelSelection ? () => setSheetOpen(true) : undefined}
+            titleStatus={
+              !modelSelection
+                ? undefined
+                : switchingModel
+                  ? "busy"
+                  : currentModel && !currentInfo && modelsLoading
+                    ? "placeholder"
+                    : undefined
+            }
             menuItems={menuItems}
             temporary={
               isDraft && canTemporary
@@ -346,6 +367,17 @@ export function ChatScreen({
                 : undefined
             }
           />
+
+          {/* The skeleton already says an uncached transcript is loading. */}
+          {(transcriptLoading && !empty) || deleting ? (
+            <View
+              pointerEvents="none"
+              className="absolute left-0 right-0"
+              style={{ top: insets.top }}
+            >
+              <LinearProgress immediate={deleting} testID="chat-progress" />
+            </View>
+          ) : null}
         </View>
 
         <View

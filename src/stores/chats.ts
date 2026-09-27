@@ -32,6 +32,8 @@ interface ChatsStoreState {
    * killed app stays hidden and is deleted on the next launch.
    */
   temporary: Record<ChatId, true>;
+  /** Not persisted: a delete in flight does not survive a restart. */
+  deleting: Record<ChatId, true>;
   upsert: (chat: ChatSummary) => void;
   /** Moves a chat to the top of the list with a fresh timestamp. */
   touch: (id: ChatId, updatedAt?: number) => void;
@@ -41,6 +43,7 @@ interface ChatsStoreState {
   markTemporary: (id: ChatId) => void;
   /** Also drops the chat from the list. */
   forgetTemporary: (id: ChatId) => void;
+  setDeleting: (ids: ChatId[], deleting: boolean) => void;
   /** Re-reads the chat list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
   clear: () => void;
@@ -59,6 +62,7 @@ export function createChatsStore(storage = mmkvStorage) {
         error: null,
         pendingRegenerate: {},
         temporary: {},
+        deleting: {},
         upsert: (chat) =>
           set((state) => ({
             chats: sortChats([...state.chats.filter((existing) => existing.id !== chat.id), chat]),
@@ -87,6 +91,15 @@ export function createChatsStore(storage = mmkvStorage) {
             delete temporary[id];
             return { temporary, chats: state.chats.filter((chat) => chat.id !== id) };
           }),
+        setDeleting: (ids, deleting) =>
+          set((state) => {
+            const next = { ...state.deleting };
+            for (const id of ids) {
+              if (deleting) next[id] = true;
+              else delete next[id];
+            }
+            return { deleting: next };
+          }),
         refresh: async () => {
           if (get().loading) return;
           set({ loading: true, error: null });
@@ -107,7 +120,14 @@ export function createChatsStore(storage = mmkvStorage) {
           }
         },
         clear: () =>
-          set({ chats: [], loading: false, error: null, pendingRegenerate: {}, temporary: {} }),
+          set({
+            chats: [],
+            loading: false,
+            error: null,
+            pendingRegenerate: {},
+            temporary: {},
+            deleting: {},
+          }),
       }),
       {
         name: "chats",

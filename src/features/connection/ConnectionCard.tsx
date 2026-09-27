@@ -128,9 +128,9 @@ export function ConnectionCard() {
         />
       ) : (
         <Button
-          label={busy ? "Connecting…" : "Connect"}
+          label="Connect"
           onPress={handleConnect}
-          disabled={busy}
+          loading={busy}
           testID="connection-connect"
         />
       )}

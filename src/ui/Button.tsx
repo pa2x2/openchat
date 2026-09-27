@@ -1,5 +1,8 @@
 import { Text } from "./Text";
+import { View } from "react-native";
 import { Pressable } from "./Pressable";
+import { Spinner } from "./Spinner";
+import type { PaletteKey } from "./theme";
 import { cn } from "@/src/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
@@ -11,6 +14,8 @@ export interface ButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   disabled?: boolean;
+  /** Also disables the button. */
+  loading?: boolean;
   className?: string;
   testID?: string;
 }
@@ -29,6 +34,13 @@ const variantTextClasses: Record<ButtonVariant, string> = {
   ghost: "text-primary",
 };
 
+const variantSpinnerTones: Record<ButtonVariant, PaletteKey> = {
+  primary: "primaryForeground",
+  secondary: "text",
+  danger: "primaryForeground",
+  ghost: "primary",
+};
+
 const sizeClasses: Record<ButtonSize, { button: string; text: string }> = {
   sm: { button: "px-3.5 py-1.5 rounded-full", text: "text-sm" },
   md: { button: "px-5 py-3 rounded-full", text: "text-base" },
@@ -41,27 +53,44 @@ export function Button({
   variant = "primary",
   size = "md",
   disabled = false,
+  loading = false,
   className,
   testID,
 }: ButtonProps) {
   const sizes = sizeClasses[size];
+  const inactive = disabled || loading;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: inactive, busy: loading }}
       accessibilityLabel={label}
       className={cn(
         "items-center justify-center",
         sizes.button,
         variantClasses[variant],
-        disabled && "opacity-50",
+        disabled && !loading && "opacity-50",
         className,
       )}
       onPress={onPress}
-      disabled={disabled}
+      disabled={inactive}
       testID={testID}
     >
-      <Text className={cn("font-medium", sizes.text, variantTextClasses[variant])}>{label}</Text>
+      {/* The label stays laid out, invisibly, so the button keeps its size. */}
+      <Text
+        className={cn(
+          "font-medium",
+          sizes.text,
+          variantTextClasses[variant],
+          loading && "opacity-0",
+        )}
+      >
+        {label}
+      </Text>
+      {loading ? (
+        <View className="absolute inset-0 items-center justify-center">
+          <Spinner size="small" tone={variantSpinnerTones[variant]} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
