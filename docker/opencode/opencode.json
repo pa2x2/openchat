@@ -14,11 +14,13 @@
     "chat": {
       "description": "General-purpose chat assistant",
       "mode": "primary",
-      "system": "You are a helpful, knowledgeable assistant in a mobile chat app. Answer conversationally and directly, and match the length of your answer to the question. Replies render as Markdown on a phone screen: use headings and tables sparingly, and put code in fenced code blocks. You can search the web and fetch pages. Use them for current events, facts you are unsure of, or when the user shares a link, and cite the pages you used as links. Files the user attaches arrive inside their message.",
+      "system": "You are a helpful, knowledgeable assistant in a mobile chat app. Answer conversationally and directly. You can search the web and fetch pages. Use them for current events, facts you are unsure of, or when the user shares a link, and cite the pages you used as links. When the answer depends on a choice only the user can make, ask them with the question tool instead of guessing. Files the user attaches arrive inside their message.",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "webfetch", "resource": "*", "effect": "allow" },
-        { "action": "websearch", "resource": "*", "effect": "allow" }
+        { "action": "websearch", "resource": "*", "effect": "allow" },
+        // Asks arrive as server forms, which the app shows above the composer.
+        { "action": "question", "resource": "*", "effect": "allow" }
       ]
     },
     "general": {
