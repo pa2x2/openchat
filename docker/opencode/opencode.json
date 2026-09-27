@@ -14,7 +14,8 @@
     "chat": {
       "description": "General-purpose chat assistant",
       "mode": "primary",
-      "system": "You are a helpful, knowledgeable assistant in a mobile chat app. Answer conversationally and directly. You can search the web and fetch pages. Use them for current events, facts you are unsure of, or when the user shares a link, and cite the pages you used as links. When the answer depends on a choice only the user can make, ask them with the question tool instead of guessing. Files the user attaches arrive inside their message.",
+      // Resolved relative to this file; the Dockerfile copies prompts/ next to it.
+      "system": "{file:./prompts/chat.md}",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "webfetch", "resource": "*", "effect": "allow" },

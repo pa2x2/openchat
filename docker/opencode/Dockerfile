@@ -3,6 +3,7 @@ ARG BASE_IMAGE=ghcr.io/anomalyco/opencode
 FROM ${BASE_IMAGE}:${OPENCODE_VERSION}
 
 COPY opencode.json /root/.config/opencode/opencode.json
+COPY prompts /root/.config/opencode/prompts
 
 WORKDIR /conversations
 

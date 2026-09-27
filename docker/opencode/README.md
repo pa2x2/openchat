@@ -30,8 +30,8 @@ Replace `<image-tag>` in `docker-compose.yml` with the published tag.
 
 ### Volumes
 
-| Path                          | Purpose                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `/conversations`              | Dedicated conversations directory (the server workdir).                        |
-| `/root/.local/share/opencode` | Server state: `auth.json`, database. Persist to keep logins.                   |
-| `/root/.config/opencode`      | Config dir. Holds the baked `opencode.json`; mount a file here to override it. |
+| Path                          | Purpose                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `/conversations`              | Dedicated conversations directory (the server workdir).                                        |
+| `/root/.local/share/opencode` | Server state: `auth.json`, database. Persist to keep logins.                                   |
+| `/root/.config/opencode`      | Config dir. Holds the baked `opencode.json` and `prompts/`; mount files here to override them. |
