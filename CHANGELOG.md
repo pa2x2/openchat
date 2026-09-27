@@ -2,6 +2,33 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-27
+
+### ✨ Added
+
+- Rename a chat from its menu, or long press it in the sidebar and choose Rename.
+- Copy conversation in the chat menu copies the whole chat as Markdown, with the title and each message under who wrote it. Replies keep only their answer, and attachments appear by name.
+- Edit your last message. Long press it and choose Edit, change the text in the composer and send. The message is replaced and the reply runs again. Cancel brings back whatever you had typed before.
+- Keep a temporary chat. A temporary chat now says so under its title, and Keep this chat in its menu turns it into a normal chat that stays when you leave.
+
+### 🔄 Changed
+
+- Long press your own message for Copy, Select text and Edit. The copy button under it is gone. Select text opens the message full screen, so you can select just part of it.
+- Long press a chat in the sidebar for Rename, Select and Delete. Selecting several chats now starts from Select.
+- Disconnect in Settings is now Forget server. It clears the saved address and password along with the chats cached on the device, and your chats stay on the server. Editing the address or password shows Save & reconnect and Cancel, and a saved password shows as Saved.
+- With no server set up, the composer stays locked and asks you to connect one, and the sidebar links to Settings.
+- The Dynamic color option is now called Material You.
+
+### 🧩 Improved
+
+- The sidebar groups chats under Today, Yesterday, Previous 7 days and Previous 30 days, then by month. Closing the sidebar clears the search.
+- A failed reply shows what went wrong on the reply itself, with a Retry button. Other errors above the composer can be dismissed.
+- Settings shows whether the app can reach your server, based on the last chat list refresh. After a relaunch it no longer asks you to tap Connect to check, and it says Can't reach the server when the refresh fails. The sidebar shows the same failure with a Retry button.
+
+### 🐛 Fixed
+
+- Screen readers announce the choices in a question card as radio buttons, checkboxes or links, matching how each behaves, instead of calling them all checkboxes.
+
 ## [1.0.0] - 2026-09-27
 
 ### 🔄 Changed
@@ -130,6 +157,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.1.0]: https://github.com/pa2x2/openchat/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0
 [1.0.0-alpha06]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha06
 [1.0.0-alpha05]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha05
