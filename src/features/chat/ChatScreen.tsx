@@ -71,13 +71,7 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
  * (the `new` route); from then on the transcript reconciles from the
  * server on open and foreground.
  */
-export function ChatScreen({
-  chatId,
-  startTemporary = false,
-}: {
-  chatId: string;
-  startTemporary?: boolean;
-}) {
+export function ChatScreen({ chatId }: { chatId: string }) {
   const isDraft = chatId === NEW_CHAT;
   const router = useRouter();
   const { openDrawer } = useDrawer();
@@ -106,7 +100,8 @@ export function ChatScreen({
   const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [temporaryToggle, setTemporaryToggle] = useState(startTemporary);
+  // null until the user flips the toggle: until then the draft follows the setting.
+  const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
   const [switchingModel, setSwitchingModel] = useState(false);
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
   const busy = useRef(false);
@@ -116,8 +111,9 @@ export function ChatScreen({
   const canRegenerate = capabilities?.regenerate === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
-  // The startup setting can turn the toggle on for a server that cannot delete.
-  const draftTemporary = temporaryToggle && canTemporary;
+  const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
+  // The default mode can turn the toggle on for a server that cannot delete.
+  const draftTemporary = (temporaryToggle ?? defaultTemporary) && canTemporary;
   const temporary = isDraft ? draftTemporary : markedTemporary;
   const providerId = useConnectionStore((state) => state.profile?.providerId);
   const lastModel = useSettingsStore((state) =>
@@ -363,7 +359,7 @@ export function ChatScreen({
             menuItems={menuItems}
             temporary={
               isDraft && canTemporary
-                ? { on: draftTemporary, onToggle: () => setTemporaryToggle((on) => !on) }
+                ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
                 : undefined
             }
           />

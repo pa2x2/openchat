@@ -3,8 +3,8 @@
  *
  * Holds the last model picked per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
- * appearance and colour preferences, haptics, the kind of chat the app opens
- * on, the update channel and automatic checks, and whether the notification
+ * appearance and colour preferences, haptics, the mode new chats start
+ * in, the update channel and automatic checks, and whether the notification
  * permission was already asked for.
  */
 
@@ -29,7 +29,7 @@ export function defaultUpdateChannel(appVersion: string): UpdateChannel {
   return isPrerelease(appVersion) ? "prerelease" : "stable";
 }
 
-export type StartupChat = "normal" | "temporary";
+export type ChatMode = "normal" | "temporary";
 
 interface SettingsStoreState {
   lastModels: Record<ProviderId, ModelRef>;
@@ -40,8 +40,8 @@ interface SettingsStoreState {
   setColorSource: (colorSource: ColorSource) => void;
   haptics: boolean;
   setHaptics: (haptics: boolean) => void;
-  startupChat: StartupChat;
-  setStartupChat: (startupChat: StartupChat) => void;
+  defaultChatMode: ChatMode;
+  setDefaultChatMode: (defaultChatMode: ChatMode) => void;
   updateChannel: UpdateChannel;
   setUpdateChannel: (channel: UpdateChannel) => void;
   checkUpdatesOnStartup: boolean;
@@ -64,8 +64,8 @@ export function createSettingsStore(
         setColorSource: (colorSource) => set({ colorSource }),
         haptics: true,
         setHaptics: (haptics) => set({ haptics }),
-        startupChat: "normal",
-        setStartupChat: (startupChat) => set({ startupChat }),
+        defaultChatMode: "normal",
+        setDefaultChatMode: (defaultChatMode) => set({ defaultChatMode }),
         updateChannel: defaultUpdateChannel(appVersion),
         setUpdateChannel: (updateChannel) => set({ updateChannel }),
         checkUpdatesOnStartup: true,
