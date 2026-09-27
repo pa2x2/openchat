@@ -15,7 +15,7 @@
 
 import { AppRegistry, AppState, PermissionsAndroid, Platform } from "react-native";
 import * as Linking from "expo-linking";
-import { UNTITLED_CHAT, type ChatId } from "@/src/domain";
+import { UNTITLED_CHAT, type ChatForm, type ChatId } from "@/src/domain";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
 import { useSettingsStore } from "@/src/stores/settings";
@@ -70,7 +70,7 @@ export function watchTurns(): () => void {
         for (const [chatId, forms] of Object.entries(state.forms)) {
           const known = new Set((previous.forms[chatId] ?? []).map((form) => form.id));
           const fresh = forms.find((form) => !known.has(form.id));
-          if (fresh) post(chatId, `Needs your answer: ${fresh.title}`);
+          if (fresh) post(chatId, formBody(fresh));
         }
       }
     }
@@ -100,6 +100,16 @@ function endedBody(chatId: ChatId): string | null {
     return turnErrors[chatId] ?? "The reply failed.";
   }
   return null;
+}
+
+/**
+ * A lone question is shown itself: forms from the agent's question tool are
+ * all titled "Questions" and carry the question in the field description.
+ */
+function formBody(form: ChatForm): string {
+  const shown = form.fields.filter((field) => !field.hidden && field.type !== "link");
+  const lone = shown.length === 1 ? (shown[0].description ?? shown[0].title) : undefined;
+  return `Needs your answer: ${snippet(lone || form.title, SNIPPET_LENGTH)}`;
 }
 
 async function notify(notifier: TurnNotifierModule, chatId: ChatId, body: string): Promise<void> {

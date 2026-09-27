@@ -5,7 +5,7 @@
  * site.
  */
 
-import { useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -34,6 +34,11 @@ export interface ComposerProps {
   reasoning?: { label: string; onPress: () => void };
   autoFocus?: boolean;
   placeholder?: string;
+  /**
+   * Set while the backend waits on a form: nothing typed here could be sent,
+   * so the field takes no input. A draft already typed stays.
+   */
+  locked?: boolean;
 }
 
 const NO_ATTACHMENTS: Attachment[] = [];
@@ -53,6 +58,7 @@ export function Composer({
   reasoning,
   autoFocus,
   placeholder = "Ask anything",
+  locked = false,
 }: ComposerProps) {
   const [text, setText] = useState("");
   const input = useRef<TextInputHandle>(null);
@@ -69,6 +75,10 @@ export function Composer({
     }),
     [],
   );
+
+  useEffect(() => {
+    if (locked) input.current?.blur();
+  }, [locked]);
 
   async function handleSend() {
     const trimmed = text.trim();
@@ -98,7 +108,8 @@ export function Composer({
         autoFocus={autoFocus}
         value={text}
         onChangeText={setText}
-        placeholder={placeholder}
+        placeholder={locked ? "Answer the question above" : placeholder}
+        editable={!locked}
         multiline
         accessibilityLabel="Message"
         className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"

@@ -1,12 +1,14 @@
 /**
  * A question the backend is waiting on, shown above the composer.
  *
+ * A form with several questions shows one per page. Back and Next keep the
+ * whole draft, so any answer can be changed until Submit sends them all.
  * Dismiss tells the backend the user won't answer, so the run moves on
  * without it.
  */
 
 import { useState } from "react";
-import { Linking, ScrollView, View } from "react-native";
+import { Keyboard, Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { ChatForm, FormAnswer, FormField, FormOption } from "@/src/domain";
@@ -15,6 +17,7 @@ import { Button } from "@/src/ui/Button";
 import { Icon, type IconName } from "@/src/ui/Icon";
 import { Input } from "@/src/ui/Input";
 import { Segmented } from "@/src/ui/Segmented";
+import { useKeyboardOpen } from "@/src/ui/keyboard";
 import {
   buildAnswer,
   canSubmit,
@@ -38,12 +41,26 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const keyboardOpen = useKeyboardOpen();
 
   const shown = form.fields.filter((field) => isFieldShown(form, field, draft));
+  // An answer can hide later questions, leaving the page past the end.
+  const index = Math.max(0, Math.min(page, shown.length - 1));
+  const field = shown.at(index);
+  const paged = shown.length > 1;
+  const last = index >= shown.length - 1;
+  const invalid = field ? fieldError(field, draft[field.key]) : null;
 
   function update(key: string, value: DraftValue) {
     setDraft((current) => ({ ...current, [key]: value }));
     setTouched((current) => new Set(current).add(key));
+  }
+
+  // The page's text field unmounts, and the keyboard would stay up without it.
+  function turnPage(next: number) {
+    Keyboard.dismiss();
+    setPage(next);
   }
 
   async function run(action: () => Promise<void>) {
@@ -60,38 +77,53 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
 
   return (
     <View className="mb-2 overflow-hidden rounded-[20px] bg-surface" testID="form-card">
-      <ScrollView
-        style={{ maxHeight: 360 }}
-        contentContainerClassName="gap-4 px-4 pb-3 pt-4"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text className="text-base font-semibold text-text">{form.title}</Text>
-        {shown.map((field) => (
-          <View key={field.key} className="gap-2">
+      {/* The question stays in view while its options scroll. */}
+      <View className="gap-4 px-4 pb-2 pt-4">
+        <View className="flex-row items-baseline gap-3">
+          <Text className="flex-1 text-base font-semibold text-text">{form.title}</Text>
+          {paged ? (
+            <Text className="text-sm text-text-muted" testID="form-page">
+              {index + 1} of {shown.length}
+            </Text>
+          ) : null}
+        </View>
+        {field?.title || field?.description ? (
+          <View className="gap-2">
             {field.title ? (
               <Text className="text-[15px] font-medium text-text">{field.title}</Text>
             ) : null}
             {field.description ? (
               <Text className="text-[14px] text-text-muted">{field.description}</Text>
             ) : null}
-            <FieldControl
-              field={field}
-              value={draft[field.key]}
-              disabled={busy}
-              onChange={(value) => update(field.key, value)}
-            />
-            {touched.has(field.key) && fieldError(field, draft[field.key]) ? (
-              <Text className="text-sm text-danger">{fieldError(field, draft[field.key])}</Text>
-            ) : null}
           </View>
-        ))}
-        {error ? (
-          <Text className="text-sm text-danger" testID="form-error">
-            {error}
-          </Text>
         ) : null}
-      </ScrollView>
-      <View className="flex-row justify-end gap-2 px-3 pb-3">
+      </View>
+      {field ? (
+        <ScrollView
+          // A new page starts scrolled to the top.
+          key={field.key}
+          // With the keyboard up, the full height pushes the question off screen.
+          style={{ maxHeight: keyboardOpen ? 160 : 280 }}
+          contentContainerClassName="px-4 py-1"
+          keyboardShouldPersistTaps="handled"
+        >
+          <FieldControl
+            field={field}
+            value={draft[field.key]}
+            disabled={busy}
+            onChange={(value) => update(field.key, value)}
+          />
+        </ScrollView>
+      ) : null}
+      {field && touched.has(field.key) && invalid ? (
+        <Text className="px-4 pt-2 text-sm text-danger">{invalid}</Text>
+      ) : null}
+      {error ? (
+        <Text className="px-4 pt-2 text-sm text-danger" testID="form-error">
+          {error}
+        </Text>
+      ) : null}
+      <View className="flex-row items-center gap-2 px-3 pb-3 pt-2">
         <Button
           label="Dismiss"
           variant="ghost"
@@ -100,13 +132,34 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           onPress={() => void run(onDismiss)}
           testID="form-dismiss"
         />
-        <Button
-          label="Submit"
-          size="sm"
-          disabled={busy || !canSubmit(form, draft)}
-          onPress={() => void run(() => onSubmit(buildAnswer(form, draft)))}
-          testID="form-submit"
-        />
+        <View className="flex-1" />
+        {paged && index > 0 ? (
+          <Button
+            label="Back"
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            onPress={() => turnPage(index - 1)}
+            testID="form-back"
+          />
+        ) : null}
+        {last ? (
+          <Button
+            label="Submit"
+            size="sm"
+            disabled={busy || !canSubmit(form, draft)}
+            onPress={() => void run(() => onSubmit(buildAnswer(form, draft)))}
+            testID="form-submit"
+          />
+        ) : (
+          <Button
+            label="Next"
+            size="sm"
+            disabled={busy || invalid !== null}
+            onPress={() => turnPage(index + 1)}
+            testID="form-next"
+          />
+        )}
       </View>
     </View>
   );
@@ -181,6 +234,9 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
       );
     case "multiselect": {
       const picked = Array.isArray(value) ? value : [];
+      const listed = new Set(field.options.map((option) => option.value));
+      // The typed answer rides in the same list as the ticked options.
+      const typed = picked.find((item) => !listed.has(item)) ?? "";
       return (
         <View className="gap-1.5">
           {field.options.map((option) => {
@@ -201,6 +257,16 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
               />
             );
           })}
+          {field.custom ? (
+            <Input
+              value={typed}
+              onChangeText={(next) =>
+                onChange([...picked.filter((item) => listed.has(item)), ...(next ? [next] : [])])
+              }
+              placeholder="Something else"
+              testID={`form-field-${field.key}-custom`}
+            />
+          ) : null}
         </View>
       );
     }

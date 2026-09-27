@@ -333,6 +333,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             ref={composer}
             autoFocus={focusOnMount}
             placeholder={temporary ? "Temporary chat" : undefined}
+            locked={form !== null}
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
             onAttach={canAttach ? () => setAttachSheetOpen(true) : undefined}
