@@ -4,8 +4,8 @@
  * Holds the last model picked per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
  * appearance and colour preferences, haptics, the kind of chat the app opens
- * on, the update channel, and whether the notification permission was already
- * asked for.
+ * on, the update channel and automatic checks, and whether the notification
+ * permission was already asked for.
  */
 
 import Constants from "expo-constants";
@@ -44,6 +44,8 @@ interface SettingsStoreState {
   setStartupChat: (startupChat: StartupChat) => void;
   updateChannel: UpdateChannel;
   setUpdateChannel: (channel: UpdateChannel) => void;
+  checkUpdatesOnStartup: boolean;
+  setCheckUpdatesOnStartup: (checkUpdatesOnStartup: boolean) => void;
   notificationsAsked: boolean;
   markNotificationsAsked: () => void;
 }
@@ -66,6 +68,8 @@ export function createSettingsStore(
         setStartupChat: (startupChat) => set({ startupChat }),
         updateChannel: defaultUpdateChannel(appVersion),
         setUpdateChannel: (updateChannel) => set({ updateChannel }),
+        checkUpdatesOnStartup: true,
+        setCheckUpdatesOnStartup: (checkUpdatesOnStartup) => set({ checkUpdatesOnStartup }),
         notificationsAsked: false,
         markNotificationsAsked: () => set({ notificationsAsked: true }),
         setLastModel: (providerId, model) =>

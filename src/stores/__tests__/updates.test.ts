@@ -1,6 +1,6 @@
 import type { GitHubRelease } from "@/src/features/updates/releases";
 import { createMemoryStorage } from "@/src/stores/storage";
-import { AUTO_CHECK_INTERVAL_MS, createUpdatesStore, type UpdaterDeps } from "@/src/stores/updates";
+import { createUpdatesStore, type UpdaterDeps } from "@/src/stores/updates";
 
 function release(tag: string, prerelease = false): GitHubRelease {
   const name = `openchat-${tag}.apk`;
@@ -26,7 +26,6 @@ function codedError(code: string, message = code) {
 }
 
 function setup(overrides: Partial<UpdaterDeps> = {}) {
-  let now = 1_000_000;
   const deps = {
     supported: true,
     appVersion: "1.0.0",
@@ -42,11 +41,11 @@ function setup(overrides: Partial<UpdaterDeps> = {}) {
     openInstallSettings: jest.fn(),
     // A real successful install kills the app; here it just never settles.
     install: jest.fn(() => new Promise<void>(() => {})),
-    now: () => now,
+    now: () => 1_000_000,
     ...overrides,
   } satisfies UpdaterDeps;
   const store = createUpdatesStore(createMemoryStorage(), deps);
-  return { store, deps, advance: (ms: number) => (now += ms) };
+  return { store, deps };
 }
 
 describe("updates store: checking", () => {
@@ -67,18 +66,6 @@ describe("updates store: checking", () => {
     expect(store.getState()).toMatchObject({ status: "idle", error: null });
     await store.getState().check();
     expect(store.getState()).toMatchObject({ status: "error", error: "offline" });
-  });
-
-  it("throttles automatic checks but not manual ones", async () => {
-    const { store, deps, advance } = setup();
-    await store.getState().check({ auto: true });
-    await store.getState().check({ auto: true });
-    expect(deps.fetchReleases).toHaveBeenCalledTimes(1);
-    await store.getState().check();
-    expect(deps.fetchReleases).toHaveBeenCalledTimes(2);
-    advance(AUTO_CHECK_INTERVAL_MS);
-    await store.getState().check({ auto: true });
-    expect(deps.fetchReleases).toHaveBeenCalledTimes(3);
   });
 
   it("lets a newer check replace a running one", async () => {
@@ -104,14 +91,13 @@ describe("updates store: checking", () => {
 
 describe("updates store: prompt", () => {
   it("opens the prompt from an automatic check until the version is dismissed", async () => {
-    const { store, advance } = setup();
+    const { store } = setup();
     await store.getState().check({ auto: true });
     expect(store.getState().sheetOpen).toBe(true);
 
     store.getState().closeSheet();
     expect(store.getState()).toMatchObject({ sheetOpen: false, dismissedVersion: "1.1.0" });
 
-    advance(AUTO_CHECK_INTERVAL_MS);
     await store.getState().check({ auto: true });
     expect(store.getState().sheetOpen).toBe(false);
   });

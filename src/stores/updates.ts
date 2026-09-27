@@ -30,9 +30,6 @@ import {
 import { useSettingsStore, type UpdateChannel } from "./settings";
 import { mmkvStorage } from "./storage";
 
-/** Automatic checks (launch, return to the app) run at most this often. */
-export const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-
 export type UpdateStatus =
   | "idle"
   | "checking"
@@ -73,8 +70,8 @@ interface UpdatesStoreState {
   dismissedVersion: string | null;
   sheetOpen: boolean;
   /**
-   * Looks for an update on the current channel. `auto` checks are throttled,
-   * stay quiet on failure, and open the sheet for a version not yet dismissed.
+   * Looks for an update on the current channel. `auto` checks stay quiet on
+   * failure and open the sheet for a version not yet dismissed.
    */
   check: (options?: { auto?: boolean }) => Promise<void>;
   startUpdate: () => Promise<void>;
@@ -179,16 +176,9 @@ export function createUpdatesStore(storage = mmkvStorage, overrides: Partial<Upd
 
           check: async ({ auto = false } = {}) => {
             if (!deps.supported) return;
-            const { status, lastCheckedAt } = get();
+            const { status } = get();
             // Never swap the release out from under a download or install.
             if (["downloading", "needsPermission", "installing"].includes(status)) return;
-            if (
-              auto &&
-              lastCheckedAt !== null &&
-              deps.now() - lastCheckedAt < AUTO_CHECK_INTERVAL_MS
-            ) {
-              return;
-            }
 
             // A newer check (say, after a channel switch) replaces a running one.
             checkController?.abort();

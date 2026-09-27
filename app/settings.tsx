@@ -70,6 +70,8 @@ function updateStatusLine(
 function UpdatesSection() {
   const channel = useSettingsStore((state) => state.updateChannel);
   const setChannel = useSettingsStore((state) => state.setUpdateChannel);
+  const checkOnStartup = useSettingsStore((state) => state.checkUpdatesOnStartup);
+  const setCheckOnStartup = useSettingsStore((state) => state.setCheckUpdatesOnStartup);
   const status = useUpdatesStore((state) => state.status);
   const release = useUpdatesStore((state) => state.release);
   const progress = useUpdatesStore((state) => state.progress);
@@ -104,6 +106,20 @@ function UpdatesSection() {
           chevron={release !== null}
           onPress={() => (release ? openSheet() : void check())}
           testID="check-updates"
+        />
+        <Row
+          icon="autorenew"
+          title="Check for updates on startup"
+          onPress={() => setCheckOnStartup(!checkOnStartup)}
+          trailing={
+            <Switch
+              value={checkOnStartup}
+              onValueChange={setCheckOnStartup}
+              accessibilityLabel="Check for updates on startup"
+              testID="check-updates-on-startup-switch"
+            />
+          }
+          testID="check-updates-on-startup"
         />
       </Group>
     </>
