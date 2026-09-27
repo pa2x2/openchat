@@ -56,7 +56,7 @@ describe("toConnectionError", () => {
 });
 
 describe("OpenCodeProvider.events", () => {
-  it("streams normalized events for one session only", async () => {
+  it("streams normalized events for one session, plus the connection", async () => {
     const wire = [
       { type: "server.connected", data: {} },
       { type: "session.text.delta", data: { sessionID: "ses_a", delta: "hi" } },
@@ -66,7 +66,11 @@ describe("OpenCodeProvider.events", () => {
     const events = await collectEvents(async function* () {
       yield* wire;
     });
-    expect(events).toEqual([{ type: "text-delta", text: "hi" }, { type: "chat-idle" }]);
+    expect(events).toEqual([
+      { type: "connected" },
+      { type: "text-delta", text: "hi" },
+      { type: "chat-idle" },
+    ]);
   });
 
   it("yields a retryable error when the subscription fails", async () => {

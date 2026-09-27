@@ -90,6 +90,8 @@ interface LiveTurn {
    * kind; after a tool call or a new step it starts a part of its own.
    */
   lastDelta: "text" | "reasoning" | null;
+  /** Picked up by `followRunningTurn`, not started by a send here. */
+  followed: boolean;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
@@ -411,6 +413,7 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
     pendingFrame: null,
     activity: null,
     lastDelta: null,
+    followed: false,
   };
   startingTurns.delete(chatId);
   liveTurns.set(chatId, turn);
@@ -455,6 +458,7 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
   }
   messages.setTurnError(chatId, null);
   const turn = trackTurn(chatId, draft);
+  turn.followed = true;
   // The run is well under way, so it may be between events for a while.
   turn.activity = THINKING;
   messages.setActivity(chatId, turn.activity);
@@ -550,6 +554,19 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
           }
           if (event.type === "form-closed") {
             useMessagesStore.getState().removeForm(chatId, event.formId);
+            continue;
+          }
+          if (event.type === "connected") {
+            // A followed run can end between the check that it runs and this
+            // subscription, and its closing events are then gone for good.
+            // A send subscribes before its prompt goes out, so it is exempt.
+            if (turn.followed && !(await stillRunning(provider, chatId))) {
+              await reconcile(turn, { over: true });
+              if (turnEnded(turn)) {
+                endTurn(turn);
+                return;
+              }
+            }
             continue;
           }
           applyEvent(turn, event);
@@ -798,9 +815,10 @@ function setActivity(turn: LiveTurn, activity: TurnActivity | null): void {
  * adopted message is unchanged across two consecutive snapshots and the
  * adapter maps it to a terminal status, the turn's closing events were
  * lost in a gap — finish the turn with that status instead of waiting
- * forever.
+ * forever. `over` says the backend already reported the run finished, so
+ * one snapshot is enough.
  */
-async function reconcile(turn: LiveTurn): Promise<void> {
+async function reconcile(turn: LiveTurn, { over = false } = {}): Promise<void> {
   flushDraft(turn);
   turn.paused = true;
   try {
@@ -828,15 +846,16 @@ async function reconcile(turn: LiveTurn): Promise<void> {
       return;
     }
     if (
-      previousSnapshot !== null &&
-      lastAssistant.text === previousSnapshot &&
-      // A tool can run for minutes without a word, so an unchanged reply
-      // alone does not mean the run is over.
-      !(await stillRunning(provider, turn.chatId))
+      over ||
+      (previousSnapshot !== null &&
+        lastAssistant.text === previousSnapshot &&
+        // A tool can run for minutes without a word, so an unchanged reply
+        // alone does not mean the run is over.
+        !(await stillRunning(provider, turn.chatId)))
     ) {
       if (turn.finished || turn.controller.signal.aborted) return;
-      // Two consecutive snapshots agree and the run is over: the turn ended
-      // while the stream was down. Adopt its ending.
+      // The run is over, as the backend said or as two agreeing snapshots
+      // show: it ended while no stream was listening. Adopt its ending.
       turn.draft = lastAssistant;
       messages.setMessages(turn.chatId, fetched);
       endTurn(turn);

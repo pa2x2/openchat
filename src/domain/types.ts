@@ -197,6 +197,11 @@ export type StreamEvent =
   | { type: "tool"; id: string; update: Partial<Omit<ToolCall, "id">> }
   | { type: "message-complete"; usage?: TokenUsage }
   | { type: "chat-idle" }
+  /**
+   * The subscription is live: nothing from here on is missed. Whatever
+   * happened before it, such as the run ending, has to be asked for.
+   */
+  | { type: "connected" }
   | { type: "form"; form: ChatForm }
   /** The form was answered, dismissed or dropped, here or elsewhere. */
   | { type: "form-closed"; formId: string }

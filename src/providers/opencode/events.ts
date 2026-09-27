@@ -30,6 +30,11 @@ export async function* chatEvents(
       // The typed union carries the structural subset used here on every
       // session-scoped member; one boundary cast keeps the normalizer pure.
       const shape = event as unknown as V2EventShape;
+      // The server's first event on every subscription, tied to no chat.
+      if (shape.type === "server.connected") {
+        yield { type: "connected" };
+        continue;
+      }
       if (!isEventForChat(shape, chatId)) continue;
       const normalized = normalizeV2Event(shape);
       if (normalized) yield normalized;

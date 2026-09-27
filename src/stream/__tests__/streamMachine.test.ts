@@ -4,6 +4,7 @@ import type { ChatProvider } from "@/src/providers/types";
 import { getProvider } from "@/src/lib/providerFactory";
 import {
   discardPendingRegenerate,
+  followRunningTurn,
   interruptTurn,
   regenerateReply,
   sendMessage,
@@ -228,6 +229,23 @@ describe("mid-turn reconnection", () => {
 
     expect(state().byChat.c9[0]).toMatchObject({ text: "Hello!", status: "complete" });
   });
+});
+
+it("ends a followed run that finished before its subscription connected", async () => {
+  // The run's closing events went out between the running check and the
+  // subscription; nothing else will arrive, so the turn must not wait on them.
+  state().setMessages("c11", [assistant({ text: "Hello" })]);
+  useProvider({
+    events: scriptedEvents([{ events: [{ type: "connected" }] }]),
+    isRunning: jest.fn().mockResolvedValueOnce(true).mockResolvedValue(false),
+    fetchMessages: jest.fn().mockResolvedValue([assistant({ text: "Hello", status: "complete" })]),
+  });
+
+  await followRunningTurn("c11");
+
+  expect(state().byChat.c11[0]).toMatchObject({ text: "Hello", status: "complete" });
+  expect(state().activeTurns.c11).toBe(false);
+  expect(state().activity.c11).toBeNull();
 });
 
 it("settles cached streaming messages when no turn is live", () => {
