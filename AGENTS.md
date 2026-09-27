@@ -10,6 +10,10 @@ pnpm lint
 pnpm test
 ```
 
+## Rules
+
+- If you start Metro server, make sure to stop it when you finish your work.
+
 ## Comments
 
 A comment earns its place by telling the reader something the code can't: why it's done this way, a constraint or platform quirk it works around, a bug it prevents, or what a non-obvious value means. If deleting the comment loses nothing a careful reader couldn't get from the code, delete it.

@@ -1,5 +1,7 @@
 import { parseMarkdownWithOptions, type MarkdownNode } from "react-native-nitro-markdown/headless";
 
+import { separateTables } from "./tableBreaks";
+
 export type { MarkdownNode };
 
 /**
@@ -13,7 +15,7 @@ export type { MarkdownNode };
  */
 export function parseMarkdown(text: string): MarkdownNode {
   try {
-    return parseMarkdownWithOptions(text, { gfm: true, math: false, html: false });
+    return parseMarkdownWithOptions(separateTables(text), { gfm: true, math: false, html: false });
   } catch {
     return {
       type: "document",
