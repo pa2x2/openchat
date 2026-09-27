@@ -16,7 +16,6 @@ import { cn } from "@/src/lib/cn";
 import { Button } from "@/src/ui/Button";
 import { Icon, type IconName } from "@/src/ui/Icon";
 import { Input } from "@/src/ui/Input";
-import { Segmented } from "@/src/ui/Segmented";
 import { useKeyboardOpen } from "@/src/ui/keyboard";
 import {
   buildAnswer,
@@ -225,15 +224,19 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
       );
     case "boolean":
       return (
-        <Segmented
-          options={[
-            { value: "yes", label: "Yes" },
-            { value: "no", label: "No" },
-          ]}
-          value={value === true ? "yes" : value === false ? "no" : ""}
-          onChange={(next) => onChange(next === "yes")}
-          testIDPrefix={`form-field-${field.key}`}
-        />
+        <View className="gap-1.5">
+          {([true, false] as const).map((answer) => (
+            <OptionRow
+              key={String(answer)}
+              option={{ value: answer ? "yes" : "no", label: answer ? "Yes" : "No" }}
+              icon={value === answer ? "radiobox-marked" : "radiobox-blank"}
+              selected={value === answer}
+              disabled={disabled}
+              onPress={() => onChange(answer)}
+              testID={`form-field-${field.key}-${answer ? "yes" : "no"}`}
+            />
+          ))}
+        </View>
       );
     case "multiselect": {
       const picked = Array.isArray(value) ? value : [];
@@ -303,15 +306,15 @@ function OptionRow({ option, icon, selected, disabled, onPress, testID }: Option
       accessibilityLabel={option.label}
       accessibilityState={{ selected, disabled }}
       className={cn(
-        "min-h-[48px] flex-row items-center gap-3 rounded-2xl px-3.5 py-2.5",
-        selected ? "bg-selected" : "bg-raised active:bg-raised-hover",
+        "min-h-[48px] flex-row items-center gap-3 rounded-2xl border bg-background px-3.5 py-2.5",
+        selected ? "border-primary" : "border-border active:bg-surface-hover",
         disabled && "opacity-50",
       )}
       disabled={disabled}
       onPress={onPress}
       testID={testID}
     >
-      <Icon name={icon} size={20} tone={selected ? "text" : "textMuted"} />
+      <Icon name={icon} size={20} tone={selected ? "primary" : "textMuted"} />
       <View className="flex-1">
         <Text className="text-[15px] text-text">{option.label}</Text>
         {option.description ? (

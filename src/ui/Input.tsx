@@ -50,9 +50,8 @@ export function Input({
         keyboardType={keyboardType}
         accessibilityLabel={label ?? placeholder}
         className={cn(
-          "w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-text",
-          "focus:border-primary",
-          error && "border-danger",
+          "w-full rounded-2xl border bg-background px-4 py-3 text-base",
+          error ? "border-danger" : "border-border focus:border-primary",
         )}
         testID={testID}
       />
