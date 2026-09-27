@@ -16,6 +16,26 @@ function isEventForChat(event: V2EventShape, chatId: ChatId): boolean {
 }
 
 /**
+ * A starting server answers the model list with nothing, then a partial
+ * list, while its providers load; `model.updated` marks the finished
+ * catalog. `provider.updated` changes the provider names shown with it.
+ */
+const CATALOG_EVENTS = new Set(["server.connected", "model.updated", "provider.updated"]);
+
+export async function* catalogChanges(
+  client: OpenCodeClient,
+  signal: AbortSignal,
+): AsyncGenerator<void> {
+  try {
+    for await (const event of client.event.subscribe({ signal })) {
+      if (CATALOG_EVENTS.has(event.type)) yield;
+    }
+  } catch {
+    // A dropped stream just ends; the caller resubscribes.
+  }
+}
+
+/**
  * Normalized event stream for one chat. Transport-level failures after the
  * stream is up surface as a retryable error event; the caller can re-
  * subscribe on recovery (live-only subscription by design).

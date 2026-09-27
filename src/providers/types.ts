@@ -61,6 +61,14 @@ export interface ChatProvider {
   /** Health check + server identification. Throws ConnectionError on failure. */
   connect(cfg: ConnectionConfig): Promise<ConnectionInfo>;
   listModels(): Promise<ModelInfo[]>;
+  /**
+   * Yields whenever `listModels()` may answer differently: once the stream
+   * is up, since changes made while nothing listened are not replayed, and
+   * on every catalog change the backend announces. Ends when the stream
+   * drops; the caller resubscribes. Without it the catalog is only re-read
+   * on demand.
+   */
+  catalogChanges?(signal: AbortSignal): AsyncIterable<void>;
   listChats(): Promise<ChatSummary[]>;
   /** Creates a backend chat. `title` may be ignored by the backend. */
   createChat(opts?: { model?: ModelRef; title?: string }): Promise<ChatSummary>;

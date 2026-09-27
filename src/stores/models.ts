@@ -3,7 +3,9 @@
  *
  * `refresh()` reads the list from the server through `ChatProvider`; the
  * cached list persists in MMKV so the picker opens instantly and works
- * offline until the server answers. Text-only models are kept; anything
+ * offline until the server answers. `watchCatalog()` re-reads it whenever
+ * the server announces a change, so what a restarting server answers before
+ * its providers load does not stick. Text-only models are kept; anything
  * else never reaches the picker.
  *
  * Favorites are the models the user starred in the picker, stored as
@@ -24,7 +26,11 @@ interface ModelsStoreState {
   /** `modelKey`s of starred models, most recently starred last. */
   favorites: string[];
   toggleFavorite: (ref: ModelRef) => void;
-  /** Re-reads the model list from the server. Safe to call concurrently. */
+  /**
+   * Re-reads the model list from the server. A call made while a read is in
+   * flight runs one more read after it, since the first may predate the
+   * change the caller heard about.
+   */
   refresh: () => Promise<void>;
   clear: () => void;
 }
@@ -52,6 +58,7 @@ export function refWithVariant(model: ModelInfo, variant: string | undefined): M
 }
 
 export function createModelsStore(storage = mmkvStorage) {
+  let stale = false;
   return create<ModelsStoreState>()(
     persist(
       (set, get) => ({
@@ -68,7 +75,10 @@ export function createModelsStore(storage = mmkvStorage) {
           }));
         },
         refresh: async () => {
-          if (get().loading) return;
+          if (get().loading) {
+            stale = true;
+            return;
+          }
           set({ loading: true, error: null });
           try {
             const provider = await getProvider();
@@ -85,6 +95,10 @@ export function createModelsStore(storage = mmkvStorage) {
                 error instanceof Error && error.message ? error.message : "Could not load models.",
             });
           }
+          if (stale) {
+            stale = false;
+            await get().refresh();
+          }
         },
         clear: () => set({ models: [], loading: false, error: null }),
       }),
@@ -98,3 +112,45 @@ export function createModelsStore(storage = mmkvStorage) {
 }
 
 export const useModelsStore = createModelsStore();
+
+const INITIAL_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 15_000;
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
+ * Keeps the catalog in step with the server until `signal` aborts,
+ * resubscribing after the change stream drops. A provider that cannot
+ * announce changes gets a single read.
+ */
+export async function watchCatalog(signal: AbortSignal): Promise<void> {
+  const { refresh } = useModelsStore.getState();
+  let backoffMs = INITIAL_BACKOFF_MS;
+  while (!signal.aborted) {
+    const provider = await getProvider();
+    if (!provider) return;
+    if (!provider.catalogChanges) {
+      await refresh();
+      return;
+    }
+    const changes = provider.catalogChanges(signal)[Symbol.asyncIterator]();
+    while (!(await changes.next()).done) {
+      backoffMs = INITIAL_BACKOFF_MS;
+      void refresh();
+    }
+    await sleep(backoffMs, signal);
+    backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+  }
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, useWindowDimensions } from "react-native";
+import { AppState, BackHandler, useWindowDimensions } from "react-native";
 import { Stack, useGlobalSearchParams, useRouter } from "expo-router";
 import { Drawer } from "react-native-drawer-layout";
 import type { LegacyPanGesture, PanGesture } from "react-native-gesture-handler";
@@ -8,7 +8,8 @@ import { DrawerContext } from "@/src/features/drawer/DrawerContext";
 import { purgeTemporaryChats } from "@/src/features/chat/temporaryChats";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
-import { useModelsStore } from "@/src/stores/models";
+import { useConnectionStore } from "@/src/stores/connection";
+import { watchCatalog } from "@/src/stores/models";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Horizontal travel (dp) before a swipe opens the sidebar; above ScrollView's touch slop. */
@@ -24,20 +25,43 @@ export default function MainLayout() {
   const { width } = useWindowDimensions();
   const { colors } = useAppTheme();
   const refreshChats = useChatsStore((state) => state.refresh);
-  const refreshModels = useModelsStore((state) => state.refresh);
+  const profile = useConnectionStore((state) => state.profile);
   const [open, setOpen] = useState(false);
 
   // Startup: warm the provider from the persisted profile, then reconcile
-  // the chat list and the model catalog against the server. The composer's
-  // reasoning chip reads the catalog, so it must not wait for the model
-  // picker to be opened.
+  // the chat list against the server.
   useEffect(() => {
     void purgeTemporaryChats();
     void (async () => {
       await getProvider();
-      await Promise.all([refreshChats(), refreshModels()]);
+      await refreshChats();
     })();
-  }, [refreshChats, refreshModels]);
+  }, [refreshChats]);
+
+  // The header and the composer's reasoning chip read the catalog, so it is
+  // kept current while the app is in front rather than when the picker opens.
+  // Watching restarts with the connection, so a new server's catalog loads.
+  useEffect(() => {
+    if (!profile) return;
+    let watch: AbortController | null = null;
+    const start = () => {
+      watch = new AbortController();
+      void watchCatalog(watch.signal);
+    };
+    const stop = () => {
+      watch?.abort();
+      watch = null;
+    };
+    if (AppState.currentState === "active") start();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") stop();
+      else if (!watch) start();
+    });
+    return () => {
+      subscription.remove();
+      stop();
+    };
+  }, [profile]);
 
   useEffect(() => {
     if (open) void refreshChats();

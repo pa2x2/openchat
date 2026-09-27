@@ -22,7 +22,7 @@ import {
   toConnectionError,
   type OpenCodeClient,
 } from "./client";
-import { chatEvents } from "./events";
+import { catalogChanges, chatEvents } from "./events";
 import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
@@ -71,6 +71,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   listModels(): Promise<ModelInfo[]> {
     return listModels(this.client());
+  }
+
+  catalogChanges(signal: AbortSignal): AsyncIterable<void> {
+    return catalogChanges(this.client(), signal);
   }
 
   listChats(): Promise<ChatSummary[]> {
