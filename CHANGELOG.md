@@ -2,6 +2,25 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha06] - 2026-09-27
+
+### ✨ Added
+
+- Settings has a Default chat mode. Set it to Temporary and every new chat starts temporary.
+
+### 🔄 Changed
+
+- Update checks run at launch instead of every time you return to the app. A new switch in Settings turns the startup check off.
+
+### 🧩 Improved
+
+- The app shows placeholders while it waits: skeleton rows in the sidebar and the model picker, and a placeholder conversation in a chat with no cached transcript. A thin bar marks a refresh or a delete in flight, and buttons such as Connect and Submit spin until their action finishes.
+- The first message in a new chat appears the moment you send it, with a placeholder reply under it, instead of holding the screen until the server creates the chat.
+
+### 🐛 Fixed
+
+- A server that is still starting no longer leaves the model list empty or half-filled. The app re-reads the catalog when the server announces a change, so the header and the picker fill in on their own.
+
 ## [1.0.0-alpha05] - 2026-09-27
 
 ### 🔄 Changed
@@ -105,6 +124,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.0.0-alpha06]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha06
 [1.0.0-alpha05]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha05
 [1.0.0-alpha04]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha04
 [1.0.0-alpha03]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha03
