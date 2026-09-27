@@ -63,7 +63,7 @@ export function Transcript({
   editingId = null,
 }: TranscriptProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
+  const { colors, floatingShadow } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   const activity = useMessagesStore((state) => state.activity[chatId] ?? null);
@@ -169,7 +169,8 @@ export function Transcript({
         <Pressable
           accessibilityLabel="Scroll to latest"
           accessibilityRole="button"
-          className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full border border-border bg-elevated"
+          className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full bg-elevated"
+          style={{ boxShadow: floatingShadow }}
           onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
           testID="scroll-to-latest"
         >

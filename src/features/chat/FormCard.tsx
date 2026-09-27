@@ -195,6 +195,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
             <OptionRow
               key={option.value}
               option={option}
+              role="radio"
               icon={option.value === text ? "radiobox-marked" : "radiobox-blank"}
               selected={option.value === text}
               disabled={disabled}
@@ -229,6 +230,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
             <OptionRow
               key={String(answer)}
               option={{ value: answer ? "yes" : "no", label: answer ? "Yes" : "No" }}
+              role="radio"
               icon={value === answer ? "radiobox-marked" : "radiobox-blank"}
               selected={value === answer}
               disabled={disabled}
@@ -251,6 +253,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
               <OptionRow
                 key={option.value}
                 option={option}
+                role="checkbox"
                 icon={on ? "checkbox-marked" : "checkbox-blank-outline"}
                 selected={on}
                 disabled={disabled}
@@ -280,6 +283,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
       return (
         <OptionRow
           option={{ value: field.url, label: "Open", description: field.url }}
+          role="link"
           icon="open-in-new"
           selected={false}
           disabled={disabled}
@@ -292,6 +296,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
 
 interface OptionRowProps {
   option: FormOption;
+  role: "radio" | "checkbox" | "link";
   icon: IconName;
   selected: boolean;
   disabled: boolean;
@@ -299,12 +304,12 @@ interface OptionRowProps {
   testID?: string;
 }
 
-function OptionRow({ option, icon, selected, disabled, onPress, testID }: OptionRowProps) {
+function OptionRow({ option, role, icon, selected, disabled, onPress, testID }: OptionRowProps) {
   return (
     <Pressable
-      accessibilityRole="checkbox"
+      accessibilityRole={role}
       accessibilityLabel={option.label}
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={role === "link" ? { disabled } : { checked: selected, disabled }}
       className={cn(
         "min-h-[48px] flex-row items-center gap-3 rounded-2xl border bg-background px-3.5 py-2.5",
         selected ? "border-primary" : "border-border active:bg-surface-hover",
