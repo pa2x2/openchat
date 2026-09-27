@@ -83,7 +83,7 @@ jobs:
           build-args: |
             OPENCODE_VERSION=${{ steps.versions.outputs.client }}
 
-      - name: Create draft GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ github.ref_name }}
@@ -97,5 +97,7 @@ jobs:
             ```sh
             docker pull ${{ steps.meta.outputs.tags }}
             ```
-          draft: true
+          draft: false
           prerelease: false
+          # Keep the app's Android release as "Latest"; server releases get no label.
+          make_latest: false
