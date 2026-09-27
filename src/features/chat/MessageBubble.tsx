@@ -1,15 +1,19 @@
 import * as Clipboard from "expo-clipboard";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { memo, useMemo, useState } from "react";
+import { ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Message, TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
+import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
+import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
+import { Menu, type MenuItem } from "@/src/ui/Menu";
+import { Sheet } from "@/src/ui/Sheet";
 
 export interface MessageBubbleProps {
   message: Message;
@@ -18,6 +22,10 @@ export interface MessageBubbleProps {
   activity?: TurnActivity | null;
   /** Set only on the newest reply while no turn is live. */
   onRegenerate?: () => void;
+  /** Set only on the user message that can be edited: the newest, while no turn is live. */
+  onEdit?: (message: Message) => void;
+  /** The message is being edited in the composer. */
+  dimmed?: boolean;
 }
 
 /** A terminal outcome worth a line under the reply; live states show inline. */
@@ -32,36 +40,91 @@ function statusFor(message: Message): string | undefined {
   }
 }
 
-const COPIED_MS = 1500;
-
 function CopyButton({ text, label, testID }: { text: string; label: string; testID: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  function handleCopy() {
-    void Clipboard.setStringAsync(text).catch(() => undefined);
-    setCopied(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-  }
-
+  const { copied, copy } = useCopyToClipboard();
   return (
     <Pressable
       accessibilityLabel={copied ? "Copied" : label}
       accessibilityRole="button"
       className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
-      onPress={handleCopy}
+      onPress={() => copy(text)}
       testID={testID}
     >
       <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
     </Pressable>
+  );
+}
+
+/**
+ * The user's own text. A long press opens its menu: copy, select text (in a
+ * sheet, since the bubble's text is not selectable in place) and, on the
+ * message that allows it, edit.
+ */
+function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Message) => void }) {
+  const [menuAt, setMenuAt] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+
+  const items: MenuItem[] = [
+    {
+      label: "Copy",
+      icon: "content-copy",
+      onPress: () => void Clipboard.setStringAsync(message.text).catch(() => undefined),
+      testID: "message-menu-copy",
+    },
+    {
+      label: "Select text",
+      icon: "cursor-text",
+      onPress: () => setSelecting(true),
+      testID: "message-menu-select",
+    },
+  ];
+  if (onEdit) {
+    items.push({
+      label: "Edit",
+      icon: "pencil-outline",
+      onPress: () => onEdit(message),
+      testID: "message-menu-edit",
+    });
+  }
+
+  return (
+    <>
+      <Bubble
+        role="user"
+        status={statusFor(message)}
+        onLongPress={(event) => {
+          setMenuAt(event.nativeEvent.pageY + 12);
+          setMenuOpen(true);
+        }}
+      >
+        <MarkdownContent
+          role="user"
+          streaming={false}
+          text={message.text}
+          testID={`markdown-${message.id}`}
+        />
+      </Bubble>
+      <Menu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        items={items}
+        anchor={{ y: menuAt ?? 0, side: "right", inset: 16 }}
+        testID="message-menu"
+      />
+      <Sheet
+        visible={selecting}
+        onClose={() => setSelecting(false)}
+        title="Select text"
+        testID="select-text-sheet"
+      >
+        <ScrollView className="max-h-96 px-2">
+          <Text selectable className="text-base leading-6 text-text">
+            {message.text}
+          </Text>
+        </ScrollView>
+      </Sheet>
+    </>
   );
 }
 
@@ -70,6 +133,8 @@ export const MessageBubble = memo(function MessageBubble({
   showReasoning,
   activity = null,
   onRegenerate,
+  onEdit,
+  dimmed = false,
 }: MessageBubbleProps) {
   const streaming = message.status === "pending" || message.status === "streaming";
   const attachments = message.attachments ?? [];
@@ -83,7 +148,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   if (isUser || !layout) {
     return (
-      <View className="mb-4 mt-2" testID={`bubble-${message.role}`}>
+      <View className={cn("mb-4 mt-2", dimmed && "opacity-50")} testID={`bubble-${message.role}`}>
         {attachments.length > 0 ? (
           <View className={hasText ? "mb-1.5 px-4" : "px-4"}>
             <AttachmentStrip
@@ -92,21 +157,7 @@ export const MessageBubble = memo(function MessageBubble({
             />
           </View>
         ) : null}
-        {hasText ? (
-          <Bubble role="user" status={statusFor(message)}>
-            <MarkdownContent
-              role="user"
-              streaming={false}
-              text={message.text}
-              testID={`markdown-${message.id}`}
-            />
-          </Bubble>
-        ) : null}
-        {hasText ? (
-          <View className="-mr-2 mt-1 flex-row self-end px-4">
-            <CopyButton label="Copy message" testID="copy-message-button" text={message.text} />
-          </View>
-        ) : null}
+        {hasText ? <UserText message={message} onEdit={onEdit} /> : null}
       </View>
     );
   }

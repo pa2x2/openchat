@@ -32,6 +32,8 @@ export interface ComposerProps {
   onRemoveAttachment?: (attachment: Attachment) => void;
   /** Present when the model offers variants: the current level and a way to change it. */
   reasoning?: { label: string; onPress: () => void };
+  /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
+  editing?: { onCancel: () => void };
   autoFocus?: boolean;
   placeholder?: string;
   /**
@@ -44,8 +46,10 @@ export interface ComposerProps {
 const NO_ATTACHMENTS: Attachment[] = [];
 
 export interface ComposerHandle {
-  /** Replaces the draft with `text` and focuses the field. */
-  insert: (text: string) => void;
+  /** Replaces the draft with `text`, and focuses the field unless told not to. */
+  insert: (text: string, focus?: boolean) => void;
+  read: () => string;
+  focus: () => void;
 }
 
 export function Composer({
@@ -56,6 +60,7 @@ export function Composer({
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
   reasoning,
+  editing,
   autoFocus,
   placeholder = "Ask anything",
   locked = false,
@@ -68,12 +73,14 @@ export function Composer({
   useImperativeHandle(
     ref,
     () => ({
-      insert: (next) => {
+      insert: (next, focus = true) => {
         setText(next);
-        input.current?.focus();
+        if (focus) input.current?.focus();
       },
+      read: () => text,
+      focus: () => input.current?.focus(),
     }),
-    [],
+    [text],
   );
 
   useEffect(() => {
@@ -96,6 +103,24 @@ export function Composer({
 
   return (
     <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
+      {editing ? (
+        <View
+          className="mx-1.5 mt-0.5 flex-row items-center gap-2 rounded-[20px] bg-raised py-1 pl-3 pr-1"
+          testID="composer-editing"
+        >
+          <Icon name="pencil-outline" size={17} tone="textMuted" />
+          <Text className="flex-1 text-sm text-text-muted">Editing message</Text>
+          <Pressable
+            accessibilityLabel="Cancel editing"
+            accessibilityRole="button"
+            className="h-8 w-8 items-center justify-center rounded-full active:bg-raised-hover"
+            onPress={editing.onCancel}
+            testID="composer-cancel-edit"
+          >
+            <Icon name="close" size={18} />
+          </Pressable>
+        </View>
+      ) : null}
       {attachments.length > 0 ? (
         <AttachmentChips
           attachments={attachments}

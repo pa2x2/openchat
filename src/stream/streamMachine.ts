@@ -265,6 +265,30 @@ function describe(error: unknown): string {
  * re-sent and the previous reply stays where it is.
  */
 export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome> {
+  return startRerun(chatId);
+}
+
+/**
+ * Replaces the chat's last user message with `text` and runs the turn again:
+ * a rerun of the last turn that sends the edited text. `original` is the
+ * text the user chose to edit; if the server's last message no longer reads
+ * that (another client wrote since), nothing is sent. Needs the backend's
+ * native rerun: re-sending instead would leave the old turn standing above.
+ */
+export async function editLastMessage(
+  chatId: ChatId,
+  original: string,
+  text: string,
+): Promise<RegenerateOutcome> {
+  return startRerun(chatId, { original, text });
+}
+
+interface Edit {
+  original: string;
+  text: string;
+}
+
+async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   // A repeated tap on the same rerun; the first one is already under way.
   if (startingTurns.has(chatId)) return { ok: false };
   if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
@@ -274,7 +298,7 @@ export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome
   startingTurns.add(chatId);
   useMessagesStore.getState().setTurnActive(chatId, true);
   try {
-    return await rerun(chatId);
+    return await rerun(chatId, edit);
   } finally {
     // Once live, the turn itself owns the chat; this only covers not starting.
     if (startingTurns.delete(chatId) && !liveTurns.has(chatId)) {
@@ -283,7 +307,7 @@ export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome
   }
 }
 
-async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
+async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   const provider = await getProvider();
   if (!provider) return { ok: false, error: "Not connected. Open Settings to connect." };
 
@@ -295,6 +319,9 @@ async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
 
   const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
   if (!target) return { ok: false, error: "There is nothing to regenerate yet." };
+  if (edit && target.user.text !== edit.original) {
+    return { ok: false, error: "The chat changed since you started editing. Try again." };
+  }
   if (!canResendAttachments(target.user.attachments)) {
     return {
       ok: false,
@@ -303,12 +330,13 @@ async function rerun(chatId: ChatId): Promise<RegenerateOutcome> {
   }
 
   const native = provider.capabilities.regenerate && typeof provider.regenerate === "function";
+  if (edit && !native) return { ok: false, error: "This server can't edit messages." };
   if (native && target.user.id.startsWith(LOCAL_ID_PREFIX)) {
     return { ok: false, error: "The server transcript is not available yet. Try again." };
   }
 
   const carried: Pick<UserMessage, "text" | "attachments"> = {
-    text: target.user.text,
+    text: edit?.text ?? target.user.text,
     ...(target.user.attachments ? { attachments: target.user.attachments } : {}),
   };
   if (native) {

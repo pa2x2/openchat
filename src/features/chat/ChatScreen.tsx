@@ -22,6 +22,7 @@ import {
   answerForm,
   discardPendingRegenerate,
   dismissForm,
+  editLastMessage,
   followRunningTurn,
   interruptTurn,
   isTurnLive,
@@ -106,6 +107,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
   const [switchingModel, setSwitchingModel] = useState(false);
+  // A sent message being edited in the composer, with what the composer held
+  // before, which comes back if the edit is cancelled.
+  const [editing, setEditing] = useState<{
+    message: Message;
+    draft: string;
+    attachments: Attachment[];
+  } | null>(null);
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
@@ -200,6 +208,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
     if (busy.current) return false;
+    if (editing) return sendEdit(text);
     // Without a model the server would answer with its own default, which the
     // header can't name: the chat would run on a model the user never saw.
     if (modelSelection && !currentModel) {
@@ -243,6 +252,46 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     } finally {
       busy.current = false;
     }
+  }
+
+  async function sendEdit(text: string): Promise<boolean> {
+    const target = editing;
+    if (!target) return false;
+    busy.current = true;
+    setEditing(null);
+    setBanner(null);
+    // What the composer held before the edit comes back straight away; the
+    // edit itself only resolves once its reply is done.
+    composer.current?.insert(target.draft, false);
+    setAttachments(target.attachments);
+    list.current?.scrollToOffset({ offset: 0, animated: true });
+    try {
+      const outcome = await editLastMessage(chatId, target.message.text, text);
+      if (outcome.ok) return true;
+      if (outcome.error) setBanner(outcome.error);
+      // Back to editing with the edited text, so nothing typed is lost.
+      setEditing({ ...target, draft: composer.current?.read() ?? target.draft });
+      setAttachments([]);
+      composer.current?.insert(text, false);
+      return false;
+    } finally {
+      busy.current = false;
+    }
+  }
+
+  function startEdit(message: Message) {
+    // Files staged for a new message would not go with the edit; they wait
+    // for it to finish, as the typed draft does.
+    setEditing({ message, draft: composer.current?.read() ?? "", attachments });
+    setAttachments([]);
+    composer.current?.insert(message.text);
+  }
+
+  function cancelEdit() {
+    if (!editing) return;
+    composer.current?.insert(editing.draft, false);
+    setAttachments(editing.attachments);
+    setEditing(null);
   }
 
   function handleInterrupt() {
@@ -346,7 +395,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   function handleNewChat() {
     if (isDraft) {
-      composer.current?.insert("");
+      composer.current?.focus();
       return;
     }
     router.replace({ pathname: "/chat/[id]", params: { id: NEW_CHAT } });
@@ -372,6 +421,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               listRef={list}
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
+              onEditMessage={capabilities?.regenerate ? startEdit : undefined}
+              editingId={editing?.message.id ?? null}
             />
           )}
 
@@ -441,11 +492,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             locked={form !== null}
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
-            onAttach={canAttach ? () => setAttachSheetOpen(true) : undefined}
+            onAttach={canAttach && !editing ? () => setAttachSheetOpen(true) : undefined}
             attachments={attachments}
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
+            editing={editing ? { onCancel: cancelEdit } : undefined}
             reasoning={
               modelSelection && variants.length > 0
                 ? { label: variantLabel, onPress: () => setReasoningSheetOpen(true) }

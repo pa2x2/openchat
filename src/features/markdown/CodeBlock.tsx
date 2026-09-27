@@ -1,16 +1,14 @@
-import * as Clipboard from "expo-clipboard";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo } from "react";
 import { View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 // RNGH's ScrollView claims a sideways swipe before the drawer's pan can, so
 // the code scrolls instead of the sidebar opening.
 import { ScrollView } from "react-native-gesture-handler";
+import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { Icon } from "@/src/ui/Icon";
 import { useCodeLines, type CodeLine } from "./highlight";
 import { MONOSPACE, type MarkdownTheme } from "./styles";
-
-const COPIED_MS = 1500;
 
 export interface CodeBlockProps {
   code: string;
@@ -37,23 +35,7 @@ const Line = memo(function Line({ tokens }: { tokens: CodeLine }) {
 
 export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
   const lines = useCodeLines(code, language, theme.scheme, live);
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  function handleCopy() {
-    // Unavailable on web or in a restricted host; nothing to tell the user.
-    void Clipboard.setStringAsync(code).catch(() => undefined);
-    setCopied(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-  }
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <View
@@ -80,7 +62,7 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
           accessibilityLabel={copied ? "Copied" : "Copy code"}
           accessibilityRole="button"
           hitSlop={6}
-          onPress={handleCopy}
+          onPress={() => copy(code)}
           style={{ padding: 8 }}
         >
           <Icon name={copied ? "check" : "content-copy"} size={15} color={theme.codeMuted} />
@@ -88,7 +70,7 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Text
-          selectable
+          selectable={theme.selectable}
           style={{
             color: theme.codeText,
             fontFamily: MONOSPACE,

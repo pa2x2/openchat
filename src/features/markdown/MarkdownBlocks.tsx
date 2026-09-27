@@ -108,7 +108,7 @@ function Paragraph({
   style?: TextStyle;
 }) {
   return (
-    <Text selectable style={[theme.body, style]}>
+    <Text selectable={theme.selectable} style={[theme.body, style]}>
       {renderInline(node.children ?? [], theme)}
     </Text>
   );
@@ -239,7 +239,7 @@ const Block = memo(
       case "html_block":
       case "math_block":
         return (
-          <Text selectable style={theme.body}>
+          <Text selectable={theme.selectable} style={theme.body}>
             {nodeText(node).replace(/\n$/, "")}
           </Text>
         );

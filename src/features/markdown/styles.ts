@@ -18,6 +18,12 @@ export interface MarkdownTheme {
   code: string;
   codeText: string;
   codeMuted: string;
+  /**
+   * Off for the user's own bubble: a long press there opens the message menu,
+   * which selectable text would take over. Its "Select text" shows the text
+   * selectable instead.
+   */
+  selectable: boolean;
 }
 
 export const MONOSPACE = "monospace";
@@ -65,5 +71,6 @@ export function getMarkdownTheme(
     code: palette.code,
     codeText: palette.codeText,
     codeMuted: palette.codeMuted,
+    selectable: !isUser,
   };
 }

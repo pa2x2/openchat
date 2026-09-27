@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { View } from "react-native";
+import { View, type GestureResponderEvent } from "react-native";
+import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 import { cn } from "@/src/lib/cn";
 
@@ -9,6 +10,8 @@ export interface BubbleProps {
   children?: ReactNode;
   role: "user" | "assistant";
   status?: string;
+  /** The user's side only: a long press on the bubble itself. */
+  onLongPress?: (event: GestureResponderEvent) => void;
   className?: string;
   testID?: string;
 }
@@ -17,7 +20,15 @@ export interface BubbleProps {
  * One message. The user's side is a tinted pill on the right; the
  * assistant's side has no bubble at all and reads as page text, full width.
  */
-export function Bubble({ text, children, role, status, className, testID }: BubbleProps) {
+export function Bubble({
+  text,
+  children,
+  role,
+  status,
+  onLongPress,
+  className,
+  testID,
+}: BubbleProps) {
   const isUser = role === "user";
   const content =
     children ??
@@ -31,7 +42,15 @@ export function Bubble({ text, children, role, status, className, testID }: Bubb
 
   return (
     <View className={cn("px-4", className)} testID={testID}>
-      {isUser ? (
+      {isUser && onLongPress ? (
+        <Pressable
+          accessibilityHint="Opens the message menu"
+          className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5 active:opacity-80"
+          onLongPress={onLongPress}
+        >
+          {content}
+        </Pressable>
+      ) : isUser ? (
         <View className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5">
           {content}
         </View>

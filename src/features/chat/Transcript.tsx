@@ -48,9 +48,20 @@ export interface TranscriptProps {
   listRef: RefObject<FlatList<Message> | null>;
   showReasoning: boolean;
   onRegenerate: () => void;
+  /** Present when the backend can edit a sent message. */
+  onEditMessage?: (message: Message) => void;
+  /** The message being edited in the composer, if any. */
+  editingId?: string | null;
 }
 
-export function Transcript({ chatId, listRef, showReasoning, onRegenerate }: TranscriptProps) {
+export function Transcript({
+  chatId,
+  listRef,
+  showReasoning,
+  onRegenerate,
+  onEditMessage,
+  editingId = null,
+}: TranscriptProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
@@ -68,6 +79,11 @@ export function Transcript({ chatId, listRef, showReasoning, onRegenerate }: Tra
   const regenerableId = !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  // Editing reruns the last turn, so it is offered on the newest user message
+  // only, and like a rerun only while no turn is live.
+  const editableId = turnActive
+    ? null
+    : (reversed.find((message) => message.role === "user")?.id ?? null);
   const replyPending =
     lastMessage?.role === "assistant" &&
     (lastMessage.status === "pending" || lastMessage.status === "streaming");
@@ -80,9 +96,20 @@ export function Transcript({ chatId, listRef, showReasoning, onRegenerate }: Tra
         showReasoning={showReasoning}
         activity={item.id === liveId ? activity : null}
         onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
+        onEdit={item.id === editableId ? onEditMessage : undefined}
+        dimmed={item.id === editingId}
       />
     ),
-    [showReasoning, liveId, activity, regenerableId, onRegenerate],
+    [
+      showReasoning,
+      liveId,
+      activity,
+      regenerableId,
+      onRegenerate,
+      editableId,
+      onEditMessage,
+      editingId,
+    ],
   );
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
