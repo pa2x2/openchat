@@ -1,14 +1,16 @@
 /**
  * Sidebar: search, new chat, every conversation the server knows about
- * except temporary ones (newest first, cached locally for instant launch),
- * and the connected server at the bottom, which leads to Settings.
+ * except temporary ones (newest first under date headings, cached locally for
+ * instant launch), and the connected server at the bottom, which leads to
+ * Settings.
  *
- * Long-pressing a chat starts selection mode, where chats can be deleted in
- * bulk. The mode lasts while anything is selected.
+ * Long-pressing a chat opens its menu: rename, delete, or select, which starts
+ * selection mode, where chats can be deleted in bulk. The mode lasts while
+ * anything is selected.
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, FlatList, View } from "react-native";
+import { BackHandler, SectionList, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,11 +22,13 @@ import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
+import { Menu, type MenuItem } from "@/src/ui/Menu";
 import { RefreshControl } from "@/src/ui/RefreshControl";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { Spinner } from "@/src/ui/Spinner";
 import { TextInput } from "@/src/ui/TextInput";
-import { confirmDeleteSelected } from "./chatActions";
+import { confirmDeleteChat, confirmDeleteSelected, promptRenameChat } from "./chatActions";
+import { groupChatsByDate } from "./dateGroups";
 
 export interface ChatDrawerProps {
   open: boolean;
@@ -58,13 +62,19 @@ export function ChatDrawer({
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<ChatId>>(new Set());
   const selecting = selected.size > 0;
+  // Kept after the menu closes, so it fades out with its items still in it.
+  const [rowMenu, setRowMenu] = useState<{ chat: ChatSummary; y: number } | null>(null);
+  const [rowMenuOpen, setRowMenuOpen] = useState(false);
 
-  // A selection left behind would greet the user the next time they open
-  // the sidebar.
+  // A selection or search left behind would greet the user the next time
+  // they open the sidebar.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (!open) setSelected(new Set());
+    if (!open) {
+      setSelected(new Set());
+      setQuery("");
+    }
   }
 
   // Registered after the layout's close-on-back, so it runs first.
@@ -86,7 +96,12 @@ export function ChatDrawer({
     );
   }, [allChats, temporary, query]);
 
+  // The layout re-reads the list at every opening, which regroups it, so
+  // "Today" moves on once the day does.
+  const sections = useMemo(() => groupChatsByDate(visible, new Date()), [visible]);
+
   const canDelete = capabilities?.deleteChat === true;
+  const canRename = capabilities?.renameChat === true;
   const toggle = useCallback(
     (id: ChatId) =>
       setSelected((current) => {
@@ -96,18 +111,77 @@ export function ChatDrawer({
       }),
     [],
   );
+  const toggleChat = useCallback((chat: ChatSummary) => toggle(chat.id), [toggle]);
+  const openRowMenu = useCallback((chat: ChatSummary, y: number) => {
+    setRowMenu({ chat, y });
+    setRowMenuOpen(true);
+  }, []);
+  const heldId = rowMenuOpen ? rowMenu?.chat.id : undefined;
   const renderChat = useCallback(
     ({ item }: { item: ChatSummary }) => (
       <ChatRow
         chat={item}
         active={item.id === activeChatId}
+        held={item.id === heldId}
         selection={selecting ? selected.has(item.id) : undefined}
         onPress={selecting ? toggle : onSelectChat}
-        onLongPress={canDelete ? toggle : undefined}
+        onLongPress={
+          selecting
+            ? canDelete
+              ? toggleChat
+              : undefined
+            : canDelete || canRename
+              ? openRowMenu
+              : undefined
+        }
       />
     ),
-    [activeChatId, selecting, selected, canDelete, toggle, onSelectChat],
+    [
+      activeChatId,
+      heldId,
+      selecting,
+      selected,
+      canDelete,
+      canRename,
+      toggle,
+      toggleChat,
+      openRowMenu,
+      onSelectChat,
+    ],
   );
+
+  const rowMenuItems: MenuItem[] = [];
+  if (rowMenu) {
+    const { chat } = rowMenu;
+    if (canRename) {
+      rowMenuItems.push({
+        label: "Rename",
+        icon: "pencil-outline",
+        onPress: () => promptRenameChat(chat),
+        testID: "row-menu-rename",
+      });
+    }
+    if (canDelete) {
+      rowMenuItems.push(
+        {
+          label: "Select",
+          icon: "checkbox-multiple-marked-outline",
+          onPress: () => toggle(chat.id),
+          testID: "row-menu-select",
+        },
+        {
+          label: "Delete",
+          icon: "trash-can-outline",
+          destructive: true,
+          onPress: () =>
+            confirmDeleteChat(chat, () => {
+              if (chat.id === activeChatId) onDeletedActive();
+            }),
+          testID: "row-menu-delete",
+        },
+      );
+    }
+  }
 
   // Only chats still listed: one deleted elsewhere may linger in the set.
   const selectedIds = allChats.filter((chat) => selected.has(chat.id)).map((chat) => chat.id);
@@ -235,10 +309,11 @@ export function ChatDrawer({
         ) : null}
       </View>
 
-      <FlatList
-        data={visible}
+      <SectionList
+        sections={sections}
         keyExtractor={(chat) => chat.id}
         keyboardShouldPersistTaps="handled"
+        stickySectionHeadersEnabled={false}
         contentContainerClassName="px-2 pb-3"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />
@@ -255,20 +330,51 @@ export function ChatDrawer({
               <Icon name="square-edit-outline" size={21} />
               <Text className="text-base text-text">New chat</Text>
             </Pressable>
-            <Text className="px-3 pb-1.5 pt-5 text-[13.5px] font-medium text-text-muted">
-              Chats
-            </Text>
+            {profile && chatsError ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Couldn't refresh chats. Retry"
+                className="mx-1 mt-2 flex-row items-center gap-2.5 rounded-[14px] bg-danger/10 px-3 py-2.5"
+                onPress={() => void refreshChats()}
+                testID="drawer-refresh-error"
+              >
+                <Icon name="alert-circle-outline" size={18} tone="danger" />
+                <Text className="flex-1 text-sm text-danger">Couldn’t refresh chats</Text>
+                <Text className="text-sm font-medium text-primary">Retry</Text>
+              </Pressable>
+            ) : null}
           </>
         }
+        renderSectionHeader={({ section }) => (
+          <Text className="px-3 pb-1.5 pt-5 text-[13.5px] font-medium text-text-muted">
+            {section.title}
+          </Text>
+        )}
         renderItem={renderChat}
         ListEmptyComponent={
-          chatsLoading && !query ? (
-            <ChatListSkeleton />
-          ) : (
-            <Text className="px-3 py-2 text-sm text-text-muted">
-              {query ? "No matching chats" : "No chats yet"}
-            </Text>
-          )
+          <View className="pt-3">
+            {!profile ? (
+              <View className="px-3 py-2">
+                <Text className="text-sm leading-5 text-text-muted">
+                  Connect a server to see your chats.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  className="mt-1 self-start py-1"
+                  onPress={onOpenSettings}
+                  testID="drawer-open-settings"
+                >
+                  <Text className="text-sm font-medium text-primary">Open settings</Text>
+                </Pressable>
+              </View>
+            ) : chatsLoading && !query ? (
+              <ChatListSkeleton />
+            ) : (
+              <Text className="px-3 py-2 text-sm text-text-muted">
+                {query ? "No matching chats" : "No chats yet"}
+              </Text>
+            )}
+          </View>
         }
       />
 
@@ -298,6 +404,14 @@ export function ChatDrawer({
           <Icon name="cog-outline" size={22} tone="textMuted" />
         </Pressable>
       </View>
+
+      <Menu
+        visible={rowMenuOpen}
+        onClose={() => setRowMenuOpen(false)}
+        items={rowMenuItems}
+        anchor={{ y: rowMenu?.y ?? 0, side: "left", inset: 40 }}
+        testID="row-menu"
+      />
     </View>
   );
 }
@@ -305,24 +419,29 @@ export function ChatDrawer({
 const ChatRow = memo(function ChatRow({
   chat,
   active,
+  held,
   selection,
   onPress,
   onLongPress,
 }: {
   chat: ChatSummary;
   active: boolean;
+  /** Its menu is open. */
+  held: boolean;
   /** Whether the row is checked; undefined outside selection mode. */
   selection: boolean | undefined;
   onPress: (id: string) => void;
-  onLongPress?: (id: string) => void;
+  /** Gets the screen y of the press, where the row's menu opens. */
+  onLongPress?: (chat: ChatSummary, y: number) => void;
 }) {
   // Per row, so a turn starting or ending re-renders only its own chat.
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
   const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
+  const title = chat.title || "Untitled";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={chat.title || "Untitled"}
+      accessibilityLabel={live ? `${title}, replying` : title}
       accessibilityState={{
         ...(selection === undefined ? { selected: active } : { checked: selection }),
         busy: deleting,
@@ -330,12 +449,14 @@ const ChatRow = memo(function ChatRow({
       }}
       className={cn(
         "flex-row items-center gap-2 rounded-[14px] px-3 py-3",
-        (selection ?? active) ? "bg-surface" : "active:bg-surface",
+        held ? "bg-surface-hover" : (selection ?? active) ? "bg-surface" : "active:bg-surface",
         deleting && "opacity-50",
       )}
       disabled={deleting}
       onPress={() => onPress(chat.id)}
-      onLongPress={onLongPress ? () => onLongPress(chat.id) : undefined}
+      onLongPress={
+        onLongPress ? (event) => onLongPress(chat, event.nativeEvent.pageY + 12) : undefined
+      }
       testID={`chat-row-${chat.id}`}
     >
       {selection !== undefined ? (
@@ -350,7 +471,7 @@ const ChatRow = memo(function ChatRow({
         className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
         numberOfLines={1}
       >
-        {chat.title || "Untitled"}
+        {title}
       </Text>
       {deleting ? <Spinner size="small" /> : null}
     </Pressable>
