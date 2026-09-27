@@ -95,6 +95,9 @@ export function Transcript({
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         maintainVisibleContentPosition={following ? undefined : HOLD_POSITION}
+        // On by default on Android, where it detaches off-screen cells and the
+        // anchor with them, so a reply taller than the screen drags the view.
+        removeClippedSubviews={false}
         onScroll={handleScroll}
         // Frequent enough that a drag away from the bottom stops following
         // before the stream moves the content under it.
