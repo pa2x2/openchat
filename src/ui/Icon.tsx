@@ -56,16 +56,18 @@ export function TemporaryChatGlyph({
   on,
   tone = "text",
   background = "elevated",
+  size = 20,
 }: {
   on: boolean;
   tone?: PaletteKey;
   background?: PaletteKey;
+  size?: number;
 }) {
   const { colors } = useAppTheme();
-  const size = 20;
-  const stroke = 1.75;
+  const scale = size / 20;
+  const stroke = 1.75 * Math.max(scale, 0.8);
   const radius = (size - stroke) / 2;
-  const gap = { width: 2.6, height: stroke + 2 };
+  const gap = { width: 2.6 * scale, height: stroke + 2 * scale };
   return (
     <View
       style={{
@@ -97,7 +99,7 @@ export function TemporaryChatGlyph({
           />
         );
       })}
-      {on ? <Icon name="check" size={13} tone={tone} /> : null}
+      {on ? <Icon name="check" size={Math.round(13 * scale)} tone={tone} /> : null}
     </View>
   );
 }

@@ -3,30 +3,24 @@
  * transcript scrolls underneath. Sidebar on the left, the model picker in
  * the middle, and new chat + the overflow menu grouped on the right. On a
  * chat not yet started, the temporary-chat toggle takes new chat's place.
+ * A temporary chat says so under the title for as long as it lasts, since
+ * leaving it deletes it.
  */
 
 import { useState } from "react";
 import { View } from "react-native";
 import { Text } from "@/src/ui/Text";
-import { Modal } from "@/src/ui/Modal";
+import { Menu, type MenuItem } from "@/src/ui/Menu";
 import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/src/lib/cn";
-import { Icon, MenuGlyph, TemporaryChatGlyph, type IconName } from "@/src/ui/Icon";
+import { Icon, MenuGlyph, TemporaryChatGlyph } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { Spinner } from "@/src/ui/Spinner";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Height of the header below the status bar; the transcript pads by this. */
 export const HEADER_HEIGHT = 60;
-
-export interface HeaderMenuItem {
-  label: string;
-  icon: IconName;
-  onPress: () => void;
-  destructive?: boolean;
-  testID?: string;
-}
 
 export interface ChatHeaderProps {
   onOpenDrawer: () => void;
@@ -39,9 +33,11 @@ export interface ChatHeaderProps {
    * title but shows a request for it is in flight.
    */
   titleStatus?: "placeholder" | "busy";
-  menuItems: HeaderMenuItem[];
+  menuItems: MenuItem[];
   /** Present on a chat not yet started; replaces the new chat button. */
   temporary?: { on: boolean; onToggle: () => void };
+  /** Marks the chat as temporary under the title. */
+  temporaryLabel?: boolean;
 }
 
 export function ChatHeader({
@@ -52,6 +48,7 @@ export function ChatHeader({
   titleStatus,
   menuItems,
   temporary,
+  temporaryLabel = false,
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
@@ -79,31 +76,45 @@ export function ChatHeader({
       </Pressable>
 
       <Pressable
-        accessibilityLabel={onPressTitle ? `Model: ${title}. Choose model` : title}
+        accessibilityLabel={[
+          onPressTitle ? `Model: ${title}. Choose model` : title,
+          temporaryLabel ? "Temporary chat" : null,
+        ]
+          .filter(Boolean)
+          .join(". ")}
         accessibilityRole={onPressTitle ? "button" : "header"}
         className={cn(
-          "mx-2 h-10 max-w-[55%] flex-row items-center gap-1 rounded-full pl-3.5 pr-2.5",
+          "mx-2 max-w-[55%] items-center justify-center rounded-full pl-3.5 pr-2.5",
+          temporaryLabel ? "h-11" : "h-10",
           onPressTitle && "active:bg-surface",
         )}
         disabled={!onPressTitle}
         onPress={onPressTitle}
         testID="model-button"
       >
-        {titleStatus === "placeholder" ? (
-          <SkeletonGroup label="Loading model" testID="model-button-skeleton">
-            <Skeleton className="h-4 w-28" />
-          </SkeletonGroup>
-        ) : (
-          <Text className="text-[17px] font-medium text-text" numberOfLines={1}>
-            {title}
-          </Text>
-        )}
-        {titleStatus === "busy" ? (
-          <View className="ml-1">
-            <Spinner size="small" />
+        <View className="flex-row items-center gap-1">
+          {titleStatus === "placeholder" ? (
+            <SkeletonGroup label="Loading model" testID="model-button-skeleton">
+              <Skeleton className="h-4 w-28" />
+            </SkeletonGroup>
+          ) : (
+            <Text className="shrink text-[17px] font-medium text-text" numberOfLines={1}>
+              {title}
+            </Text>
+          )}
+          {titleStatus === "busy" ? (
+            <View className="ml-1">
+              <Spinner size="small" />
+            </View>
+          ) : onPressTitle ? (
+            <Icon name="chevron-down" size={18} tone="textMuted" />
+          ) : null}
+        </View>
+        {temporaryLabel ? (
+          <View className="flex-row items-center gap-1" testID="temporary-label">
+            <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
+            <Text className="text-xs text-text-muted">Temporary chat</Text>
           </View>
-        ) : onPressTitle ? (
-          <Icon name="chevron-down" size={18} tone="textMuted" />
         ) : null}
       </Pressable>
 
@@ -147,55 +158,13 @@ export function ChatHeader({
         ) : null}
       </View>
 
-      <HeaderMenu
+      <Menu
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
         items={menuItems}
-        top={insets.top + HEADER_HEIGHT - 4}
+        anchor={{ y: insets.top + HEADER_HEIGHT - 4, side: "right", inset: 12 }}
+        testID="chat-menu-popover"
       />
     </View>
-  );
-}
-
-function HeaderMenu({
-  visible,
-  onClose,
-  items,
-  top,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  items: HeaderMenuItem[];
-  top: number;
-}) {
-  return (
-    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close menu">
-        <View
-          className="absolute right-3 min-w-[220px] rounded-[20px] bg-elevated p-1.5"
-          style={{ top, boxShadow: "0px 8px 32px rgba(0, 0, 0, 0.22)" }}
-          testID="chat-menu-popover"
-        >
-          {items.map((item) => (
-            <Pressable
-              key={item.label}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              className="flex-row items-center gap-3 rounded-[14px] px-3 py-3 active:bg-raised"
-              onPress={() => {
-                onClose();
-                item.onPress();
-              }}
-              testID={item.testID}
-            >
-              <Icon name={item.icon} size={20} tone={item.destructive ? "danger" : "text"} />
-              <Text className={cn("text-[15.5px]", item.destructive ? "text-danger" : "text-text")}>
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </Pressable>
-    </Modal>
   );
 }

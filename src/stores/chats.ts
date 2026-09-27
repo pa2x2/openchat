@@ -43,6 +43,8 @@ interface ChatsStoreState {
   markTemporary: (id: ChatId) => void;
   /** Also drops the chat from the list. */
   forgetTemporary: (id: ChatId) => void;
+  /** Turns a temporary chat into a normal one, so leaving it no longer deletes it. */
+  keepTemporary: (id: ChatId) => void;
   setDeleting: (ids: ChatId[], deleting: boolean) => void;
   /** Re-reads the chat list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
@@ -90,6 +92,12 @@ export function createChatsStore(storage = mmkvStorage) {
             const temporary = { ...state.temporary };
             delete temporary[id];
             return { temporary, chats: state.chats.filter((chat) => chat.id !== id) };
+          }),
+        keepTemporary: (id) =>
+          set((state) => {
+            const temporary = { ...state.temporary };
+            delete temporary[id];
+            return { temporary };
           }),
         setDeleting: (ids, deleting) =>
           set((state) => {

@@ -7,7 +7,7 @@ import { Composer, type ComposerHandle } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
 import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, HEADER_HEIGHT, type HeaderMenuItem } from "./ChatHeader";
+import { ChatHeader, HEADER_HEIGHT } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
@@ -36,6 +36,7 @@ import { useConnectionStore } from "@/src/stores/connection";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { LinearProgress } from "@/src/ui/LinearProgress";
+import type { MenuItem } from "@/src/ui/Menu";
 
 /** Route id for the not-yet-created chat; the backend chat is made lazily. */
 export const NEW_CHAT = "new";
@@ -298,7 +299,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
-  const menuItems: HeaderMenuItem[] = [];
+  const menuItems: MenuItem[] = [];
+  if (!isDraft && temporary) {
+    menuItems.push({
+      label: "Keep this chat",
+      icon: "content-save-outline",
+      onPress: () => useChatsStore.getState().keepTemporary(chatId),
+      testID: "menu-keep",
+    });
+  }
   if (!isDraft && !temporary && capabilities?.deleteChat) {
     menuItems.push({
       label: "Delete",
@@ -361,6 +370,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
                     : undefined
             }
             menuItems={menuItems}
+            temporaryLabel={temporary}
             temporary={
               isDraft && canTemporary
                 ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }

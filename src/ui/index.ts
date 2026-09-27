@@ -32,4 +32,5 @@ export { TextInput, type TextInputHandle, type TextInputProps } from "./TextInpu
 export { RefreshControl, type RefreshControlProps } from "./RefreshControl";
 export { playHaptic, type Haptic } from "./haptics";
 export { Modal, type ModalProps } from "./Modal";
+export { Menu, type MenuAnchor, type MenuItem } from "./Menu";
 export { Text, type TextProps } from "./Text";
