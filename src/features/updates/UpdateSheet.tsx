@@ -61,7 +61,15 @@ export function UpdateSheet() {
           style={{ flexGrow: 0, maxHeight: 320 }}
           className="mb-3 rounded-[20px] bg-raised"
         >
-          <View className="px-4 py-2">
+          {/* Holds the touch so the sheet's drag-to-dismiss never gets it,
+              not even on a downward drag: on Android the view holding the JS
+              responder intercepts native moves, so the card would stop this
+              ScrollView from scrolling on any slow drag. */}
+          <View
+            className="px-4 py-2"
+            onStartShouldSetResponder={() => true}
+            onResponderTerminationRequest={() => false}
+          >
             <MarkdownContent
               text={release.notes}
               role="assistant"
