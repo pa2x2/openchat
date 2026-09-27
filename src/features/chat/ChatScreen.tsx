@@ -108,6 +108,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
   const canAttach = capabilities?.attachments === true;
+  const modelSelection = capabilities?.modelSelection === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
@@ -196,6 +197,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
     if (busy.current) return false;
+    // Without a model the server would answer with its own default, which the
+    // header can't name: the chat would run on a model the user never saw.
+    if (modelSelection && !currentModel) {
+      setSheetOpen(true);
+      return false;
+    }
     busy.current = true;
     setBanner(null);
     setAttachments([]);
@@ -291,7 +298,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
-  const modelSelection = capabilities?.modelSelection === true;
   const menuItems: HeaderMenuItem[] = [];
   if (!isDraft && !temporary && capabilities?.deleteChat) {
     menuItems.push({
