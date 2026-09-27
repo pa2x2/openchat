@@ -2,6 +2,12 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-09-27
+
+### 🔄 Changed
+
+- Sending with no model picked opens the model picker instead of letting the server answer on one the app cannot name.
+
 ## [1.0.0-alpha06] - 2026-09-27
 
 ### ✨ Added
@@ -124,6 +130,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.0.0]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0
 [1.0.0-alpha06]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha06
 [1.0.0-alpha05]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha05
 [1.0.0-alpha04]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha04
