@@ -1,13 +1,15 @@
 /**
- * Chat controls: sidebar on the left, the chat's title in the middle, and new
- * chat + the overflow menu on the right. On a chat not yet started, the
- * temporary-chat toggle takes new chat's place. A temporary chat says so under
- * the title for as long as it lasts, since leaving it deletes it.
+ * Chat controls: sidebar on the left, and new chat + the overflow menu on the
+ * right. On a chat not yet started, the temporary-chat toggle takes new
+ * chat's place. A temporary chat says so under the title for as long as it
+ * lasts, since leaving it deletes it.
  *
  * Where they sit is a setting. At the top there is no bar, just raised
- * buttons over a fade, so the transcript scrolls underneath. At the bottom
- * they are a flat row under the composer, within reach of the thumb, and the
- * top keeps only `StatusBarFade`.
+ * buttons over a fade, so the transcript scrolls underneath, and the chat's
+ * title sits between them. At the bottom they are a flat row under the
+ * composer, within reach of the thumb. The title needs no reaching, so it
+ * stays at the top in `ChatTitleBar`, where it has the screen's width and
+ * does not leave with the row when the keyboard opens.
  */
 
 import { useRef, useState } from "react";
@@ -24,6 +26,9 @@ import { useAppTheme, withAlpha } from "@/src/ui/theme";
 /** Height of the top header below the status bar; the transcript pads by this. */
 export const HEADER_HEIGHT = 60;
 
+/** Height of `ChatTitleBar` below the status bar: two lines of the title. */
+export const TITLE_BAR_HEIGHT = 40;
+
 /** Gap between the bottom row and the menu that opens above it. */
 const MENU_GAP = 8;
 
@@ -31,6 +36,7 @@ export interface ChatHeaderProps {
   placement: ChatControls;
   onOpenDrawer: () => void;
   onNewChat: () => void;
+  /** Shown only at the top. */
   title: string;
   menuItems: MenuItem[];
   /** Present on a chat not yet started; replaces the new chat button. */
@@ -55,6 +61,11 @@ export function ChatHeader({
   // Screen y the menu hangs from. The bottom row is measured when the menu
   // opens: the row moves with the composer, which grows as the user types.
   const [menuY, setMenuY] = useState(0);
+  const [titleLines, setTitleLines] = useState(1);
+  // A title on two lines, or with the label under it, reaches down into the
+  // fade, where the transcript's text would show through it. The solid part
+  // grows to hold it.
+  const solid = titleLines > 1 || temporaryLabel ? 1 - 16 / (insets.top + HEADER_HEIGHT) : 0.65;
 
   function openMenu() {
     if (top) {
@@ -128,7 +139,7 @@ export function ChatHeader({
           ? {
               paddingTop: insets.top + 6,
               paddingBottom: 14,
-              experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} 65%, ${withAlpha(colors.background, 0)})`,
+              experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} ${Math.round(solid * 100)}%, ${withAlpha(colors.background, 0)})`,
             }
           : undefined
       }
@@ -147,35 +158,17 @@ export function ChatHeader({
         <MenuGlyph />
       </Pressable>
 
-      <View
-        accessible
-        accessibilityLabel={[title, temporaryLabel ? "Temporary chat" : null]
-          .filter(Boolean)
-          .join(". ")}
-        accessibilityRole="header"
-        // A drag that starts on the title still scrolls the transcript under it.
-        pointerEvents="none"
-        // Centred on the screen, not between the buttons, which differ in
-        // width; the padding clears the wider side.
-        className={cn(
-          "absolute bottom-0 left-0 right-0 items-center justify-center px-[108px]",
-          top ? "h-[72px]" : "top-0",
-        )}
-        testID="chat-title"
-      >
-        <Text
-          className={cn("font-medium text-text", top ? "text-[17px]" : "text-base")}
-          numberOfLines={1}
+      {top ? (
+        <View
+          // A drag that starts on the title still scrolls the transcript under it.
+          pointerEvents="none"
+          // Centred on the screen, not between the buttons, which differ in
+          // width; the padding clears the wider side.
+          className="absolute bottom-0 left-0 right-0 h-[72px] items-center justify-center px-[108px]"
         >
-          {title}
-        </Text>
-        {temporaryLabel ? (
-          <View className="flex-row items-center gap-1" testID="temporary-label">
-            <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
-            <Text className="text-xs text-text-muted">Temporary chat</Text>
-          </View>
-        ) : null}
-      </View>
+          <ChatTitle title={title} temporaryLabel={temporaryLabel} onLines={setTitleLines} />
+        </View>
+      ) : null}
 
       {top ? (
         <View
@@ -199,21 +192,71 @@ export function ChatHeader({
   );
 }
 
+/** Space under `ChatTitleBar` over which the transcript fades out. */
+const TITLE_BAR_FADE = 12;
+
 /**
- * With the controls at the bottom, what is left of the header: the fade that
- * keeps the transcript from running under the status bar's icons.
+ * With the controls at the bottom, what is left of the header: the chat's
+ * title over a fade that keeps the transcript from running under it and the
+ * status bar's icons.
  */
-export function StatusBarFade() {
+export function ChatTitleBar({
+  title,
+  temporaryLabel = false,
+}: {
+  title: string;
+  temporaryLabel?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
+  const solid = insets.top + TITLE_BAR_HEIGHT;
   return (
     <View
       pointerEvents="none"
-      className="absolute left-0 right-0 top-0"
+      className="absolute left-0 right-0 top-0 items-center justify-center px-4"
       style={{
-        height: insets.top + 12,
-        experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} 70%, ${withAlpha(colors.background, 0)})`,
+        height: solid + TITLE_BAR_FADE,
+        paddingTop: insets.top,
+        paddingBottom: TITLE_BAR_FADE,
+        experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} ${Math.round((solid / (solid + TITLE_BAR_FADE)) * 100)}%, ${withAlpha(colors.background, 0)})`,
       }}
-    />
+    >
+      <ChatTitle title={title} temporaryLabel={temporaryLabel} />
+    </View>
+  );
+}
+
+function ChatTitle({
+  title,
+  temporaryLabel,
+  onLines,
+}: {
+  title: string;
+  temporaryLabel: boolean;
+  onLines?: (lines: number) => void;
+}) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={temporaryLabel ? `${title}. Temporary chat` : title}
+      accessibilityRole="header"
+      className="items-center"
+      testID="chat-title"
+    >
+      <Text
+        className="text-center text-[15px] font-medium leading-[18px]"
+        // The label takes the second line's place.
+        numberOfLines={temporaryLabel ? 1 : 2}
+        onTextLayout={onLines && ((event) => onLines(event.nativeEvent.lines.length))}
+      >
+        {title}
+      </Text>
+      {temporaryLabel ? (
+        <View className="flex-row items-center gap-1" testID="temporary-label">
+          <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
+          <Text className="text-xs text-text-muted">Temporary chat</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }

@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
 import { AUTO_LABEL, ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, HEADER_HEIGHT, StatusBarFade } from "./ChatHeader";
+import { ChatHeader, ChatTitleBar, HEADER_HEIGHT, TITLE_BAR_HEIGHT } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { RecentChats } from "./RecentChats";
@@ -137,7 +137,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
   const controls = useSettingsStore((state) => state.chatControls);
-  const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : 0);
+  const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : TITLE_BAR_HEIGHT);
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
   // The default mode can turn the toggle on for a server that cannot delete.
   const draftTemporary = (temporaryToggle ?? defaultTemporary) && canTemporary;
@@ -413,6 +413,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }
 
+  const title = !isDraft && named && chat ? chat.title : "New chat";
   const header = (
     <ChatHeader
       placement={controls}
@@ -421,7 +422,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         openDrawer();
       }}
       onNewChat={handleNewChat}
-      title={!isDraft && named && chat ? chat.title : "New chat"}
+      title={title}
       menuItems={menuItems}
       temporaryLabel={temporary}
       temporary={
@@ -475,7 +476,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             />
           )}
 
-          {controls === "top" ? header : <StatusBarFade />}
+          {controls === "top" ? header : <ChatTitleBar title={title} temporaryLabel={temporary} />}
 
           {/* The skeleton already says an uncached transcript is loading. */}
           {(transcriptLoading && !empty) || deleting ? (
