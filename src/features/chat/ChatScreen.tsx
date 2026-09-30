@@ -413,7 +413,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }
 
-  const title = !isDraft && named && chat ? chat.title : "New chat";
+  const title = !isDraft && named && chat ? chat.title : null;
   const header = (
     <ChatHeader
       placement={controls}

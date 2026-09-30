@@ -36,8 +36,8 @@ export interface ChatHeaderProps {
   placement: ChatControls;
   onOpenDrawer: () => void;
   onNewChat: () => void;
-  /** Shown only at the top. */
-  title: string;
+  /** Null until the chat has a name. Shown only at the top. */
+  title: string | null;
   menuItems: MenuItem[];
   /** Present on a chat not yet started; replaces the new chat button. */
   temporary?: { on: boolean; onToggle: () => void };
@@ -204,7 +204,8 @@ export function ChatTitleBar({
   title,
   temporaryLabel = false,
 }: {
-  title: string;
+  /** Null until the chat has a name. */
+  title: string | null;
   temporaryLabel?: boolean;
 }) {
   const insets = useSafeAreaInsets();
@@ -231,25 +232,29 @@ function ChatTitle({
   temporaryLabel,
   onLines,
 }: {
-  title: string;
+  title: string | null;
   temporaryLabel: boolean;
   onLines?: (lines: number) => void;
 }) {
+  const shown = title ?? "New chat";
   return (
     <View
       accessible
-      accessibilityLabel={temporaryLabel ? `${title}. Temporary chat` : title}
+      accessibilityLabel={temporaryLabel ? `${shown}. Temporary chat` : shown}
       accessibilityRole="header"
       className="items-center"
       testID="chat-title"
     >
       <Text
-        className="text-center text-[15px] font-medium leading-[18px]"
+        className={cn(
+          "text-center text-[15px] font-medium leading-[18px]",
+          title === null && "text-text-muted",
+        )}
         // The label takes the second line's place.
         numberOfLines={temporaryLabel ? 1 : 2}
         onTextLayout={onLines && ((event) => onLines(event.nativeEvent.lines.length))}
       >
-        {title}
+        {shown}
       </Text>
       {temporaryLabel ? (
         <View className="flex-row items-center gap-1" testID="temporary-label">
