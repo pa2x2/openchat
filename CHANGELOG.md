@@ -2,6 +2,12 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-09-30
+
+### 🔄 Changed
+
+- The sidebar lists chats from the bottom up. The newest chat sits just above search and new chat, where your thumb already is, and older chats run up the screen under their date headings. Pull up from the bottom to refresh.
+
 ## [1.2.0] - 2026-09-30
 
 ### ✨ Added
@@ -186,6 +192,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.2.1]: https://github.com/pa2x2/openchat/releases/tag/v1.2.1
 [1.2.0]: https://github.com/pa2x2/openchat/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pa2x2/openchat/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0
