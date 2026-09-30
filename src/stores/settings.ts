@@ -4,8 +4,8 @@
  * Holds the last model picked per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
  * appearance and colour preferences, haptics, the mode new chats start
- * in, the update channel and automatic checks, and whether the notification
- * permission was already asked for.
+ * in, where the chat controls sit, the update channel and automatic checks,
+ * and whether the notification permission was already asked for.
  */
 
 import Constants from "expo-constants";
@@ -31,6 +31,13 @@ export function defaultUpdateChannel(appVersion: string): UpdateChannel {
 
 export type ChatMode = "normal" | "temporary";
 
+/**
+ * Where the chat screen's buttons (sidebar, new chat, the chat menu) sit:
+ * floating over the top of the transcript, or in a row under the composer,
+ * within reach of the thumb.
+ */
+export type ChatControls = "top" | "bottom";
+
 interface SettingsStoreState {
   lastModels: Record<ProviderId, ModelRef>;
   setLastModel: (providerId: ProviderId, model: ModelRef) => void;
@@ -42,6 +49,8 @@ interface SettingsStoreState {
   setHaptics: (haptics: boolean) => void;
   defaultChatMode: ChatMode;
   setDefaultChatMode: (defaultChatMode: ChatMode) => void;
+  chatControls: ChatControls;
+  setChatControls: (chatControls: ChatControls) => void;
   updateChannel: UpdateChannel;
   setUpdateChannel: (channel: UpdateChannel) => void;
   checkUpdatesOnStartup: boolean;
@@ -66,6 +75,8 @@ export function createSettingsStore(
         setHaptics: (haptics) => set({ haptics }),
         defaultChatMode: "normal",
         setDefaultChatMode: (defaultChatMode) => set({ defaultChatMode }),
+        chatControls: "bottom",
+        setChatControls: (chatControls) => set({ chatControls }),
         updateChannel: defaultUpdateChannel(appVersion),
         setUpdateChannel: (updateChannel) => set({ updateChannel }),
         checkUpdatesOnStartup: true,

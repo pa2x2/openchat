@@ -3,19 +3,19 @@
  * out like T3 Code's picker. A rail on the left switches between Favorites
  * and each upstream provider; the list on the right shows that provider's
  * models, starred ones first. Typing in the search field looks across every
- * provider at once.
+ * provider at once. Under the list, the model in use offers its variants
+ * (usually its reasoning effort), or "Auto" for the model's own default.
  *
  * The list comes from the models store (cached locally, refreshed from the
- * server every time the sheet opens). Selecting a row reports the model and
- * closes the sheet; the caller decides what the choice means (switch the
- * current chat or save it as the default).
+ * server every time the sheet opens). Selecting a model or a variant reports
+ * it and closes the sheet; the caller decides what the choice applies to.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, SectionList, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ModelInfo, ModelRef } from "@/src/domain";
+import type { ModelInfo, ModelRef, ModelVariant } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { modelKey, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { Button } from "@/src/ui/Button";
@@ -35,6 +35,9 @@ export function formatContextWindow(tokens: number): string {
   return `${Math.round(tokens / 1_000)}K`;
 }
 
+/** Label for running without a variant: the model's own default. */
+export const AUTO_LABEL = "Auto";
+
 /** Rail entry for the starred models; never clashes with a provider id in practice. */
 const FAVORITES = "favorites";
 
@@ -49,9 +52,22 @@ export interface ModelSheetProps {
   onClose: () => void;
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
+  /** Variants of the model in use; empty when it has none. */
+  variants?: ModelVariant[];
+  /** Undefined is Auto. */
+  onSelectVariant?: (variant: string | undefined) => void;
 }
 
-export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetProps) {
+const NO_VARIANTS: ModelVariant[] = [];
+
+export function ModelSheet({
+  visible,
+  onClose,
+  selected,
+  onSelect,
+  variants = NO_VARIANTS,
+  onSelectVariant,
+}: ModelSheetProps) {
   const models = useModelsStore((state) => state.models);
   const loading = useModelsStore((state) => state.loading);
   const error = useModelsStore((state) => state.error);
@@ -112,7 +128,18 @@ export function ModelSheet({ visible, onClose, selected, onSelect }: ModelSheetP
           <View className="mb-2 h-[3px]">
             {loading ? <LinearProgress testID="model-progress" /> : null}
           </View>
-          <ModelBrowser key={opening} models={models} selected={selected} onSelect={handleSelect} />
+          <ModelBrowser key={opening} models={models} selected={selected} onSelect={handleSelect}>
+            {variants.length > 0 && onSelectVariant ? (
+              <VariantRow
+                variants={variants}
+                selected={selected?.variant}
+                onSelect={(variant) => {
+                  onSelectVariant(variant);
+                  onClose();
+                }}
+              />
+            ) : null}
+          </ModelBrowser>
         </>
       )}
     </Sheet>
@@ -155,10 +182,13 @@ function ModelBrowser({
   models,
   selected,
   onSelect,
+  children,
 }: {
   models: ModelInfo[];
   selected?: ModelRef | null;
   onSelect: (model: ModelInfo) => void;
+  /** Shown between the list and the search field. */
+  children?: React.ReactNode;
 }) {
   const favorites = useModelsStore((state) => state.favorites);
   const toggleFavorite = useModelsStore((state) => state.toggleFavorite);
@@ -307,7 +337,82 @@ function ModelBrowser({
           )}
         />
       </View>
+      {children}
       <SearchField value={query} onChangeText={setQuery} />
+    </View>
+  );
+}
+
+function VariantRow({
+  variants,
+  selected,
+  onSelect,
+}: {
+  variants: ModelVariant[];
+  selected: string | undefined;
+  onSelect: (variant: string | undefined) => void;
+}) {
+  const options: { id: string | undefined; label: string; hint?: string }[] = [
+    { id: undefined, label: AUTO_LABEL, hint: "The model's default" },
+    ...variants,
+  ];
+  const row = useRef<ScrollView>(null);
+  const rowWidth = useRef(0);
+  return (
+    <View className="mt-2" testID="model-variants">
+      <Text className="px-3 pb-1.5 text-[13px] font-medium text-text-muted">Reasoning</Text>
+      {/* Scrolls, as a model can offer more levels than fit across the sheet. */}
+      <ScrollView
+        ref={row}
+        onLayout={(event) => {
+          rowWidth.current = event.nativeEvent.layout.width;
+        }}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        accessibilityRole="radiogroup"
+        className="flex-grow-0 rounded-[20px] bg-raised"
+        contentContainerClassName="flex-grow p-1"
+      >
+        {options.map((option) => {
+          const active = option.id === selected;
+          return (
+            <Pressable
+              key={option.id ?? "auto"}
+              onPress={() => onSelect(option.id)}
+              accessibilityRole="radio"
+              accessibilityLabel={option.label}
+              accessibilityHint={option.hint}
+              accessibilityState={{ checked: active }}
+              // The level in use may sit past the edge of the row: centre it.
+              onLayout={
+                active
+                  ? ({ nativeEvent: { layout } }) =>
+                      row.current?.scrollTo({
+                        x: layout.x + layout.width / 2 - rowWidth.current / 2,
+                        animated: false,
+                      })
+                  : undefined
+              }
+              className={cn(
+                "h-10 min-w-16 flex-1 items-center justify-center rounded-2xl px-3.5",
+                active ? "bg-text" : "active:bg-raised-hover",
+              )}
+              testID={`model-variant-${option.id ?? "auto"}`}
+            >
+              <Text
+                className={cn(
+                  "text-[15px]",
+                  active ? "font-medium text-background" : "text-text-muted",
+                )}
+                numberOfLines={1}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }

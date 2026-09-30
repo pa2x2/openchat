@@ -8,13 +8,11 @@
 import { useCallback, useMemo, useState, type RefObject } from "react";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, Message, TurnActivity } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
-import { HEADER_HEIGHT } from "./ChatHeader";
 import { MessageBubble } from "./MessageBubble";
 
 /** How far up the transcript the "jump to latest" button appears. */
@@ -48,6 +46,8 @@ const PENDING_REPLY: Message = {
 export interface TranscriptProps {
   chatId: ChatId;
   listRef: RefObject<FlatList<Message> | null>;
+  /** What covers the top of the list: the status bar, and the chat controls when they float there. */
+  topInset: number;
   showReasoning: boolean;
   onRegenerate: () => void;
   /** Present when the backend can edit a sent message. */
@@ -58,12 +58,12 @@ export interface TranscriptProps {
 export function Transcript({
   chatId,
   listRef,
+  topInset,
   showReasoning,
   onRegenerate,
   onEditMessage,
   editingId = null,
 }: TranscriptProps) {
-  const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
@@ -148,7 +148,7 @@ export function Transcript({
         // before the stream moves the content under it.
         scrollEventThrottle={16}
         // Inverted: the header component sits at the bottom, the footer
-        // at the top, under the floating header.
+        // at the top.
         ListHeaderComponent={
           <>
             {starting ? (
@@ -157,7 +157,7 @@ export function Transcript({
             <View className="h-3" />
           </>
         }
-        ListFooterComponent={<View style={{ height: insets.top + HEADER_HEIGHT + 4 }} />}
+        ListFooterComponent={<View style={{ height: topInset + 4 }} />}
         renderItem={renderMessage}
       />
 

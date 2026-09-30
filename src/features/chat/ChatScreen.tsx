@@ -6,10 +6,9 @@ import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
-import { ModelSheet } from "./ModelSheet";
-import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
+import { AUTO_LABEL, ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, HEADER_HEIGHT } from "./ChatHeader";
+import { ChatHeader, HEADER_HEIGHT, StatusBarFade } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
@@ -37,6 +36,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
+import { cn } from "@/src/lib/cn";
 import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
@@ -70,8 +70,9 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
 }
 
 /**
- * Conversation screen: the transcript under a floating header, with the
- * composer pinned to the bottom.
+ * Conversation screen: the transcript, with the composer pinned to the
+ * bottom. The chat controls float over the top of the transcript or sit in a
+ * row under the composer, as the user set.
  *
  * A chat is created on the server only when its first message is sent
  * (the `new` route); from then on the transcript reconciles from the
@@ -109,7 +110,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // null until the user flips the toggle: until then the draft follows the setting.
@@ -130,6 +130,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const modelSelection = capabilities?.modelSelection === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
+  const controls = useSettingsStore((state) => state.chatControls);
+  const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : 0);
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
   // The default mode can turn the toggle on for a server that cannot delete.
   const draftTemporary = (temporaryToggle ?? defaultTemporary) && canTemporary;
@@ -218,7 +220,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (busy.current) return false;
     if (editing) return sendEdit(text);
     // Without a model the server would answer with its own default, which the
-    // header can't name: the chat would run on a model the user never saw.
+    // composer can't name: the chat would run on a model the user never saw.
     if (modelSelection && !currentModel) {
       setSheetOpen(true);
       return false;
@@ -401,6 +403,27 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }
 
+  const header = (
+    <ChatHeader
+      placement={controls}
+      onOpenDrawer={() => {
+        Keyboard.dismiss();
+        openDrawer();
+      }}
+      onNewChat={handleNewChat}
+      title={(!isDraft && chat?.title) || "New chat"}
+      menuItems={menuItems}
+      temporaryLabel={temporary}
+      temporary={
+        isDraft && canTemporary
+          ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
+          : undefined
+      }
+    />
+  );
+  // Typing needs the room, and nothing in the row is for a message being written.
+  const controlsBelow = controls === "bottom" && !keyboardOpen;
+
   const shownError = banner ?? (turnError && !replyFailed ? turnError : null);
 
   function dismissError() {
@@ -423,7 +446,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           {empty && transcriptLoading && !isDraft ? (
             <TranscriptSkeleton />
           ) : empty ? (
-            <View className="flex-1" style={{ paddingTop: insets.top + HEADER_HEIGHT }}>
+            <View className="flex-1" style={{ paddingTop: topInset }}>
               <EmptyChat
                 connected={connected}
                 temporary={temporary}
@@ -434,6 +457,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             <Transcript
               chatId={chatId}
               listRef={list}
+              topInset={topInset}
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
@@ -441,31 +465,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             />
           )}
 
-          <ChatHeader
-            onOpenDrawer={() => {
-              Keyboard.dismiss();
-              openDrawer();
-            }}
-            onNewChat={handleNewChat}
-            title={modelSelection ? (currentLabel ?? "Choose model") : "OpenChat"}
-            onPressTitle={modelSelection ? () => setSheetOpen(true) : undefined}
-            titleStatus={
-              !modelSelection
-                ? undefined
-                : switchingModel
-                  ? "busy"
-                  : currentModel && !currentInfo && modelsLoading
-                    ? "placeholder"
-                    : undefined
-            }
-            menuItems={menuItems}
-            temporaryLabel={temporary}
-            temporary={
-              isDraft && canTemporary
-                ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
-                : undefined
-            }
-          />
+          {controls === "top" ? header : <StatusBarFade />}
 
           {/* The skeleton already says an uncached transcript is loading. */}
           {(transcriptLoading && !empty) || deleting ? (
@@ -480,8 +480,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         </View>
 
         <View
-          className="mb-2 px-3 pt-1"
-          style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}
+          className={cn("px-3 pt-1", controlsBelow ? "mb-0.5" : "mb-2")}
+          style={{
+            paddingBottom: keyboardOpen ? 8 : insets.bottom + (controlsBelow ? 2 : 8),
+          }}
         >
           {form ? (
             <FormCard
@@ -528,12 +530,22 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
             editing={editing ? { onCancel: cancelEdit } : undefined}
-            reasoning={
-              modelSelection && variants.length > 0
-                ? { label: variantLabel, onPress: () => setReasoningSheetOpen(true) }
+            model={
+              modelSelection
+                ? {
+                    label: currentLabel ?? "Choose model",
+                    level: variants.length > 0 ? variantLabel : undefined,
+                    status: switchingModel
+                      ? "busy"
+                      : currentModel && !currentInfo && modelsLoading
+                        ? "placeholder"
+                        : undefined,
+                    onPress: () => setSheetOpen(true),
+                  }
                 : undefined
             }
           />
+          {controlsBelow ? header : null}
         </View>
 
         {canAttach ? (
@@ -549,15 +561,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onClose={() => setSheetOpen(false)}
             selected={currentModel}
             onSelect={handleSelectModel}
-          />
-        ) : null}
-        {modelSelection && variants.length > 0 ? (
-          <ReasoningSheet
-            visible={reasoningSheetOpen}
-            onClose={() => setReasoningSheetOpen(false)}
             variants={variants}
-            selected={currentModel?.variant}
-            onSelect={handleSelectVariant}
+            onSelectVariant={handleSelectVariant}
           />
         ) : null}
       </SeededKeyboardAvoidingView>
