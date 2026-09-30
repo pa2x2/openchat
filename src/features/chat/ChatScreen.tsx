@@ -379,11 +379,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       testID: "menu-keep",
     });
   }
-  if (!isDraft && !temporary && capabilities?.renameChat) {
+  const rename =
+    !isDraft && !temporary && capabilities?.renameChat
+      ? () => promptRenameChat({ id: chatId, title: chat?.title ?? "" })
+      : undefined;
+  if (rename) {
     menuItems.push({
       label: "Rename",
       icon: "pencil-outline",
-      onPress: () => promptRenameChat({ id: chatId, title: chat?.title ?? "" }),
+      onPress: rename,
       testID: "menu-rename",
     });
   }
@@ -476,7 +480,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             />
           )}
 
-          {controls === "top" ? header : <ChatTitleBar title={title} temporaryLabel={temporary} />}
+          {controls === "top" ? (
+            header
+          ) : (
+            <ChatTitleBar title={title} temporaryLabel={temporary} onRename={rename} />
+          )}
 
           {/* The skeleton already says an uncached transcript is loading. */}
           {(transcriptLoading && !empty) || deleting ? (

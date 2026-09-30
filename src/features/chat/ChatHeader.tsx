@@ -203,17 +203,22 @@ const TITLE_BAR_FADE = 12;
 export function ChatTitleBar({
   title,
   temporaryLabel = false,
+  onRename,
 }: {
   /** Null until the chat has a name. */
   title: string | null;
   temporaryLabel?: boolean;
+  /** Present on a chat that can be renamed; a tap on the title calls it. */
+  onRename?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const solid = insets.top + TITLE_BAR_HEIGHT;
   return (
     <View
-      pointerEvents="none"
+      // Only the title takes a touch; a drag from anywhere else on the bar
+      // scrolls the transcript.
+      pointerEvents="box-none"
       className="absolute left-0 right-0 top-0 items-center justify-center px-4"
       style={{
         height: solid + TITLE_BAR_FADE,
@@ -222,7 +227,7 @@ export function ChatTitleBar({
         experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} ${Math.round((solid / (solid + TITLE_BAR_FADE)) * 100)}%, ${withAlpha(colors.background, 0)})`,
       }}
     >
-      <ChatTitle title={title} temporaryLabel={temporaryLabel} />
+      <ChatTitle title={title} temporaryLabel={temporaryLabel} onPress={onRename} />
     </View>
   );
 }
@@ -230,19 +235,26 @@ export function ChatTitleBar({
 function ChatTitle({
   title,
   temporaryLabel,
+  onPress,
   onLines,
 }: {
   title: string | null;
   temporaryLabel: boolean;
+  onPress?: () => void;
   onLines?: (lines: number) => void;
 }) {
   const shown = title ?? "New chat";
   return (
-    <View
-      accessible
+    <Pressable
+      accessibilityHint={onPress ? "Renames the chat" : undefined}
       accessibilityLabel={temporaryLabel ? `${shown}. Temporary chat` : shown}
-      accessibilityRole="header"
-      className="items-center"
+      accessibilityRole={onPress ? "button" : "header"}
+      className="items-center active:opacity-60"
+      hitSlop={10}
+      // Where a tap does nothing, a drag that starts on the title scrolls the
+      // transcript under it.
+      pointerEvents={onPress ? "auto" : "none"}
+      onPress={onPress}
       testID="chat-title"
     >
       <Text
@@ -262,6 +274,6 @@ function ChatTitle({
           <Text className="text-xs text-text-muted">Temporary chat</Text>
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
