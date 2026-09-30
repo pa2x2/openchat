@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AppState, FlatList, Keyboard, View } from "react-native";
+import { AppState, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
@@ -85,7 +85,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
   const connected = useConnectionStore((state) => state.profile !== null);
-  const list = useRef<FlatList<Message>>(null);
   const composer = useRef<ComposerHandle>(null);
   const keyboardOpen = useKeyboardOpen();
   // A screen that mounts under an open keyboard (the draft becoming a chat on
@@ -229,8 +228,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     busy.current = true;
     setBanner(null);
     setAttachments([]);
-    // Sending jumps to the newest message, wherever the transcript was.
-    list.current?.scrollToOffset({ offset: 0, animated: true });
     try {
       const provider = await getProvider();
       if (!provider) {
@@ -275,7 +272,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     // edit itself only resolves once its reply is done.
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
-    list.current?.scrollToOffset({ offset: 0, animated: true });
     try {
       const outcome = await editLastMessage(chatId, target.message.text, text);
       if (outcome.ok) return true;
@@ -457,8 +453,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           ) : (
             <Transcript
               chatId={chatId}
-              listRef={list}
               topInset={topInset}
+              staged={isDraft}
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}

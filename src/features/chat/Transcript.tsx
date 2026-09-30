@@ -3,9 +3,15 @@
  * latest" button. It owns the transcript subscription so that a streaming
  * reply, which changes the transcript on every frame, re-renders only this
  * list and not the header, composer and sheets around it.
+ *
+ * A turn that runs on this screen is pinned: its question sits at the top of
+ * the list and the reply grows into the space under it, so nothing moves
+ * while the reply is read. A reply that outgrows that space runs on below the
+ * fold instead of pushing its own first lines out of view. The turn stays
+ * laid out that way until the next one starts or the screen is left.
  */
 
-import { useCallback, useMemo, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
 import type { ChatId, Message, TurnActivity } from "@/src/domain";
@@ -18,8 +24,28 @@ import { MessageBubble } from "./MessageBubble";
 /** How far up the transcript the "jump to latest" button appears. */
 const SCROLL_BUTTON_OFFSET = 300;
 
+/**
+ * The same, while a reply is being written: what is below the fold is then
+ * still arriving, so the way to it is offered as soon as the list is off it.
+ */
+const LIVE_SCROLL_BUTTON_OFFSET = 48;
+
 /** Within this many px of the newest message, the list follows a streaming reply. */
 const FOLLOW_OFFSET = 8;
+
+/** Space the list keeps above the oldest message and below the newest. */
+const TOP_GAP = 4;
+const BOTTOM_GAP = 12;
+
+/**
+ * How close a pinned reply gets to filling the space under its question
+ * before the list is told to hold its place. The hold has to be in effect
+ * before the layout pass in which the reply outgrows the space, and a reply
+ * can grow by several lines in one pass. Capped at half the space: under an
+ * open keyboard there is little of it, and a reply that has barely started
+ * must not count as filling it.
+ */
+const HOLD_MARGIN = 240;
 
 // The list is inverted, so a reply growing at index 0 pushes everything above
 // it up while the offset stays put: at the bottom that follows the stream, but
@@ -29,11 +55,11 @@ const FOLLOW_OFFSET = 8;
 // makes the native side shift the offset by the growth in the same layout pass.
 const HOLD_POSITION = { minIndexForVisible: 1 };
 
+const ASKING: TurnActivity = { kind: "asking" };
+
 // Stands in for the reply while a turn is starting but has no reply of its own
 // yet: a rerun holds the chat while it re-reads the transcript and has the
 // server roll the old turn back.
-const ASKING: TurnActivity = { kind: "asking" };
-
 const PENDING_REPLY: Message = {
   id: "pending-reply",
   role: "assistant",
@@ -45,9 +71,13 @@ const PENDING_REPLY: Message = {
 
 export interface TranscriptProps {
   chatId: ChatId;
-  listRef: RefObject<FlatList<Message> | null>;
   /** What covers the top of the list: the status bar, and the chat controls when they float there. */
   topInset: number;
+  /**
+   * The transcript is a turn staged on a chat the server is still creating.
+   * No turn is live on it yet, and it is laid out as one that is.
+   */
+  staged?: boolean;
   showReasoning: boolean;
   onRegenerate: () => void;
   /** Present when the backend can edit a sent message. */
@@ -57,14 +87,15 @@ export interface TranscriptProps {
 
 export function Transcript({
   chatId,
-  listRef,
   topInset,
+  staged = false,
   showReasoning,
   onRegenerate,
   onEditMessage,
   editingId = null,
 }: TranscriptProps) {
   const { colors, floatingShadow } = useAppTheme();
+  const listRef = useRef<FlatList<Message>>(null);
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
   // An open form stalls the run, whatever the run was doing when it asked.
@@ -84,29 +115,104 @@ export function Transcript({
   const regenerableId = !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  const questionIndex = reversed.findIndex((message) => message.role === "user");
+  const questionId = reversed[questionIndex]?.id ?? null;
   // Editing reruns the last turn, so it is offered on the newest user message
   // only, and like a rerun only while no turn is live.
-  const editableId = turnActive
-    ? null
-    : (reversed.find((message) => message.role === "user")?.id ?? null);
+  const editableId = turnActive ? null : questionId;
   const replyPending =
     lastMessage?.role === "assistant" &&
     (lastMessage.status === "pending" || lastMessage.status === "streaming");
   const starting = turnActive && !replyPending;
 
+  const live = turnActive || staged;
+  const [wasLive, setWasLive] = useState(live);
+  // The newest turn is pinned by position, not by message id: the ids change
+  // when the server's copy of the transcript replaces the local one.
+  const [pinned, setPinned] = useState(live);
+  // The list keeps its place as the pinned reply outgrows the screen, until
+  // the user returns to the newest message.
+  const [held, setHeld] = useState(live);
+  const [settledQuestion, setSettledQuestion] = useState(live ? null : questionId);
+  const [turnStarts, setTurnStarts] = useState(0);
+  if (!live && settledQuestion !== questionId) setSettledQuestion(questionId);
+  if (live !== wasLive) {
+    setWasLive(live);
+    if (live) {
+      setPinned(true);
+      setHeld(true);
+      // A turn picked up again (a rerun, a run followed after a reconnect)
+      // leaves the list where the reader has it.
+      if (questionId !== settledQuestion) {
+        setTurnStarts(turnStarts + 1);
+        // The scroll to the newest message is reported a frame after it is
+        // asked for. A list still holding its old place until then would
+        // keep it against the space that opens under the question.
+        setFollowing(true);
+      }
+    }
+  }
+
+  // A new question starts at the newest message, wherever the transcript was.
+  useEffect(() => {
+    if (turnStarts > 0) listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [turnStarts]);
+
+  const dragged = useRef(false);
+  const wandered = useRef(false);
+  useEffect(() => {
+    if (!live) return;
+    dragged.current = false;
+    wandered.current = false;
+  }, [live]);
+
+  const [listHeight, setListHeight] = useState(0);
+  const [questionHeight, setQuestionHeight] = useState(0);
+  // What the reply is stretched to, so that the question above it lands at
+  // the top of the list. Zero until both are measured.
+  const slotHeight =
+    pinned && listHeight > 0 && questionHeight > 0
+      ? Math.max(0, listHeight - topInset - TOP_GAP - questionHeight - BOTTOM_GAP)
+      : 0;
+  const pinnedReplyId = pinned && questionIndex === 1 ? reversed[0].id : null;
+  const [reply, setReply] = useState<{ id: string; height: number } | null>(null);
+  const filling =
+    slotHeight > 0 &&
+    reply?.id === pinnedReplyId &&
+    reply.height > slotHeight - Math.min(HOLD_MARGIN, slotHeight / 2);
+  const hold = held && filling;
+
   const renderMessage = useCallback(
-    ({ item }: { item: Message }) => (
-      <MessageBubble
-        message={item}
-        showReasoning={showReasoning}
-        activity={item.id === liveId ? activity : null}
-        onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
-        onEdit={item.id === editableId ? onEditMessage : undefined}
-        dimmed={item.id === editingId}
-        // The store keeps the reason for the latest turn only.
-        error={item.id === lastMessage?.id ? turnError : null}
-      />
-    ),
+    ({ item, index }: { item: Message; index: number }) => {
+      const isQuestion = pinned && index === questionIndex;
+      const isReply = item.id === pinnedReplyId;
+      return (
+        // Every cell is wrapped alike, so one that stops being the pinned
+        // turn keeps its state instead of remounting.
+        <View style={isReply ? { minHeight: slotHeight } : undefined}>
+          <View
+            onLayout={
+              isQuestion
+                ? (event) => setQuestionHeight(event.nativeEvent.layout.height)
+                : isReply
+                  ? (event) => setReply({ id: item.id, height: event.nativeEvent.layout.height })
+                  : undefined
+            }
+          >
+            <MessageBubble
+              message={item}
+              showReasoning={showReasoning}
+              activity={item.id === liveId ? activity : null}
+              onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
+              onEdit={item.id === editableId ? onEditMessage : undefined}
+              dimmed={item.id === editingId}
+              // The store keeps the reason for the latest turn only.
+              error={item.id === lastMessage?.id ? turnError : null}
+            />
+          </View>
+        </View>
+      );
+    },
     [
       showReasoning,
       liveId,
@@ -118,16 +224,28 @@ export function Transcript({
       editingId,
       lastMessage?.id,
       turnError,
+      pinned,
+      questionIndex,
+      pinnedReplyId,
+      slotHeight,
     ],
   );
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     // The list is inverted: offset 0 is the newest message.
     const offset = event.nativeEvent.contentOffset.y;
-    const away = offset > SCROLL_BUTTON_OFFSET;
+    const away = offset > (live ? LIVE_SCROLL_BUTTON_OFFSET : SCROLL_BUTTON_OFFSET);
     if (away !== showScrollButton) setShowScrollButton(away);
     const atLatest = offset <= FOLLOW_OFFSET;
     if (atLatest !== following) setFollowing(atLatest);
+    // Only a return the user made counts: the hold itself moves the list off
+    // the newest message, and a new question scrolls it back there.
+    if (!atLatest) {
+      if (dragged.current) wandered.current = true;
+    } else if (wandered.current) {
+      wandered.current = false;
+      if (held) setHeld(false);
+    }
   }
 
   return (
@@ -139,11 +257,15 @@ export function Transcript({
         keyExtractor={(message) => message.id}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={following ? undefined : HOLD_POSITION}
+        maintainVisibleContentPosition={following && !hold ? undefined : HOLD_POSITION}
         // On by default on Android, where it detaches off-screen cells and the
         // anchor with them, so a reply taller than the screen drags the view.
         removeClippedSubviews={false}
+        onLayout={(event) => setListHeight(event.nativeEvent.layout.height)}
         onScroll={handleScroll}
+        onScrollBeginDrag={() => {
+          dragged.current = true;
+        }}
         // Frequent enough that a drag away from the bottom stops following
         // before the stream moves the content under it.
         scrollEventThrottle={16}
@@ -151,13 +273,16 @@ export function Transcript({
         // at the top.
         ListHeaderComponent={
           <>
-            {starting ? (
-              <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
-            ) : null}
-            <View className="h-3" />
+            {/* Until the pinned question has a reply of its own, this holds the reply's space. */}
+            <View style={pinned && questionIndex === 0 ? { minHeight: slotHeight } : undefined}>
+              {starting ? (
+                <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
+              ) : null}
+            </View>
+            <View style={{ height: BOTTOM_GAP }} />
           </>
         }
-        ListFooterComponent={<View style={{ height: topInset + 4 }} />}
+        ListFooterComponent={<View style={{ height: topInset + TOP_GAP }} />}
         renderItem={renderMessage}
       />
 
@@ -175,7 +300,10 @@ export function Transcript({
           accessibilityRole="button"
           className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full bg-elevated"
           style={{ boxShadow: floatingShadow }}
-          onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+          onPress={() => {
+            setHeld(false);
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }}
           testID="scroll-to-latest"
         >
           <Icon name="arrow-down" size={18} />
