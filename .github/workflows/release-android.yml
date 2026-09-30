@@ -149,6 +149,10 @@ jobs:
           key: android
           evict-old-files: job
 
+      # For the reason given in build.yml.
+      - name: Identify the compiler to ccache by its version
+        run: ccache --set-config "compiler_check=%compiler% --version"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

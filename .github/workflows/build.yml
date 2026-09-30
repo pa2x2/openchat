@@ -57,6 +57,12 @@ jobs:
           key: android
           evict-old-files: job
 
+      # Gradle downloads the NDK on every run, which gives the compiler a new mtime each time, and
+      # mtime is what ccache tells compilers apart by unless told otherwise. Left at that, no
+      # run ever hits what an earlier one cached.
+      - name: Identify the compiler to ccache by its version
+        run: ccache --set-config "compiler_check=%compiler% --version"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
