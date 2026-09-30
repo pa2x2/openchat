@@ -196,6 +196,8 @@ export type TurnActivity =
   | { kind: "thinking" }
   /** `name` is the backend's own tool name, shown for the "other" category. */
   | { kind: "tool"; category: ToolCategory; name: string }
+  /** The run is stalled on a form the user has not settled yet. */
+  | { kind: "asking" }
   | { kind: "retrying"; attempt: number }
   | { kind: "compacting" };
 

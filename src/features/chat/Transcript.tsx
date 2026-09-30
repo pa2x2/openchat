@@ -9,7 +9,7 @@ import { useCallback, useMemo, useState, type RefObject } from "react";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ChatId, Message } from "@/src/domain";
+import type { ChatId, Message, TurnActivity } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
@@ -34,6 +34,8 @@ const HOLD_POSITION = { minIndexForVisible: 1 };
 // Stands in for the reply while a turn is starting but has no reply of its own
 // yet: a rerun holds the chat while it re-reads the transcript and has the
 // server roll the old turn back.
+const ASKING: TurnActivity = { kind: "asking" };
+
 const PENDING_REPLY: Message = {
   id: "pending-reply",
   role: "assistant",
@@ -65,7 +67,10 @@ export function Transcript({
   const { colors, floatingShadow } = useAppTheme();
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
   const turnActive = useMessagesStore((state) => state.activeTurns[chatId] ?? false);
-  const activity = useMessagesStore((state) => state.activity[chatId] ?? null);
+  // An open form stalls the run, whatever the run was doing when it asked.
+  const activity = useMessagesStore((state) =>
+    state.forms[chatId]?.length ? ASKING : (state.activity[chatId] ?? null),
+  );
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [following, setFollowing] = useState(true);

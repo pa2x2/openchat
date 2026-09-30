@@ -229,6 +229,8 @@ function activityRow(activity: TurnActivity): { icon: IconName; label: string } 
               ? `Using ${activity.name}`
               : "Using a tool",
       };
+    case "asking":
+      return { icon: "comment-question-outline", label: "Waiting for your answer" };
     case "retrying":
       return {
         icon: "refresh",
