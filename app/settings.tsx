@@ -8,6 +8,7 @@ import {
   useSettingsStore,
   type Appearance,
   type ColorSource,
+  type ChatControls,
   type ChatMode,
   type UpdateChannel,
 } from "@/src/stores/settings";
@@ -33,6 +34,11 @@ const COLOR_SOURCES: { value: ColorSource; label: string }[] = [
 const CHAT_MODES: { value: ChatMode; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "temporary", label: "Temporary" },
+];
+
+const CHAT_CONTROLS: { value: ChatControls; label: string }[] = [
+  { value: "bottom", label: "Bottom" },
+  { value: "top", label: "Top" },
 ];
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
@@ -161,6 +167,8 @@ export default function SettingsScreen() {
   const setColorSource = useSettingsStore((state) => state.setColorSource);
   const defaultChatMode = useSettingsStore((state) => state.defaultChatMode);
   const setDefaultChatMode = useSettingsStore((state) => state.setDefaultChatMode);
+  const chatControls = useSettingsStore((state) => state.chatControls);
+  const setChatControls = useSettingsStore((state) => state.setChatControls);
 
   return (
     <View className="flex-1 bg-background">
@@ -199,6 +207,14 @@ export default function SettingsScreen() {
           value={defaultChatMode}
           onChange={setDefaultChatMode}
           testIDPrefix="default-chat-mode"
+        />
+
+        <GroupLabel>Chat controls</GroupLabel>
+        <Segmented
+          options={CHAT_CONTROLS}
+          value={chatControls}
+          onChange={setChatControls}
+          testIDPrefix="chat-controls"
         />
 
         <GroupLabel>Interaction</GroupLabel>

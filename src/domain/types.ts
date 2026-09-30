@@ -65,12 +65,62 @@ export interface UserMessage {
   attachments?: Attachment[];
 }
 
+/**
+ * Tokens as a backend counted them, each in one bucket only: input read from
+ * a cache is not also in `input`, and reasoning is not also in `output`. An
+ * adapter whose backend counts them inclusively subtracts.
+ */
 export interface TokenUsage {
   input?: number;
   output?: number;
   reasoning?: number;
   cacheRead?: number;
   cacheWrite?: number;
+}
+
+export interface Money {
+  amount: number;
+  /** ISO 4217 code, e.g. "USD". */
+  currency: string;
+}
+
+/**
+ * The span a usage report covers, in epoch milliseconds: `from` is in it and
+ * `to` is not. Without `from` it starts at the backend's first record, and
+ * without `to` it ends now.
+ */
+export interface UsageQuery {
+  from?: number;
+  to?: number;
+  /** Also fill `UsageReport.days`. A backend may pay for every day, so ask only for a span worth charting. */
+  daily?: boolean;
+}
+
+export interface UsageTotals {
+  /** Round-trips to a model. */
+  requests?: number;
+  usage?: TokenUsage;
+  /** Unset when nothing counted had a price. */
+  cost?: Money;
+}
+
+/**
+ * What a span of time used, as the backend counts it. A backend may count
+ * only the chats it still has, so a deleted chat can be missing from it.
+ */
+export interface UsageReport extends UsageTotals {
+  /** When the first use in the span happened; unset when the backend doesn't say. */
+  from?: number;
+  chats?: number;
+  /** Messages the user sent. */
+  prompts?: number;
+  /** One entry per model and variant, in no particular order. */
+  models: (UsageTotals & { model: ModelRef })[];
+  /**
+   * The days with use, oldest first. A day is a calendar day where the device
+   * is, written "2026-09-30". Empty unless the query asked for days.
+   */
+  days: (UsageTotals & { date: string })[];
 }
 
 export type FormValue = string | number | boolean | string[];
@@ -144,6 +194,21 @@ export interface ChatForm {
   id: string;
   title: string;
   fields: FormField[];
+  /**
+   * The tool call that raised the form, when the backend keeps the answers
+   * with that call. Unset when the transcript will hold no trace of them.
+   */
+  toolId?: string;
+}
+
+/** What a form asked and what came back, as the reply that asked it shows it. */
+export interface FormResult {
+  /** The tool call that asked, or the form itself when there was none. */
+  id: string;
+  status: "waiting" | "answered" | "dismissed";
+  questions: string[];
+  /** One list per question, in order; empty for a question left unanswered. */
+  answers: string[][];
 }
 
 export type ToolCategory =
@@ -169,7 +234,8 @@ export interface ToolCall {
 export type ReplyPart =
   | { type: "text"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "tool"; tool: ToolCall };
+  | { type: "tool"; tool: ToolCall }
+  | { type: "form"; form: FormResult };
 
 /**
  * What a running reply is doing when it isn't writing text. Tool calls and
@@ -180,6 +246,8 @@ export type TurnActivity =
   | { kind: "thinking" }
   /** `name` is the backend's own tool name, shown for the "other" category. */
   | { kind: "tool"; category: ToolCategory; name: string }
+  /** The run is stalled on a form the user has not settled yet. */
+  | { kind: "asking" }
   | { kind: "retrying"; attempt: number }
   | { kind: "compacting" };
 
@@ -195,7 +263,22 @@ export type StreamEvent =
   | { type: "activity"; activity: TurnActivity | null }
   /** Starts or updates the tool call `id`; fields left out keep their value. */
   | { type: "tool"; id: string; update: Partial<Omit<ToolCall, "id">> }
-  | { type: "message-complete"; usage?: TokenUsage }
+  /** Starts or updates the form result `id`; fields left out keep their value. */
+  | { type: "form-result"; id: string; update: Partial<Omit<FormResult, "id">> }
+  /**
+   * One round-trip to the model is over; a reply that uses tools makes
+   * several. The figures are that round-trip's alone, and the app adds them
+   * up. Its `usage` is also how many tokens the model's context now holds.
+   */
+  | {
+      type: "message-complete";
+      usage?: TokenUsage;
+      cost?: Money;
+      generationMs?: number;
+      model?: ModelRef;
+    }
+  /** The chat's totals so far, replacing the ones known before. */
+  | { type: "chat-usage"; usage?: TokenUsage; cost?: Money }
   | { type: "chat-idle" }
   /**
    * The subscription is live: nothing from here on is missed. Whatever
@@ -220,7 +303,21 @@ export interface Message {
   parts?: ReplyPart[];
   attachments?: Attachment[];
   status: MessageStatus;
+  /** What a reply used, over all of its round-trips to the model. */
   usage?: TokenUsage;
+  /** How many round-trips `usage` counts. */
+  requests?: number;
+  /** Unset when the backend doesn't know the price, which is not the same as free. */
+  cost?: Money;
+  contextTokens?: number;
+  /**
+   * Milliseconds the model spent on a reply, without the time its tools ran
+   * or a form waited. Unset unless it is known for every round-trip `usage`
+   * counts, so that the two give a speed.
+   */
+  generationMs?: number;
+  /** The model that wrote a reply; a chat can change models between replies. */
+  model?: ModelRef;
   createdAt: number;
   /** When a reply stopped running; unset while it runs or when the backend didn't say. */
   completedAt?: number;
@@ -233,6 +330,13 @@ export interface ChatSummary {
   title: string;
   updatedAt: number;
   model?: ModelRef;
+  /**
+   * Everything the chat has used, as the backend counts it. That can be more
+   * than its replies add up to: a backend may also count work that left no
+   * reply behind, such as naming the chat or a reply that was regenerated.
+   */
+  usage?: TokenUsage;
+  cost?: Money;
 }
 
 /**
@@ -249,4 +353,5 @@ export interface Capabilities {
   modelSelection: boolean;
   deleteChat: boolean;
   renameChat: boolean;
+  usageReport: boolean;
 }

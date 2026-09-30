@@ -123,6 +123,10 @@ export default function MainLayout() {
     setOpen(false);
     router.push("/settings");
   }, [router]);
+  const openUsage = useCallback(() => {
+    setOpen(false);
+    router.push("/usage");
+  }, [router]);
 
   return (
     <DrawerContext.Provider value={controls}>
@@ -143,6 +147,7 @@ export default function MainLayout() {
             onSelectChat={goToChat}
             onNewChat={startNewChat}
             onOpenSettings={openSettings}
+            onOpenUsage={openUsage}
             onDeletedActive={startNewChat}
           />
         )}

@@ -13,6 +13,8 @@ import type {
   ModelInfo,
   ModelRef,
   StreamEvent,
+  UsageQuery,
+  UsageReport,
   UserMessage,
 } from "@/src/domain";
 import type { ChatProvider, ConnectionConfig, ConnectionInfo } from "@/src/providers/types";
@@ -28,6 +30,7 @@ import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
 import { createChat, deleteChat, isRunning, listChats, renameChat, switchModel } from "./sessions";
+import { usageReport } from "./stats";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
@@ -39,6 +42,7 @@ export const openCodeCapabilities: Capabilities = {
   modelSelection: true,
   deleteChat: true,
   renameChat: true,
+  usageReport: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -140,5 +144,9 @@ export class OpenCodeProvider implements ChatProvider {
 
   fetchMessages(chatId: ChatId): Promise<Message[]> {
     return fetchMessages(this.client(), chatId);
+  }
+
+  usageReport(query: UsageQuery): Promise<UsageReport> {
+    return usageReport(this.client(), query);
   }
 }

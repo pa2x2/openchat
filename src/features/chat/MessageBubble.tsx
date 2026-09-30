@@ -4,13 +4,17 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { Message, TurnActivity } from "@/src/domain";
+import { totalTokens, type Message, type TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
+import { FormResultCard } from "./FormResultCard";
+import { ReplyDetails } from "./ReplyDetails";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
+import { formatCost, formatTokensShort } from "./usageFormat";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
+import { Button } from "@/src/ui/Button";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
 import { Menu, type MenuItem } from "@/src/ui/Menu";
@@ -50,6 +54,16 @@ function CopyButton({ text, label, testID }: { text: string; label: string; test
       <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
     </Pressable>
   );
+}
+
+/** What a running reply has used so far; it moves when a step ends, not as text arrives. */
+function runningCount(message: Message): string | null {
+  if (!message.usage) return null;
+  const cost = formatCost(message.cost);
+  return [`${formatTokensShort(totalTokens(message.usage))} tokens`, cost]
+    .filter(Boolean)
+    .join(" · ")
+    .concat(" so far");
 }
 
 function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => void }) {
@@ -95,22 +109,10 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        <View className="h-14 flex-row items-center gap-2 px-2">
-          <Pressable
-            accessibilityLabel="Close"
-            accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-            onPress={onClose}
-            testID="select-text-close"
-          >
-            <Icon name="close" size={22} />
-          </Pressable>
+        <View className="h-14 justify-center px-5">
           <Text className="text-lg font-medium text-text">Select text</Text>
         </View>
-        <ScrollView
-          contentContainerClassName="px-5 pt-2"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        >
+        <ScrollView contentContainerClassName="px-5 pb-6 pt-2">
           <Text
             selectable
             selectionColor={withAlpha(colors.primary, 0.35)}
@@ -120,6 +122,9 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
             {text}
           </Text>
         </ScrollView>
+        <View className="px-4 pt-2" style={{ paddingBottom: insets.bottom + 12 }}>
+          <Button label="Done" variant="secondary" onPress={onClose} testID="select-text-close" />
+        </View>
       </View>
     </Modal>
   );
@@ -201,6 +206,7 @@ export const MessageBubble = memo(function MessageBubble({
   const isUser = message.role === "user";
   const hasText = message.text.length > 0;
   const [foldOpen, setFoldOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const layout = useMemo(
     () => (isUser ? null : layoutReply(message, { showReasoning, activity })),
     [isUser, message, showReasoning, activity],
@@ -224,10 +230,16 @@ export const MessageBubble = memo(function MessageBubble({
 
   const status = statusFor(message);
   const failed = message.status === "error";
+  const hasDetails = message.usage !== undefined;
+  // Retry sits in the error card, so a failed reply offers no regenerate here.
+  const canRegenerate = Boolean(onRegenerate) && !failed;
+  const running = streaming ? runningCount(message) : null;
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (
       <WorkRow key={block.key} block={block} />
+    ) : block.type === "form" ? (
+      <FormResultCard key={block.key} form={block.form} />
     ) : (
       <View key={block.key} className="my-0.5">
         <MarkdownContent
@@ -274,20 +286,19 @@ export const MessageBubble = memo(function MessageBubble({
       {failed ? <ReplyError error={error} onRetry={onRegenerate} /> : null}
       {streaming ? (
         // Holds the action row's place so the reply doesn't jump when it ends.
-        <View className="mt-1 h-9" />
-      ) : failed ? (
-        // Retry sits in the error card.
-        layout.answer ? (
-          <View className="-ml-2 mt-1 flex-row">
-            <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
-          </View>
-        ) : null
-      ) : layout.answer || onRegenerate ? (
+        <View className="mt-1 h-9 justify-center">
+          {running ? (
+            <Text className="text-[13px] text-text-muted" testID="reply-running-count">
+              {running}
+            </Text>
+          ) : null}
+        </View>
+      ) : layout.answer || canRegenerate || hasDetails ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
             <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
           ) : null}
-          {onRegenerate ? (
+          {canRegenerate ? (
             <Pressable
               accessibilityHint="Runs this reply again and replaces it"
               accessibilityLabel="Regenerate reply"
@@ -299,8 +310,31 @@ export const MessageBubble = memo(function MessageBubble({
               <Icon name="refresh" size={19} tone="textMuted" />
             </Pressable>
           ) : null}
+          {hasDetails ? (
+            <Pressable
+              accessibilityHint={
+                detailsOpen ? "Hides what the reply used" : "Shows what the reply used"
+              }
+              accessibilityLabel="Reply details"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: detailsOpen }}
+              className={cn(
+                "h-9 w-9 items-center justify-center rounded-full active:bg-surface",
+                detailsOpen && "bg-surface",
+              )}
+              onPress={() => setDetailsOpen((current) => !current)}
+              testID="reply-details-button"
+            >
+              <Icon
+                name="information-outline"
+                size={19}
+                tone={detailsOpen ? "text" : "textMuted"}
+              />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
+      {detailsOpen && hasDetails && !streaming ? <ReplyDetails message={message} /> : null}
     </Bubble>
   );
 });

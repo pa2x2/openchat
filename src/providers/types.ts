@@ -17,6 +17,8 @@ import type {
   ModelRef,
   ProviderId,
   StreamEvent,
+  UsageQuery,
+  UsageReport,
   UserMessage,
 } from "@/src/domain";
 
@@ -134,6 +136,9 @@ export interface ChatProvider {
    * is for `isRunning` to say.
    */
   fetchMessages(chatId: ChatId): Promise<Message[]>;
+
+  /** Only present when `capabilities.usageReport` is true. */
+  usageReport?(query: UsageQuery): Promise<UsageReport>;
 }
 
 export interface ConfigField {

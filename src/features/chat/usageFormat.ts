@@ -1,0 +1,83 @@
+/**
+ * How the statistics are written. A figure the backend did not send has no
+ * text here: the functions return null or leave the row out, and the UI shows
+ * nothing in its place.
+ */
+
+import type { Money, TokenUsage } from "@/src/domain";
+import { formatDuration } from "./replyLayout";
+
+function grouped(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+export function formatTokens(count: number): string {
+  return grouped(String(Math.round(count)));
+}
+
+/**
+ * Tokens where room is tight: `842`, `48.6k`, `128k`, `1.42M`. Each range is
+ * picked from the rounded figure, so a count just under a boundary moves up
+ * to the next unit instead of printing `100.0k` or `1000k`.
+ */
+export function formatTokensShort(count: number): string {
+  if (count < 1_000) return String(Math.round(count));
+  const tenths = Math.round(count / 100);
+  if (tenths < 1_000) return `${(tenths / 10).toFixed(1)}k`;
+  const thousands = Math.round(count / 1_000);
+  if (thousands < 1_000) return `${thousands}k`;
+  return `${(count / 1_000_000).toFixed(2)}M`;
+}
+
+/**
+ * From one unit up, two decimals. Below, the first two digits that are not
+ * zero, since two decimals would print nearly every reply as 0.00. Null for
+ * an amount that is not above zero: a cost is never shown as nothing.
+ */
+export function formatCost(cost: Money | undefined): string | null {
+  if (!cost || !(cost.amount > 0)) return null;
+  const { amount, currency } = cost;
+  const decimals = amount >= 1 ? 2 : Math.max(2, Math.ceil(-Math.log10(amount)) + 1);
+  // Rounding can leave a zero past the second decimal: 0.0996 is "0.100" at three.
+  const fixed = amount.toFixed(decimals).replace(/(\.\d\d\d*?)0+$/, "$1");
+  const [whole, fraction] = fixed.split(".");
+  const text = `${grouped(whole)}.${fraction}`;
+  return currency === "USD" ? `$${text}` : `${text} ${currency}`;
+}
+
+/** One decimal under a minute, where "Worked for" rounds to whole seconds. */
+export function formatModelTime(ms: number): string {
+  return ms < 59_950 ? `${(ms / 1_000).toFixed(1)}s` : formatDuration(ms);
+}
+
+export interface Figure {
+  label: string;
+  value: string;
+}
+
+/**
+ * Tokens by kind. Input written to the provider's cache was new input on
+ * this reply, so it counts as input. A kind with no tokens has no row.
+ */
+export function tokenFigures(usage: TokenUsage | undefined): Figure[] {
+  if (!usage) return [];
+  const counts: [string, number][] = [
+    ["Input", (usage.input ?? 0) + (usage.cacheWrite ?? 0)],
+    ["Cached input", usage.cacheRead ?? 0],
+    ["Output", usage.output ?? 0],
+    ["Reasoning", usage.reasoning ?? 0],
+  ];
+  return counts
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, value: formatTokens(count) }));
+}
+
+/** How full the context is, as a share of the window: 0 to 1. */
+export function contextShare(tokens: number, window: number): number {
+  return Math.min(1, Math.max(0, tokens / window));
+}
+
+export function formatShare(share: number): string {
+  const percent = Math.round(share * 100);
+  return percent === 0 && share > 0 ? "<1%" : `${percent}%`;
+}

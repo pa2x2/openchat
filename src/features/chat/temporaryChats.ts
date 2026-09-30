@@ -6,6 +6,7 @@
  */
 
 import type { ChatId } from "@/src/domain";
+import { deleteChatKeepingUsage } from "@/src/features/usage/deleteChat";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
@@ -18,7 +19,7 @@ export async function discardTemporaryChat(id: ChatId): Promise<void> {
   try {
     const provider = await getProvider();
     if (!provider) return;
-    await provider.deleteChat(id);
+    await deleteChatKeepingUsage(provider, id);
   } catch {
     return;
   }

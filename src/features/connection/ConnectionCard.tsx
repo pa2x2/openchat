@@ -26,6 +26,7 @@ import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { useModelsStore } from "@/src/stores/models";
+import { useUsageStore } from "@/src/stores/usage";
 
 export function ConnectionCard() {
   // Only one backend ships, so an unconnected app offers the first one
@@ -117,7 +118,7 @@ export function ConnectionCard() {
 
   function handleForget() {
     if (!profile) return;
-    const { providerId } = profile;
+    const { providerId, baseUrl } = profile;
     showDialog({
       title: "Forget this server?",
       message: "The app forgets its address and password. Your chats stay on the server.",
@@ -131,6 +132,7 @@ export function ConnectionCard() {
             useConnectionStore.getState().forget();
             useChatsStore.getState().clear();
             useModelsStore.getState().clear();
+            useUsageStore.getState().forgetServer(baseUrl);
             const messages = useMessagesStore.getState();
             for (const chatId of Object.keys(messages.byChat)) messages.removeChat(chatId);
             setValues({ baseUrl: "" });

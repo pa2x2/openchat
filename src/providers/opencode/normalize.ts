@@ -14,9 +14,9 @@ import type {
   FormOption,
   FormValue,
   StreamEvent,
-  TokenUsage,
   ToolCategory,
 } from "@/src/domain";
+import { toCost, toTokenUsage, type WireTokens } from "./usage";
 
 /** Structural subset of the client's form field union. */
 interface WireField {
@@ -45,6 +45,7 @@ interface WireField {
 export interface WireForm {
   id: string;
   title: string;
+  metadata?: Record<string, unknown>;
   fields: readonly WireField[];
 }
 
@@ -106,7 +107,52 @@ function toFormField(field: WireField): FormField {
 }
 
 export function toChatForm(form: WireForm): ChatForm {
-  return { id: form.id, title: form.title, fields: form.fields.map(toFormField) };
+  // The question tool names its own call; its result then carries the answers.
+  const tool = form.metadata?.kind === "question" ? form.metadata.tool : undefined;
+  const toolId = (tool as { id?: unknown } | undefined)?.id;
+  return {
+    id: form.id,
+    title: form.title,
+    fields: form.fields.map(toFormField),
+    ...(typeof toolId === "string" ? { toolId } : {}),
+  };
+}
+
+export const QUESTION_TOOL = "question";
+
+/**
+ * The questions in a `question` call's input, or null for any other input.
+ * Live events after the first don't name their tool, so the input's shape is
+ * what tells a question call apart.
+ */
+export function askedQuestions(input: unknown): string[] | null {
+  const questions = (input as { questions?: unknown } | null)?.questions;
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const texts: string[] = [];
+  for (const entry of questions as { question?: unknown; options?: unknown }[]) {
+    if (typeof entry?.question !== "string" || !Array.isArray(entry.options)) return null;
+    texts.push(entry.question);
+  }
+  return texts;
+}
+
+/** The answers in a `question` call's result metadata: one list per question. */
+export function givenAnswers(metadata: unknown): string[][] | null {
+  const answers = (metadata as { answers?: unknown } | null | undefined)?.answers;
+  if (!Array.isArray(answers)) return null;
+  const valid = answers.every(
+    (answer) => Array.isArray(answer) && answer.every((item) => typeof item === "string"),
+  );
+  return valid ? (answers as string[][]) : null;
+}
+
+// How the question tool fails when its form is dismissed, by the user or by
+// the server dropping it. Any other failure of the call is a real one.
+const DISMISSED = "The user dismissed this question";
+
+export function isDismissal(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return typeof message === "string" && message.includes(DISMISSED);
 }
 
 // OpenCode's built-in tools. Anything else (MCP, plugins) is "other".
@@ -147,16 +193,17 @@ const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" }
 /** Structural subset of the client's V2Event union the normalizer consumes. */
 export interface V2EventShape {
   type: string;
+  /** When the server emitted it, in epoch milliseconds. */
+  created?: number;
   data: {
     sessionID?: string;
     assistantMessageID?: string;
     delta?: string;
-    tokens?: {
-      input: number;
-      output: number;
-      reasoning: number;
-      cache: { read: number; write: number };
-    };
+    tokens?: WireTokens;
+    cost?: number;
+    model?: { providerID: string; id: string; variant?: string };
+    /** On a step's start: when the step began, which is before its event went out. */
+    started?: number;
     error?: {
       name?: string;
       type?: string;
@@ -222,10 +269,19 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       const id = event.data.id;
       if (typeof id !== "string") return null;
       if (event.type === "session.tool.called") {
+        const questions = askedQuestions(event.data.input);
+        if (questions) return { type: "form-result", id, update: { status: "waiting", questions } };
         return { type: "tool", id, update: { subject: toolSubject(event.data.input) } };
       }
-      const status = event.type === "session.tool.success" ? "done" : "failed";
-      return { type: "tool", id, update: { status } };
+      if (event.type === "session.tool.success") {
+        const answers = givenAnswers(event.data.metadata);
+        if (answers) return { type: "form-result", id, update: { status: "answered", answers } };
+        return { type: "tool", id, update: { status: "done" } };
+      }
+      if (isDismissal(event.data.error)) {
+        return { type: "form-result", id, update: { status: "dismissed" } };
+      }
+      return { type: "tool", id, update: { status: "failed" } };
     }
     case "session.retry.scheduled": {
       const attempt = event.data.attempt;
@@ -236,19 +292,19 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     }
     case "session.compaction.started":
       return { type: "activity", activity: { kind: "compacting" } };
-    case "session.step.ended": {
-      const tokens = event.data.tokens;
-      const usage: TokenUsage | undefined = tokens
-        ? {
-            input: tokens.input,
-            output: tokens.output,
-            reasoning: tokens.reasoning,
-            cacheRead: tokens.cache?.read,
-            cacheWrite: tokens.cache?.write,
-          }
-        : undefined;
-      return { type: "message-complete", usage };
-    }
+    case "session.step.ended":
+      return {
+        type: "message-complete",
+        usage: toTokenUsage(event.data.tokens),
+        cost: toCost(event.data.cost),
+      };
+    // Sent after every step, and once the chat is named: naming runs a model too.
+    case "session.usage.updated":
+      return {
+        type: "chat-usage",
+        usage: toTokenUsage(event.data.tokens),
+        cost: toCost(event.data.cost),
+      };
     // One chat turn finished. The v2 server reports whole prompt runs via
     // `session.execution.*`; `session.idle` appears in newer builds.
     case "session.idle":
@@ -270,6 +326,10 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     // execution failure. Surfacing it directly means the reason reaches the
     // user even if the execution-level event never arrives.
     case "session.step.failed":
+      // An aborted step is the run being stopped, not failing: by an
+      // interrupt, or by the user dismissing a question. The execution event
+      // that follows ends the turn.
+      if (event.data.error?.type === "aborted") return null;
       return {
         type: "error",
         message: errorMessage(event.data.error, "The reply step failed."),

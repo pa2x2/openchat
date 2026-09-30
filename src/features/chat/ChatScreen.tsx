@@ -1,18 +1,19 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AppState, FlatList, Keyboard, View } from "react-native";
+import { AppState, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
-import { ModelSheet } from "./ModelSheet";
-import { AUTO_LABEL, ReasoningSheet } from "./ReasoningSheet";
+import { AUTO_LABEL, ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, HEADER_HEIGHT } from "./ChatHeader";
+import { ChatHeader, ChatTitleBar, HEADER_HEIGHT, TITLE_BAR_HEIGHT } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
+import { RecentChats } from "./RecentChats";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
+import { UsageSheet } from "./UsageSheet";
 import { discardTemporaryChat } from "./temporaryChats";
 import { conversationMarkdown } from "./conversationText";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
@@ -37,7 +38,14 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
-import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
+import { cn } from "@/src/lib/cn";
+import {
+  UNTITLED_CHAT,
+  type Attachment,
+  type Message,
+  type ModelInfo,
+  type ModelRef,
+} from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
@@ -70,8 +78,9 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
 }
 
 /**
- * Conversation screen: the transcript under a floating header, with the
- * composer pinned to the bottom.
+ * Conversation screen: the transcript, with the composer pinned to the
+ * bottom. The chat controls float over the top of the transcript or sit in a
+ * row under the composer, as the user set.
  *
  * A chat is created on the server only when its first message is sent
  * (the `new` route); from then on the transcript reconciles from the
@@ -83,7 +92,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
   const connected = useConnectionStore((state) => state.profile !== null);
-  const list = useRef<FlatList<Message>>(null);
   const composer = useRef<ComposerHandle>(null);
   const keyboardOpen = useKeyboardOpen();
   // A screen that mounts under an open keyboard (the draft becoming a chat on
@@ -109,8 +117,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
 
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [reasoningSheetOpen, setReasoningSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  const [usageSheetOpen, setUsageSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
@@ -130,6 +138,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const modelSelection = capabilities?.modelSelection === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
+  const controls = useSettingsStore((state) => state.chatControls);
+  const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : TITLE_BAR_HEIGHT);
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
   // The default mode can turn the toggle on for a server that cannot delete.
   const draftTemporary = (temporaryToggle ?? defaultTemporary) && canTemporary;
@@ -144,6 +154,28 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   );
   const currentLabel = currentInfo?.label ?? null;
   const modelsLoading = useModelsStore((state) => state.loading);
+  // The newest reply that says how full the context is. One that failed
+  // before its first step says nothing, and must not take the meter away.
+  // Read as two plain values: the reply itself changes on every streamed frame.
+  const contextTokens = useMessagesStore(
+    (state) =>
+      state.byChat[chatId]?.findLast((message) => message.contextTokens !== undefined)
+        ?.contextTokens,
+  );
+  const contextModel = useMessagesStore(
+    (state) =>
+      state.byChat[chatId]?.findLast((message) => message.contextTokens !== undefined)?.model,
+  );
+  // The next message runs on the chat's model, so its window is the one that
+  // counts; a chat without one is measured against the model that replied.
+  const windowModel = chat?.model ?? contextModel;
+  const contextWindow = useModelsStore((state) =>
+    windowModel
+      ? state.models.find((model) => sameModelRef(model.ref, windowModel))?.contextWindow
+      : undefined,
+  );
+  const context =
+    contextTokens !== undefined ? { tokens: contextTokens, window: contextWindow } : null;
   const variants = currentInfo?.variants ?? [];
   const variantLabel = currentModel?.variant
     ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
@@ -204,6 +236,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (isDraft) useMessagesStore.getState().removeChat(NEW_CHAT);
   }, [isDraft]);
 
+  // The server names a chat once it has a message to name it after, and the
+  // chat list is otherwise only re-read when the sidebar opens.
+  const named = Boolean(chat?.title) && chat?.title !== UNTITLED_CHAT;
+  useEffect(() => {
+    if (!isDraft && !turnActive && !named) void useChatsStore.getState().refresh();
+  }, [isDraft, turnActive, named]);
+
   // Leaving a temporary chat deletes it. Read at unmount rather than render,
   // so a chat deleted some other way meanwhile is not deleted twice.
   useEffect(() => {
@@ -218,7 +257,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (busy.current) return false;
     if (editing) return sendEdit(text);
     // Without a model the server would answer with its own default, which the
-    // header can't name: the chat would run on a model the user never saw.
+    // composer can't name: the chat would run on a model the user never saw.
     if (modelSelection && !currentModel) {
       setSheetOpen(true);
       return false;
@@ -226,8 +265,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     busy.current = true;
     setBanner(null);
     setAttachments([]);
-    // Sending jumps to the newest message, wherever the transcript was.
-    list.current?.scrollToOffset({ offset: 0, animated: true });
     try {
       const provider = await getProvider();
       if (!provider) {
@@ -272,7 +309,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     // edit itself only resolves once its reply is done.
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
-    list.current?.scrollToOffset({ offset: 0, animated: true });
     try {
       const outcome = await editLastMessage(chatId, target.message.text, text);
       if (outcome.ok) return true;
@@ -367,11 +403,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       testID: "menu-keep",
     });
   }
-  if (!isDraft && !temporary && capabilities?.renameChat) {
+  const rename =
+    !isDraft && !temporary && capabilities?.renameChat
+      ? () => promptRenameChat({ id: chatId, title: chat?.title ?? "" })
+      : undefined;
+  if (rename) {
     menuItems.push({
       label: "Rename",
       icon: "pencil-outline",
-      onPress: () => promptRenameChat({ id: chatId, title: chat?.title ?? "" }),
+      onPress: rename,
       testID: "menu-rename",
     });
   }
@@ -401,6 +441,28 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }
 
+  const title = !isDraft && named && chat ? chat.title : null;
+  const header = (
+    <ChatHeader
+      placement={controls}
+      onOpenDrawer={() => {
+        Keyboard.dismiss();
+        openDrawer();
+      }}
+      onNewChat={handleNewChat}
+      title={title}
+      menuItems={menuItems}
+      temporaryLabel={temporary}
+      temporary={
+        isDraft && canTemporary
+          ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
+          : undefined
+      }
+    />
+  );
+  // Typing needs the room, and nothing in the row is for a message being written.
+  const controlsBelow = controls === "bottom" && !keyboardOpen;
+
   const shownError = banner ?? (turnError && !replyFailed ? turnError : null);
 
   function dismissError() {
@@ -423,7 +485,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           {empty && transcriptLoading && !isDraft ? (
             <TranscriptSkeleton />
           ) : empty ? (
-            <View className="flex-1" style={{ paddingTop: insets.top + HEADER_HEIGHT }}>
+            <View className="flex-1" style={{ paddingTop: topInset }}>
               <EmptyChat
                 connected={connected}
                 temporary={temporary}
@@ -433,7 +495,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           ) : (
             <Transcript
               chatId={chatId}
-              listRef={list}
+              topInset={topInset}
+              staged={isDraft}
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
@@ -441,31 +504,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             />
           )}
 
-          <ChatHeader
-            onOpenDrawer={() => {
-              Keyboard.dismiss();
-              openDrawer();
-            }}
-            onNewChat={handleNewChat}
-            title={modelSelection ? (currentLabel ?? "Choose model") : "OpenChat"}
-            onPressTitle={modelSelection ? () => setSheetOpen(true) : undefined}
-            titleStatus={
-              !modelSelection
-                ? undefined
-                : switchingModel
-                  ? "busy"
-                  : currentModel && !currentInfo && modelsLoading
-                    ? "placeholder"
-                    : undefined
-            }
-            menuItems={menuItems}
-            temporaryLabel={temporary}
-            temporary={
-              isDraft && canTemporary
-                ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
-                : undefined
-            }
-          />
+          {controls === "top" ? (
+            header
+          ) : (
+            <ChatTitleBar title={title} temporaryLabel={temporary} onRename={rename} />
+          )}
 
           {/* The skeleton already says an uncached transcript is loading. */}
           {(transcriptLoading && !empty) || deleting ? (
@@ -480,15 +523,22 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         </View>
 
         <View
-          className="mb-2 px-3 pt-1"
-          style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 8 }}
+          className={cn("px-3 pt-1", controlsBelow ? "mb-0.5" : "mb-2")}
+          style={{
+            paddingBottom: keyboardOpen ? 8 : insets.bottom + (controlsBelow ? 2 : 8),
+          }}
         >
+          {isDraft && empty && connected && !temporary && !keyboardOpen ? (
+            <RecentChats
+              onOpen={(id) => router.replace({ pathname: "/chat/[id]", params: { id } })}
+            />
+          ) : null}
           {form ? (
             <FormCard
               key={form.id}
               form={form}
-              onSubmit={(answer) => answerForm(chatId, form.id, answer)}
-              onDismiss={() => dismissForm(chatId, form.id)}
+              onSubmit={(answer, result) => answerForm(chatId, form, answer, result)}
+              onDismiss={(result) => dismissForm(chatId, form, result)}
             />
           ) : null}
           {shownError ? (
@@ -528,12 +578,23 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
             editing={editing ? { onCancel: cancelEdit } : undefined}
-            reasoning={
-              modelSelection && variants.length > 0
-                ? { label: variantLabel, onPress: () => setReasoningSheetOpen(true) }
+            context={context ? { ...context, onPress: () => setUsageSheetOpen(true) } : undefined}
+            model={
+              modelSelection
+                ? {
+                    label: currentLabel ?? "Choose model",
+                    level: variants.length > 0 ? variantLabel : undefined,
+                    status: switchingModel
+                      ? "busy"
+                      : currentModel && !currentInfo && modelsLoading
+                        ? "placeholder"
+                        : undefined,
+                    onPress: () => setSheetOpen(true),
+                  }
                 : undefined
             }
           />
+          {controlsBelow ? header : null}
         </View>
 
         {canAttach ? (
@@ -543,21 +604,21 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onPick={handleAddAttachment}
           />
         ) : null}
+        <UsageSheet
+          visible={usageSheetOpen}
+          onClose={() => setUsageSheetOpen(false)}
+          context={context}
+          usage={chat?.usage}
+          cost={chat?.cost}
+        />
         {modelSelection ? (
           <ModelSheet
             visible={sheetOpen}
             onClose={() => setSheetOpen(false)}
             selected={currentModel}
             onSelect={handleSelectModel}
-          />
-        ) : null}
-        {modelSelection && variants.length > 0 ? (
-          <ReasoningSheet
-            visible={reasoningSheetOpen}
-            onClose={() => setReasoningSheetOpen(false)}
             variants={variants}
-            selected={currentModel?.variant}
-            onSelect={handleSelectVariant}
+            onSelectVariant={handleSelectVariant}
           />
         ) : null}
       </SeededKeyboardAvoidingView>

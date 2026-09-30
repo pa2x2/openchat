@@ -12,6 +12,7 @@ import type { ChatForm, ChatId, Message, TurnActivity } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
+import { placedFormRecords, withFormRecords, type FormRecord } from "./formRecords";
 import { createThrottledJSONStorage, mmkvStorage } from "./storage";
 
 /**
@@ -29,6 +30,8 @@ interface MessagesStoreState {
   turnErrors: Record<ChatId, string | null>;
   /** Forms the backend is waiting on, oldest first (runtime only). */
   forms: Record<ChatId, ChatForm[]>;
+  /** Settled forms the server transcript has no trace of, in the order they were settled. */
+  formRecords: Record<ChatId, FormRecord[]>;
   /** What the live turn is doing; null while it writes text or no turn runs (runtime only). */
   activity: Record<ChatId, TurnActivity | null>;
   /** Replaces the whole transcript of a chat (reconcile / cold open). */
@@ -45,6 +48,7 @@ interface MessagesStoreState {
   setForms: (chatId: ChatId, forms: ChatForm[]) => void;
   addForm: (chatId: ChatId, form: ChatForm) => void;
   removeForm: (chatId: ChatId, formId: string) => void;
+  addFormRecord: (chatId: ChatId, record: FormRecord) => void;
 }
 
 function sortMessages(messages: Message[]): Message[] {
@@ -105,6 +109,7 @@ export function createMessagesStore(
         activeTurns: {},
         turnErrors: {},
         forms: {},
+        formRecords: {},
         activity: {},
         setForms: (chatId, forms) =>
           set((state) => ({ forms: { ...state.forms, [chatId]: forms } })),
@@ -123,6 +128,13 @@ export function createMessagesStore(
               forms: { ...state.forms, [chatId]: existing.filter((form) => form.id !== formId) },
             };
           }),
+        addFormRecord: (chatId, record) =>
+          set((state) => ({
+            formRecords: {
+              ...state.formRecords,
+              [chatId]: [...(state.formRecords[chatId] ?? []), record],
+            },
+          })),
         setTurnActive: (chatId, active) =>
           set((state) => ({ activeTurns: { ...state.activeTurns, [chatId]: active } })),
         setTurnError: (chatId, error) =>
@@ -182,7 +194,9 @@ export function createMessagesStore(
           set((state) => {
             const byChat = { ...state.byChat };
             delete byChat[chatId];
-            return { byChat };
+            const formRecords = { ...state.formRecords };
+            delete formRecords[chatId];
+            return { byChat, formRecords };
           }),
         fetchMessages: async (chatId) => {
           set((state) => ({ loading: { ...state.loading, [chatId]: true } }));
@@ -194,10 +208,20 @@ export function createMessagesStore(
             }
             const messages = await provider.fetchMessages(chatId);
             // Server truth wins; the cached transcript is replaced wholesale.
-            set((state) => ({
-              byChat: { ...state.byChat, [chatId]: normalizeTranscript(messages) },
-              loading: { ...state.loading, [chatId]: false },
-            }));
+            // Only this device's form records go back in, and those whose
+            // reply the server no longer has are dropped.
+            set((state) => {
+              const known = state.formRecords[chatId];
+              const records = known ? placedFormRecords(messages, known) : undefined;
+              return {
+                byChat: {
+                  ...state.byChat,
+                  [chatId]: normalizeTranscript(withFormRecords(messages, records)),
+                },
+                ...(records ? { formRecords: { ...state.formRecords, [chatId]: records } } : {}),
+                loading: { ...state.loading, [chatId]: false },
+              };
+            });
           } catch {
             // Keep the cached transcript on failure; the reconnect machinery
             // (src/stream/) retries when connectivity returns.
@@ -211,12 +235,15 @@ export function createMessagesStore(
           persistIntervalMs > 0
             ? createThrottledJSONStorage(() => storage, persistIntervalMs)
             : createJSONStorage(() => storage),
-        // Only the transcript persists. Attachment payloads are left out: they
-        // are megabytes of base64 that would be rewritten throughout every
-        // streamed reply. The bytes come back with the next transcript read from the
-        // server, so a cached transcript shows attachment names without
-        // previews until then.
-        partialize: (state) => ({ byChat: stripAttachmentBytes(state.byChat) }),
+        // Only the transcript and the form records persist. Attachment
+        // payloads are left out: they are megabytes of base64 that would be
+        // rewritten throughout every streamed reply. The bytes come back with
+        // the next transcript read from the server, so a cached transcript
+        // shows attachment names without previews until then.
+        partialize: (state) => ({
+          byChat: stripAttachmentBytes(state.byChat),
+          formRecords: state.formRecords,
+        }),
       },
     ),
   );

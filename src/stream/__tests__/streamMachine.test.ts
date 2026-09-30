@@ -3,6 +3,7 @@ import type { ChatId, Message, StreamEvent } from "@/src/domain";
 import type { ChatProvider } from "@/src/providers/types";
 import { getProvider } from "@/src/lib/providerFactory";
 import {
+  answerForm,
   discardPendingRegenerate,
   followRunningTurn,
   interruptTurn,
@@ -43,6 +44,8 @@ function scriptedEvents(scripts: Script[]): ChatProvider["events"] {
 
 const textDelta = (text: string): StreamEvent => ({ type: "text-delta", text });
 const chatIdle = (): StreamEvent => ({ type: "chat-idle" });
+const step = (figures: Omit<Extract<StreamEvent, { type: "message-complete" }>, "type">) =>
+  ({ type: "message-complete", ...figures }) satisfies StreamEvent;
 
 function useProvider(overrides: Partial<ChatProvider> = {}): ChatProvider {
   const provider = {
@@ -72,7 +75,7 @@ async function flush() {
 }
 
 beforeEach(() => {
-  useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {} });
+  useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {}, formRecords: {} });
   useChatsStore.setState({ chats: [], loading: false, error: null, pendingRegenerate: {} });
   getProviderMock.mockReset();
 });
@@ -99,6 +102,62 @@ describe("sendMessage", () => {
     ]);
     expect(provider.send).toHaveBeenCalledWith("c1", expect.objectContaining({ text: "hi" }));
     expect(state().activeTurns.c1).toBe(false);
+  });
+
+  it("adds up a reply's steps, and keeps a sentence whole when the chat's totals land inside it", async () => {
+    useChatsStore.setState({ chats: [{ id: "c1", title: "Greeting", updatedAt: 1 }] });
+    const totals = { usage: { input: 130, output: 12 }, cost: { amount: 0.5, currency: "USD" } };
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            step({ usage: { input: 100, output: 10 }, cost: { amount: 0.25, currency: "USD" } }),
+            textDelta("Hel"),
+            { type: "chat-usage", ...totals },
+            textDelta("lo"),
+            step({
+              usage: { input: 150, output: 5, cacheRead: 100 },
+              cost: { amount: 0.5, currency: "USD" },
+            }),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    expect(state().byChat.c1[1]).toMatchObject({
+      parts: [{ type: "text", text: "Hello" }],
+      usage: { input: 250, output: 15, cacheRead: 100 },
+      cost: { amount: 0.75, currency: "USD" },
+      contextTokens: 255,
+    });
+    expect(useChatsStore.getState().chats[0]).toMatchObject(totals);
+  });
+
+  // A reply picked up mid-step gets that step's tokens but not its time;
+  // dividing by the time of the other steps would show it faster than it was.
+  it("leaves a reply's generation time unknown once a step comes without one", async () => {
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            step({ usage: { output: 10 }, generationMs: 400 }),
+            step({ usage: { output: 30 } }),
+            step({ usage: { output: 5 }, generationMs: 100 }),
+            textDelta("Done"),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    const reply = state().byChat.c1[1];
+    expect(reply.usage).toEqual({ output: 45 });
+    expect(reply.generationMs).toBeUndefined();
   });
 
   it("keeps the user message and fails the turn when delivery fails", async () => {
@@ -137,6 +196,87 @@ describe("sendMessage", () => {
 
     expect(state().turnErrors.c4).toContain("without returning a reply");
     expect(state().activeTurns.c4).toBe(false);
+  });
+});
+
+describe("forms", () => {
+  const tool = (id: string, update: object): StreamEvent => ({ type: "tool", id, update });
+  const result = { id: "frm_1", status: "answered", questions: ["Name"], answers: [["Ada"]] };
+
+  // A form no tool call raised is in no transcript: the reply has to take it
+  // at once, and it has to come back when a reconnect adopts the server's copy.
+  it("keeps the result of a form the transcript will not record", async () => {
+    const lookup = { id: "t1", name: "lookup", category: "other", subject: "", status: "running" };
+    const provider = useProvider({
+      answerForm: jest.fn().mockResolvedValue(undefined),
+      events: scriptedEvents([
+        { events: [tool("t1", { name: "lookup", status: "running" })], drop: true },
+        { events: [] },
+      ]),
+      fetchMessages: jest
+        .fn()
+        .mockResolvedValue([assistant({ parts: [{ type: "tool", tool: lookup as never }] })]),
+      isRunning: jest.fn().mockResolvedValue(true),
+    });
+    jest.useFakeTimers();
+    try {
+      const sending = sendMessage("c1", "hi");
+      await flush();
+
+      await answerForm("c1", { id: "frm_1", title: "Input", fields: [] }, {}, result as never);
+      // Answered from the transcript's own record: nothing to keep.
+      await answerForm("c1", { id: "frm_2", title: "Questions", fields: [], toolId: "t9" }, {}, {
+        ...result,
+        id: "frm_2",
+      } as never);
+
+      expect(provider.answerForm).toHaveBeenCalledTimes(2);
+      expect(state().byChat.c1.at(-1)?.parts).toMatchObject([
+        { type: "tool", tool: { id: "t1" } },
+        { type: "form", form: { id: "frm_1", answers: [["Ada"]] } },
+      ]);
+
+      // The stream dropped: the reply is now the server's, which has no form.
+      await jest.advanceTimersByTimeAsync(2_000);
+      expect(state().byChat.c1.at(-1)).toMatchObject({
+        id: "a1",
+        parts: [{ type: "tool" }, { type: "form", form: { id: "frm_1" } }],
+      });
+
+      await interruptTurn("c1");
+      await sending;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // The event naming a question's questions can be lost to a reconnect. An
+  // answer with no question to show under must not become an empty card.
+  it("leaves a call a plain tool when its questions never arrived", async () => {
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            tool("t1", { name: "question", status: "running" }),
+            { type: "form-result", id: "t1", update: { status: "answered", answers: [["A"]] } },
+            tool("t2", { name: "question", status: "running" }),
+            { type: "form-result", id: "t2", update: { status: "waiting", questions: ["Q?"] } },
+            { type: "form-result", id: "t2", update: { status: "answered", answers: [["B"]] } },
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    expect(state().byChat.c1.at(-1)?.parts).toEqual([
+      { type: "tool", tool: expect.objectContaining({ id: "t1", status: "done" }) },
+      {
+        type: "form",
+        form: { id: "t2", status: "answered", questions: ["Q?"], answers: [["B"]] },
+      },
+    ]);
   });
 });
 

@@ -8,6 +8,7 @@ export type {
   FormCondition,
   FormField,
   FormOption,
+  FormResult,
   FormValue,
   Message,
   MessageRole,
@@ -15,6 +16,7 @@ export type {
   ModelInfo,
   ModelRef,
   ModelVariant,
+  Money,
   ProviderId,
   ReplyPart,
   StreamEvent,
@@ -23,6 +25,19 @@ export type {
   ToolCategory,
   ToolStatus,
   TurnActivity,
+  UsageQuery,
+  UsageReport,
+  UsageTotals,
   UserMessage,
 } from "./types";
 export { UNTITLED_CHAT } from "./types";
+export {
+  addCost,
+  addTotals,
+  addUsage,
+  localDay,
+  mergeReports,
+  totalTokens,
+  transcriptUsage,
+} from "./usage";
+export type { UsageEntry } from "./usage";

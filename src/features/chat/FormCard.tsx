@@ -1,26 +1,30 @@
 /**
  * A question the backend is waiting on, shown above the composer.
  *
- * A form with several questions shows one per page. Back and Next keep the
- * whole draft, so any answer can be changed until Submit sends them all.
- * Dismiss tells the backend the user won't answer, so the run moves on
- * without it.
+ * A form with several questions shows one per page and ends on a review of
+ * every answer, which is where Submit is. Back and Next keep the whole draft,
+ * and a row of the review opens its question again, so any answer can be
+ * changed until Submit sends them all. Dismiss tells the backend the user
+ * won't answer, which stops the run.
  */
 
 import { useState } from "react";
 import { Keyboard, Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatForm, FormAnswer, FormField, FormOption } from "@/src/domain";
+import type { ChatForm, FormAnswer, FormField, FormOption, FormResult } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Button } from "@/src/ui/Button";
 import { Icon, type IconName } from "@/src/ui/Icon";
 import { Input } from "@/src/ui/Input";
 import { useKeyboardOpen } from "@/src/ui/keyboard";
 import {
+  answerText,
   buildAnswer,
   canSubmit,
   fieldError,
+  fieldQuestion,
+  formResult,
   initialDraft,
   isFieldShown,
   type DraftValue,
@@ -29,9 +33,12 @@ import {
 
 export interface FormCardProps {
   form: ChatForm;
-  /** Rejects with a user-facing message when the backend did not take it. */
-  onSubmit: (answer: FormAnswer) => Promise<void>;
-  onDismiss: () => Promise<void>;
+  /**
+   * Rejects with a user-facing message when the backend did not take it.
+   * `result` is the form as the transcript shows it afterwards.
+   */
+  onSubmit: (answer: FormAnswer, result: FormResult) => Promise<void>;
+  onDismiss: (result: FormResult) => Promise<void>;
 }
 
 export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
@@ -42,14 +49,17 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
   const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  // The question was opened from the review, which is where it goes back to.
+  const [revising, setRevising] = useState(false);
   const keyboardOpen = useKeyboardOpen();
 
   const shown = form.fields.filter((field) => isFieldShown(form, field, draft));
-  // An answer can hide later questions, leaving the page past the end.
-  const index = Math.max(0, Math.min(page, shown.length - 1));
-  const field = shown.at(index);
   const paged = shown.length > 1;
-  const last = index >= shown.length - 1;
+  // The review is one page past the last question. An answer can hide later
+  // questions, leaving the page past the end.
+  const index = Math.max(0, Math.min(page, paged ? shown.length : shown.length - 1));
+  const reviewing = paged && index === shown.length;
+  const field = reviewing ? undefined : shown.at(index);
   const invalid = field ? fieldError(field, draft[field.key]) : null;
 
   function update(key: string, value: DraftValue) {
@@ -58,9 +68,10 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
   }
 
   // The page's text field unmounts, and the keyboard would stay up without it.
-  function turnPage(next: number) {
+  function turnPage(next: number, fromReview = false) {
     Keyboard.dismiss();
     setPage(next);
+    setRevising(fromReview);
   }
 
   async function run(kind: "submit" | "dismiss", action: () => Promise<void>) {
@@ -83,7 +94,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           <Text className="flex-1 text-base font-semibold text-text">{form.title}</Text>
           {paged ? (
             <Text className="text-sm text-text-muted" testID="form-page">
-              {index + 1} of {shown.length}
+              {reviewing ? "Review" : `${index + 1} of ${shown.length}`}
             </Text>
           ) : null}
         </View>
@@ -115,6 +126,25 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           />
         </ScrollView>
       ) : null}
+      {reviewing ? (
+        <ScrollView
+          style={{ maxHeight: 280 }}
+          contentContainerClassName="gap-1.5 px-4 py-1"
+          testID="form-review"
+        >
+          {shown.map((question, at) =>
+            question.type === "link" ? null : (
+              <ReviewRow
+                key={question.key}
+                field={question}
+                value={draft[question.key]}
+                disabled={busy}
+                onPress={() => turnPage(at, true)}
+              />
+            ),
+          )}
+        </ScrollView>
+      ) : null}
       {field && touched.has(field.key) && invalid ? (
         <Text className="px-4 pt-2 text-sm text-danger">{invalid}</Text>
       ) : null}
@@ -130,11 +160,11 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           size="sm"
           disabled={busy}
           loading={pending === "dismiss"}
-          onPress={() => void run("dismiss", onDismiss)}
+          onPress={() => void run("dismiss", () => onDismiss(formResult(form, draft, "dismissed")))}
           testID="form-dismiss"
         />
         <View className="flex-1" />
-        {paged && index > 0 ? (
+        {paged && index > 0 && !revising ? (
           <Button
             label="Back"
             variant="secondary"
@@ -144,26 +174,68 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
             testID="form-back"
           />
         ) : null}
-        {last ? (
+        {reviewing || !paged ? (
           <Button
             label="Submit"
             size="sm"
             disabled={busy || !canSubmit(form, draft)}
             loading={pending === "submit"}
-            onPress={() => void run("submit", () => onSubmit(buildAnswer(form, draft)))}
+            onPress={() =>
+              void run("submit", () =>
+                onSubmit(buildAnswer(form, draft), formResult(form, draft, "answered")),
+              )
+            }
             testID="form-submit"
           />
         ) : (
           <Button
-            label="Next"
+            label={revising ? "Done" : "Next"}
             size="sm"
             disabled={busy || invalid !== null}
-            onPress={() => turnPage(index + 1)}
+            onPress={() => turnPage(revising ? shown.length : index + 1)}
             testID="form-next"
           />
         )}
       </View>
     </View>
+  );
+}
+
+interface ReviewRowProps {
+  field: FormField;
+  value: DraftValue | undefined;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function ReviewRow({ field, value, disabled, onPress }: ReviewRowProps) {
+  const invalid = fieldError(field, value);
+  const answer = answerText(field, value).join(", ");
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Opens the question to change its answer"
+      className={cn(
+        "min-h-[48px] flex-row items-center gap-3 rounded-2xl border border-border bg-background px-3.5 py-2.5 active:bg-surface-hover",
+        disabled && "opacity-50",
+      )}
+      disabled={disabled}
+      onPress={onPress}
+      testID={`form-review-${field.key}`}
+    >
+      <View className="flex-1">
+        <Text className="text-[13px] leading-[17px] text-text-muted">{fieldQuestion(field)}</Text>
+        <Text
+          className={cn(
+            "mt-0.5 text-[15px] font-medium",
+            invalid ? "text-danger" : answer ? "text-text" : "text-text-faint",
+          )}
+        >
+          {invalid ?? (answer || "No answer")}
+        </Text>
+      </View>
+      <Icon name="pencil-outline" size={18} tone="textMuted" />
+    </Pressable>
   );
 }
 

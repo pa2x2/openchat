@@ -1,12 +1,12 @@
 /**
- * Sidebar: search, new chat, every conversation the server knows about
- * except temporary ones (newest first under date headings, cached locally for
- * instant launch), and the connected server at the bottom, which leads to
- * Settings.
+ * Sidebar: every conversation the server knows about except temporary ones
+ * (newest first under date headings, cached locally for instant launch) and,
+ * under the list where the thumb reaches them, search, new chat and the
+ * connected server, which leads to Settings and to its usage.
  *
  * Long-pressing a chat opens its menu: rename, delete, or select, which starts
- * selection mode, where chats can be deleted in bulk. The mode lasts while
- * anything is selected.
+ * selection mode, where chats can be deleted in bulk. Its controls take the
+ * place of search and new chat, and the mode lasts while anything is selected.
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -21,6 +21,7 @@ import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
+import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import { Menu, type MenuItem } from "@/src/ui/Menu";
 import { RefreshControl } from "@/src/ui/RefreshControl";
@@ -36,6 +37,7 @@ export interface ChatDrawerProps {
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
   onOpenSettings: () => void;
+  onOpenUsage: () => void;
   /** Called after the active chat is deleted, so the screen can move on. */
   onDeletedActive: () => void;
 }
@@ -46,9 +48,11 @@ export function ChatDrawer({
   onSelectChat,
   onNewChat,
   onOpenSettings,
+  onOpenUsage,
   onDeletedActive,
 }: ChatDrawerProps) {
   const insets = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
   const allChats = useChatsStore((state) => state.chats);
   const temporary = useChatsStore((state) => state.temporary);
   const refreshChats = useChatsStore((state) => state.refresh);
@@ -102,6 +106,7 @@ export function ChatDrawer({
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
+  const canShowUsage = profile !== null && capabilities?.usageReport === true;
   const toggle = useCallback(
     (id: ChatId) =>
       setSelected((current) => {
@@ -222,86 +227,11 @@ export function ChatDrawer({
   const statusTone = !profile ? "bg-text-faint" : chatsError ? "bg-danger" : "bg-success";
 
   return (
-    <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top + 8 }}
+    <SeededKeyboardAvoidingView
+      behavior="padding"
+      style={{ flex: 1, paddingTop: insets.top }}
       testID="chat-drawer"
     >
-      {selecting ? (
-        <View
-          className="mb-2 h-11 flex-row items-center gap-1 px-1.5"
-          testID="drawer-selection-bar"
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Cancel selection"
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-            onPress={() => setSelected(new Set())}
-          >
-            <Icon name="close" size={22} />
-          </Pressable>
-          <Text
-            className="flex-1 text-[17px] font-medium text-text"
-            accessibilityLiveRegion="polite"
-          >
-            {selectedIds.length} selected
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={allVisibleSelected ? "Deselect all" : "Select all"}
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-            onPress={toggleAllVisible}
-            testID="drawer-select-all"
-          >
-            <Icon
-              name={
-                allVisibleSelected ? "checkbox-multiple-marked" : "checkbox-multiple-marked-outline"
-              }
-              size={22}
-              tone={allVisibleSelected ? "primary" : "text"}
-            />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${selectedIds.length} selected`}
-            accessibilityState={{
-              disabled: selectedIds.length === 0 || deletingSelected,
-              busy: deletingSelected,
-            }}
-            disabled={selectedIds.length === 0 || deletingSelected}
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-            onPress={deleteSelected}
-            testID="drawer-delete-selected"
-          >
-            {deletingSelected ? (
-              <Spinner size="small" tone="danger" />
-            ) : (
-              <Icon name="trash-can-outline" size={22} tone="danger" />
-            )}
-          </Pressable>
-        </View>
-      ) : (
-        <View className="flex-row items-center gap-2 px-3 pb-2">
-          <View className="h-11 flex-1 flex-row items-center gap-2.5 rounded-full bg-surface px-3.5">
-            <Icon name="magnify" size={20} tone="textMuted" />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search"
-              accessibilityLabel="Search chats"
-              className="h-11 flex-1 text-base text-text"
-              returnKeyType="search"
-              testID="drawer-search"
-            />
-            {query ? (
-              <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={() => setQuery("")}>
-                <Icon name="close" size={18} tone="textMuted" />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-      )}
-
       {/* Pull-to-refresh draws its own spinner, and a first load shows skeleton rows. */}
       <View className="h-[3px] px-3">
         {chatsLoading && !refreshing && allChats.length > 0 ? (
@@ -319,31 +249,19 @@ export function ChatDrawer({
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />
         }
         ListHeaderComponent={
-          <>
+          profile && chatsError ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="New chat"
-              className="h-12 flex-row items-center gap-3.5 rounded-[14px] px-3 active:bg-surface"
-              onPress={onNewChat}
-              testID="drawer-new-chat"
+              accessibilityLabel="Couldn't refresh chats. Retry"
+              className="mx-1 mt-2 flex-row items-center gap-2.5 rounded-[14px] bg-danger/10 px-3 py-2.5"
+              onPress={() => void refreshChats()}
+              testID="drawer-refresh-error"
             >
-              <Icon name="square-edit-outline" size={21} />
-              <Text className="text-base text-text">New chat</Text>
+              <Icon name="alert-circle-outline" size={18} tone="danger" />
+              <Text className="flex-1 text-sm text-danger">Couldn’t refresh chats</Text>
+              <Text className="text-sm font-medium text-primary">Retry</Text>
             </Pressable>
-            {profile && chatsError ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Couldn't refresh chats. Retry"
-                className="mx-1 mt-2 flex-row items-center gap-2.5 rounded-[14px] bg-danger/10 px-3 py-2.5"
-                onPress={() => void refreshChats()}
-                testID="drawer-refresh-error"
-              >
-                <Icon name="alert-circle-outline" size={18} tone="danger" />
-                <Text className="flex-1 text-sm text-danger">Couldn’t refresh chats</Text>
-                <Text className="text-sm font-medium text-primary">Retry</Text>
-              </Pressable>
-            ) : null}
-          </>
+          ) : null
         }
         renderSectionHeader={({ section }) => (
           <Text className="px-3 pb-1.5 pt-5 text-[13.5px] font-medium text-text-muted">
@@ -379,30 +297,142 @@ export function ChatDrawer({
       />
 
       <View
-        className="border-t border-border px-3 pt-2.5"
-        style={{ paddingBottom: insets.bottom + 10 }}
+        className="gap-1.5 border-t border-border px-3 pt-2.5"
+        style={{ paddingBottom: keyboardOpen ? 8 : insets.bottom + 10 }}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Settings. Server ${serverLabel}`}
-          className="flex-row items-center gap-3 rounded-[14px] p-2 active:bg-surface"
-          onPress={onOpenSettings}
-          testID="drawer-settings"
-        >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
-            <Icon name="server-outline" size={19} tone="primaryForeground" />
+        {selecting ? (
+          <View className="-mx-1 h-11 flex-row items-center gap-1" testID="drawer-selection-bar">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel selection"
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+              onPress={() => setSelected(new Set())}
+            >
+              <Icon name="close" size={22} />
+            </Pressable>
+            <Text
+              className="flex-1 text-[17px] font-medium text-text"
+              accessibilityLiveRegion="polite"
+            >
+              {selectedIds.length} selected
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={allVisibleSelected ? "Deselect all" : "Select all"}
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+              onPress={toggleAllVisible}
+              testID="drawer-select-all"
+            >
+              <Icon
+                name={
+                  allVisibleSelected
+                    ? "checkbox-multiple-marked"
+                    : "checkbox-multiple-marked-outline"
+                }
+                size={22}
+                tone={allVisibleSelected ? "primary" : "text"}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${selectedIds.length} selected`}
+              accessibilityState={{
+                disabled: selectedIds.length === 0 || deletingSelected,
+                busy: deletingSelected,
+              }}
+              disabled={selectedIds.length === 0 || deletingSelected}
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+              onPress={deleteSelected}
+              testID="drawer-delete-selected"
+            >
+              {deletingSelected ? (
+                <Spinner size="small" tone="danger" />
+              ) : (
+                <Icon name="trash-can-outline" size={22} tone="danger" />
+              )}
+            </Pressable>
           </View>
-          <View className="flex-1">
-            <Text className="text-[15.5px] font-medium text-text">{providerLabel}</Text>
-            <View className="flex-row items-center gap-1.5">
-              <View className={cn("h-2 w-2 rounded-full", statusTone)} />
-              <Text className="flex-1 text-[13px] text-text-muted" numberOfLines={1}>
-                {serverLabel}
-              </Text>
+        ) : (
+          <View className="flex-row items-center gap-1">
+            <View className="h-11 flex-1 flex-row items-center gap-2.5 rounded-full bg-surface px-3.5">
+              <Icon name="magnify" size={20} tone="textMuted" />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search"
+                accessibilityLabel="Search chats"
+                className="h-11 flex-1 text-base text-text"
+                returnKeyType="search"
+                testID="drawer-search"
+              />
+              {query ? (
+                <Pressable
+                  accessibilityLabel="Clear search"
+                  hitSlop={8}
+                  onPress={() => setQuery("")}
+                >
+                  <Icon name="close" size={18} tone="textMuted" />
+                </Pressable>
+              ) : null}
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="New chat"
+              className="-mr-1 h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+              onPress={onNewChat}
+              testID="drawer-new-chat"
+            >
+              <Icon name="square-edit-outline" size={21} />
+            </Pressable>
           </View>
-          <Icon name="cog-outline" size={22} tone="textMuted" />
-        </Pressable>
+        )}
+        {keyboardOpen ? null : (
+          <View className="flex-row items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Settings. Server ${serverLabel}`}
+              className="flex-1 flex-row items-center gap-3 rounded-[14px] p-2 active:bg-surface"
+              onPress={onOpenSettings}
+              testID="drawer-settings"
+            >
+              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
+                <Icon name="server-outline" size={19} tone="primaryForeground" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[15.5px] font-medium text-text">{providerLabel}</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <View className={cn("h-2 w-2 rounded-full", statusTone)} />
+                  <Text className="flex-1 text-[13px] text-text-muted" numberOfLines={1}>
+                    {serverLabel}
+                  </Text>
+                </View>
+              </View>
+              {/* With a usage button beside it, the cog moves out to sit after that button. */}
+              {canShowUsage ? null : <Icon name="cog-outline" size={22} tone="textMuted" />}
+            </Pressable>
+            {canShowUsage ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Usage"
+                  className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                  onPress={onOpenUsage}
+                  testID="drawer-usage"
+                >
+                  <Icon name="chart-box-outline" size={22} tone="textMuted" />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Settings"
+                  className="-mr-1 h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                  onPress={onOpenSettings}
+                >
+                  <Icon name="cog-outline" size={22} tone="textMuted" />
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        )}
       </View>
 
       <Menu
@@ -412,7 +442,7 @@ export function ChatDrawer({
         anchor={{ y: rowMenu?.y ?? 0, side: "left", inset: 40 }}
         testID="row-menu"
       />
-    </View>
+    </SeededKeyboardAvoidingView>
   );
 }
 

@@ -23,21 +23,27 @@
  * responsive even when a provider iterator ignores its abort signal.
  */
 
-import type {
-  Attachment,
-  ChatId,
-  FormAnswer,
-  Message,
-  ReplyPart,
-  StreamEvent,
-  ToolCall,
-  TurnActivity,
-  UserMessage,
+import {
+  addCost,
+  addUsage,
+  totalTokens,
+  type Attachment,
+  type ChatForm,
+  type ChatId,
+  type FormAnswer,
+  type FormResult,
+  type Message,
+  type ReplyPart,
+  type StreamEvent,
+  type ToolCall,
+  type TurnActivity,
+  type UserMessage,
 } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
 import type { ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
+import { withFormRecords } from "@/src/stores/formRecords";
 import { useMessagesStore } from "@/src/stores/messages";
 
 const INITIAL_BACKOFF_MS = 500;
@@ -587,6 +593,12 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
             useMessagesStore.getState().removeForm(chatId, event.formId);
             continue;
           }
+          // Kept out of `applyEvent`: totals can arrive between two deltas of
+          // one sentence, and anything applied there ends the part being written.
+          if (event.type === "chat-usage") {
+            useChatsStore.getState().setUsage(chatId, event);
+            continue;
+          }
           if (event.type === "connected") {
             // A followed run can end between the check that it runs and this
             // subscription, and its closing events are then gone for good.
@@ -690,10 +702,13 @@ export async function syncForms(provider: ChatProvider, chatId: ChatId): Promise
 /**
  * Settles a form from the card. On failure the form list is re-synced: the
  * usual cause is a form the backend already closed, which then disappears.
+ * `result` is what the card showed and the user picked; it is kept only for
+ * a form the backend's transcript will not record.
  */
 async function settleForm(
   chatId: ChatId,
-  formId: string,
+  form: ChatForm,
+  result: FormResult,
   settle: (provider: ChatProvider) => Promise<void> | undefined,
 ): Promise<void> {
   const provider = await getProvider();
@@ -704,15 +719,45 @@ async function settleForm(
     void syncForms(provider, chatId);
     throw error;
   }
-  useMessagesStore.getState().removeForm(chatId, formId);
+  useMessagesStore.getState().removeForm(chatId, form.id);
+  if (!form.toolId) keepFormResult(chatId, result);
 }
 
-export function answerForm(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void> {
-  return settleForm(chatId, formId, (provider) => provider.answerForm?.(chatId, formId, answer));
+export function answerForm(
+  chatId: ChatId,
+  form: ChatForm,
+  answer: FormAnswer,
+  result: FormResult,
+): Promise<void> {
+  return settleForm(chatId, form, result, (provider) =>
+    provider.answerForm?.(chatId, form.id, answer),
+  );
 }
 
-export function dismissForm(chatId: ChatId, formId: string): Promise<void> {
-  return settleForm(chatId, formId, (provider) => provider.dismissForm?.(chatId, formId));
+export function dismissForm(chatId: ChatId, form: ChatForm, result: FormResult): Promise<void> {
+  return settleForm(chatId, form, result, (provider) => provider.dismissForm?.(chatId, form.id));
+}
+
+/**
+ * Puts a settled form into the live reply. It is saved as a record when a
+ * tool call can anchor it, which a form raised mid-run has: the call that
+ * asked is still running. Without one it lasts until the transcript is next
+ * fetched.
+ */
+function keepFormResult(chatId: ChatId, form: FormResult): void {
+  const turn = liveTurns.get(chatId);
+  if (!turn || form.questions.length === 0) return;
+  flushDraft(turn);
+  const parts = turn.draft.parts ?? [];
+  const anchor = runningTool(turn.draft) ?? parts.findLast((part) => part.type === "tool")?.tool;
+  if (anchor) {
+    const record = { afterToolId: anchor.id, form };
+    useMessagesStore.getState().addFormRecord(chatId, record);
+    turn.draft = withFormRecords([turn.draft], [record])[0];
+  } else {
+    turn.draft = { ...turn.draft, parts: [...parts, { type: "form", form }] };
+  }
+  writeDraft(turn);
 }
 
 function applyEvent(turn: LiveTurn, event: StreamEvent): void {
@@ -737,8 +782,12 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
     case "activity":
       setActivity(turn, event.activity);
       break;
-    case "tool": {
-      turn.draft = updateTool(turn.draft, event.id, event.update);
+    case "tool":
+    case "form-result": {
+      turn.draft =
+        event.type === "tool"
+          ? updateTool(turn.draft, event.id, event.update)
+          : updateFormResult(turn.draft, event.id, event.update);
       writeDraft(turn);
       // With calls running side by side, the latest one still going is shown.
       const running = runningTool(turn.draft);
@@ -748,13 +797,26 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       );
       break;
     }
-    case "message-complete":
-      // Step-level completion; usage is final for the step so far.
-      turn.draft = { ...turn.draft, ...(event.usage ? { usage: event.usage } : {}) };
-      messages.patchMessage(turn.chatId, turn.draft.id, {
-        ...(event.usage ? { usage: event.usage } : {}),
-      });
+    case "message-complete": {
+      const { draft } = turn;
+      // Usage counted without its time would make the reply look faster than
+      // it was, so one round-trip of unknown length leaves the whole unknown.
+      const timed = draft.usage === undefined || draft.generationMs !== undefined;
+      const counted: Partial<Message> = {
+        usage: addUsage(draft.usage, event.usage),
+        requests: event.usage ? (draft.requests ?? 0) + 1 : draft.requests,
+        cost: addCost(draft.cost, event.cost),
+        contextTokens: event.usage ? totalTokens(event.usage) : draft.contextTokens,
+        generationMs:
+          timed && event.generationMs !== undefined
+            ? (draft.generationMs ?? 0) + event.generationMs
+            : undefined,
+        model: event.model ?? draft.model,
+      };
+      turn.draft = { ...draft, ...counted };
+      messages.patchMessage(turn.chatId, draft.id, counted);
       break;
+    }
     case "chat-idle": {
       // The whole prompt run finished. An assistant message that never
       // produced visible text failed silently — surface it as an error with a
@@ -808,9 +870,18 @@ function appendDelta(
   return { ...draft, status: "streaming", parts: nextParts, text: draft.text + joiner + delta };
 }
 
+/** A call is one part, shown as a tool until it turns out to have asked a form. */
+function callIndex(parts: ReplyPart[], id: string): number {
+  return parts.findIndex(
+    (part) =>
+      (part.type === "tool" && part.tool.id === id) ||
+      (part.type === "form" && part.form.id === id),
+  );
+}
+
 function updateTool(draft: Message, id: string, update: Partial<Omit<ToolCall, "id">>): Message {
   const parts = draft.parts ?? [];
-  const index = parts.findIndex((part) => part.type === "tool" && part.tool.id === id);
+  const index = callIndex(parts, id);
   const current = index >= 0 ? parts[index] : undefined;
   // A call's first event can be lost to a reconnect; later ones still add it.
   const tool: ToolCall = {
@@ -823,6 +894,34 @@ function updateTool(draft: Message, id: string, update: Partial<Omit<ToolCall, "
     index >= 0
       ? parts.map((part, at) => (at === index ? { type: "tool", tool } : part))
       : [...parts, { type: "tool", tool }];
+  return { ...draft, status: "streaming", parts: nextParts };
+}
+
+const TOOL_STATUS = { waiting: "running", answered: "done", dismissed: "failed" } as const;
+
+function updateFormResult(
+  draft: Message,
+  id: string,
+  update: Partial<Omit<FormResult, "id">>,
+): Message {
+  const parts = draft.parts ?? [];
+  const index = callIndex(parts, id);
+  const current = index >= 0 ? parts[index] : undefined;
+  // The event with the questions can be lost to a reconnect. With nothing to
+  // show as a form, the call stays the tool it was.
+  if (current?.type !== "form" && !update.questions) {
+    return update.status ? updateTool(draft, id, { status: TOOL_STATUS[update.status] }) : draft;
+  }
+  const form: FormResult = {
+    ...(current?.type === "form"
+      ? current.form
+      : { id, status: "waiting", questions: [], answers: [] }),
+    ...update,
+  };
+  const nextParts: ReplyPart[] =
+    index >= 0
+      ? parts.map((part, at) => (at === index ? { type: "form", form } : part))
+      : [...parts, { type: "form", form }];
   return { ...draft, status: "streaming", parts: nextParts };
 }
 
@@ -855,9 +954,10 @@ async function reconcile(turn: LiveTurn, { over = false } = {}): Promise<void> {
   try {
     const provider = await getProvider();
     if (!provider) return;
-    const fetched = await provider.fetchMessages(turn.chatId);
+    const server = await provider.fetchMessages(turn.chatId);
     if (turn.finished || turn.controller.signal.aborted) return;
     const messages = useMessagesStore.getState();
+    const fetched = withFormRecords(server, messages.formRecords[turn.chatId]);
     const lastAssistant = [...fetched].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) {
       messages.setMessages(turn.chatId, fetched);

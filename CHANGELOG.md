@@ -2,6 +2,35 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-30
+
+### ✨ Added
+
+- A Usage screen, opened from the new button beside the settings cog in the sidebar. It shows tokens, cost and model requests for today, the last 7 or 30 days, or all time, with a bar for each day and a list of models. Tap a total to switch what the chart and the list measure. Tap a day to read its figures. Cost appears only for models the server has a price for.
+- The server stops counting a chat once it is deleted. The app now keeps what a chat used when you delete it here, temporary chats included, and adds it back to the Usage screen. Chats deleted before this version or from another client are not counted.
+- A ring by the send button shows how full the model's context is. It turns amber at 80% and red at 95%. Tap it for the chat's usage, which lists the tokens in context and the tokens and cost of the whole chat.
+- An info button under a finished reply opens its details: the model, how long the model wrote and how fast, the cost, and tokens by kind. A running reply shows its tokens and cost so far.
+- A new chat lists your three most recent chats above the composer, so you can return to one without opening the sidebar.
+
+### 🔄 Changed
+
+- The sidebar, new chat and menu buttons now sit in a row under the composer and step aside while you type. Chat controls in Settings moves them back to the top.
+- The top of a chat shows the chat's name instead of the model. It reads New chat in grey until the server names it. With the controls at the bottom, tap the name to rename the chat.
+- The model picker moved into the composer, where a chip shows the model and its reasoning level. Reasoning levels are now a row at the bottom of the model sheet instead of a sheet of their own, and the sheet is only as tall as its lists.
+- In the sidebar, search, new chat and the selection controls moved under the chat list.
+- The select text view closes with a Done button at the bottom.
+
+### 🧩 Improved
+
+- Your message stays at the top of the screen while its reply is written, and the reply grows into the space under it. A reply longer than the screen runs on below, and the arrow takes you to the end.
+- A form with several questions ends on a review page. Tap an answer to change it, then submit from there.
+- Answered questions stay in the reply with your answers, and a dismissed question shows as skipped. Copy conversation includes them. While a question is open, the reply says it is waiting for your answer.
+- A code block taller than the screen has a second copy button at its end.
+
+### 🐛 Fixed
+
+- Dismissing a question no longer ends the reply with an error.
+
 ## [1.1.0] - 2026-09-27
 
 ### ✨ Added
@@ -157,6 +186,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.2.0]: https://github.com/pa2x2/openchat/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pa2x2/openchat/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0
 [1.0.0-alpha06]: https://github.com/pa2x2/openchat/releases/tag/v1.0.0-alpha06

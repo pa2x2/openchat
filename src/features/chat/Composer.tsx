@@ -1,8 +1,8 @@
 /**
  * Message composer: a floating card with the text input on top and a toolbar
- * below. Each optional control (stop, attach, reasoning chip) renders only
- * when the caller passes its prop, so capability gating stays at the call
- * site.
+ * below. Each optional control (stop, attach, model chip, context meter)
+ * renders only when the caller passes its prop, so capability gating stays at
+ * the call site.
  */
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
@@ -12,9 +12,12 @@ import { Pressable } from "@/src/ui/Pressable";
 import type { Attachment } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
+import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
+import { Spinner } from "@/src/ui/Spinner";
 import { TextInput, type TextInputHandle } from "@/src/ui/TextInput";
 import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
+import { ContextMeter, type ContextUse } from "./ContextMeter";
 
 export interface ComposerProps {
   ref?: Ref<ComposerHandle>;
@@ -30,8 +33,20 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
-  /** Present when the model offers variants: the current level and a way to change it. */
-  reasoning?: { label: string; onPress: () => void };
+  /** Present when the backend lets the user pick the model; opens the picker. */
+  model?: {
+    label: string;
+    /** The reasoning level the model runs with, when it offers any. */
+    level?: string;
+    /**
+     * "placeholder" stands in for a label still loading; "busy" keeps the
+     * label but shows a request for it is in flight.
+     */
+    status?: "placeholder" | "busy";
+    onPress: () => void;
+  };
+  /** Present once a reply has said how full the model's context is; stays while a reply streams. */
+  context?: ContextUse & { onPress: () => void };
   /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
   editing?: { onCancel: () => void };
   autoFocus?: boolean;
@@ -60,7 +75,8 @@ export function Composer({
   onAttach,
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
-  reasoning,
+  model,
+  context,
   editing,
   autoFocus,
   placeholder = "Ask anything",
@@ -99,9 +115,9 @@ export function Composer({
   }
 
   const sendDisabled = (text.trim().length === 0 && attachments.length === 0) || locked;
-  // Attach and the chip step aside while a reply streams.
+  // Attach and the model chip step aside while a reply streams.
   const showAttach = Boolean(onAttach) && !streaming;
-  const showReasoning = Boolean(reasoning) && !streaming;
+  const showModel = Boolean(model) && !streaming;
 
   return (
     <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
@@ -155,26 +171,47 @@ export function Composer({
             <Icon name="plus" size={26} />
           </Pressable>
         ) : null}
-        {showReasoning && reasoning ? (
+        {showModel && model ? (
           <Pressable
-            accessibilityHint="Chooses how much the model thinks before answering"
-            accessibilityLabel={`Reasoning: ${reasoning.label}`}
+            accessibilityHint="Chooses the model and how much it thinks before answering"
+            accessibilityLabel={[
+              `Model: ${model.label}`,
+              model.level && `Reasoning: ${model.level}`,
+            ]
+              .filter(Boolean)
+              .join(". ")}
             accessibilityRole="button"
             className={cn(
-              "h-9 flex-row items-center gap-1 rounded-full pl-2 pr-1.5 active:bg-raised",
+              "h-9 shrink flex-row items-center gap-1 rounded-full pl-2 pr-1.5 active:bg-raised",
               !showAttach && "ml-1",
             )}
-            onPress={reasoning.onPress}
-            testID="composer-reasoning"
+            onPress={model.onPress}
+            testID="model-button"
           >
-            <Icon name="lightbulb-outline" size={18} tone="textMuted" />
-            <Text className="text-[15px] font-medium text-text-muted" numberOfLines={1}>
-              {reasoning.label}
-            </Text>
-            <Icon name="chevron-down" size={16} tone="textMuted" />
+            {model.status === "placeholder" ? (
+              <SkeletonGroup label="Loading model" testID="model-button-skeleton">
+                <Skeleton className="h-4 w-28 bg-raised" />
+              </SkeletonGroup>
+            ) : (
+              <>
+                <Text className="shrink text-[15px] font-medium text-text" numberOfLines={1}>
+                  {model.label}
+                </Text>
+                {model.level ? (
+                  // Outside the label, so a long model name is what gets cut short.
+                  <Text className="text-[15px] font-medium text-text-muted">· {model.level}</Text>
+                ) : null}
+              </>
+            )}
+            {model.status === "busy" ? (
+              <Spinner size="small" />
+            ) : (
+              <Icon name="chevron-down" size={16} tone="textMuted" />
+            )}
           </Pressable>
         ) : null}
         <View className="flex-1" />
+        {context ? <ContextMeter context={context} onPress={context.onPress} /> : null}
         {streaming ? (
           <Pressable
             accessibilityHint="Stops the current response"

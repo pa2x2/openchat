@@ -6,9 +6,18 @@
  */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
+}
+
+export function formatWeekday(date: Date): string {
+  return WEEKDAYS[date.getDay()];
+}
+
+export function formatMonthDay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}`;
 }
 
 /** Same-day timestamps show the time, older ones a short date. */
@@ -24,4 +33,19 @@ export function formatTimestamp(epochMs: number, now = new Date()): string {
   const sameYear = date.getFullYear() === now.getFullYear();
   const day = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
   return sameYear ? day : `${day}, ${date.getFullYear()}`;
+}
+
+/**
+ * How long ago, for a short list of recent things: minutes, then hours for
+ * the rest of today, "Yesterday", and a short date from there on.
+ */
+export function formatRelative(epochMs: number, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - epochMs) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (epochMs >= today.getTime()) return `${Math.floor(minutes / 60)} h ago`;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (epochMs >= yesterday.getTime()) return "Yesterday";
+  return formatTimestamp(epochMs, now);
 }

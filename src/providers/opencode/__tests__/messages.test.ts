@@ -12,16 +12,21 @@ describe("toMessages", () => {
       {
         type: "assistant",
         id: "msg_3",
-        time: { created: 60, completed: 89 },
+        time: { created: 60, streamed: 88, completed: 89 },
         finish: "stop",
+        model: { providerID: "zen", id: "glm", variant: "default" },
         content: [{ type: "text", text: "Expo SDK 57 is out." }],
         tokens: { input: 900, output: 40, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.5,
       },
       {
         type: "assistant",
         id: "msg_2",
-        time: { created: 30, completed: 59 },
+        // Done writing at 40; the fetch it called ran until 59.
+        time: { created: 30, streamed: 40, completed: 59 },
         finish: "tool-calls",
+        tokens: { input: 500, output: 20, reasoning: 10, cache: { read: 100, write: 0 } },
+        cost: 0.25,
         content: [
           { type: "reasoning", text: "Fetch the changelog." },
           { type: "text", text: "Reading the changelog." },
@@ -86,7 +91,13 @@ describe("toMessages", () => {
         { type: "text", text: "Expo SDK 57 is out." },
       ],
       status: "complete",
-      usage: { input: 900, output: 40, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+      // What the steps used together, where the context holds only what the last one read.
+      usage: { input: 1400, output: 60, reasoning: 10, cacheRead: 100, cacheWrite: 0 },
+      requests: 2,
+      cost: { amount: 0.75, currency: "USD" },
+      contextTokens: 940,
+      generationMs: 38,
+      model: { provider: "zen", id: "glm" },
       createdAt: 11,
       completedAt: 90,
     });
@@ -109,6 +120,67 @@ describe("toMessages", () => {
       { type: "idle", id: "i", time: { created: 5 }, outcome: "interrupted" },
     ].map(wire);
     expect(toMessages(stopped)[0]).toMatchObject({ status: "interrupted", completedAt: 5 });
+  });
+
+  // The answers a question got live only in its tool call. Read as a plain
+  // tool, an answered question reopens as "Used question" and a dismissed
+  // one as a failure, while a call that never asked must not read as skipped.
+  it("reads a question call as the form it asked", () => {
+    const input = {
+      questions: [
+        { header: "Stay", question: "How long?", options: [{ label: "A week", description: "" }] },
+        { header: "Likes", question: "What for?", options: [], multiple: true },
+      ],
+    };
+    const question = (id: string, state: Record<string, unknown>) => ({
+      type: "tool",
+      id,
+      name: "question",
+      state: { input, ...state },
+      time: { created: 2 },
+    });
+    const reply = wire({
+      type: "assistant",
+      id: "a",
+      time: { created: 1, completed: 9 },
+      content: [
+        question("answered", {
+          status: "completed",
+          content: [{ type: "text", text: "User has answered your questions: …" }],
+          metadata: { answers: [["A week"], []] },
+        }),
+        question("dismissed", {
+          status: "error",
+          error: { type: "unknown", message: "The user dismissed this question" },
+        }),
+        question("denied", {
+          status: "error",
+          error: { type: "unknown", message: "Permission denied: question" },
+        }),
+      ],
+    });
+
+    expect(toMessages([reply])[0].parts).toEqual([
+      {
+        type: "form",
+        form: {
+          id: "answered",
+          status: "answered",
+          questions: ["How long?", "What for?"],
+          answers: [["A week"], []],
+        },
+      },
+      {
+        type: "form",
+        form: {
+          id: "dismissed",
+          status: "dismissed",
+          questions: ["How long?", "What for?"],
+          answers: [],
+        },
+      },
+      { type: "tool", tool: expect.objectContaining({ id: "denied", status: "failed" }) },
+    ]);
   });
 
   it("drops entries the transcript must not show", () => {

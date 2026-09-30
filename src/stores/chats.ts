@@ -37,6 +37,7 @@ interface ChatsStoreState {
   upsert: (chat: ChatSummary) => void;
   /** Moves a chat to the top of the list with a fresh timestamp. */
   touch: (id: ChatId, updatedAt?: number) => void;
+  setUsage: (id: ChatId, totals: Pick<ChatSummary, "usage" | "cost">) => void;
   remove: (ids: ChatId[]) => void;
   markPendingRegenerate: (id: ChatId, messageId: string) => void;
   clearPendingRegenerate: (id: ChatId) => void;
@@ -74,6 +75,10 @@ export function createChatsStore(storage = mmkvStorage) {
             chats: sortChats(
               state.chats.map((chat) => (chat.id === id ? { ...chat, updatedAt } : chat)),
             ),
+          })),
+        setUsage: (id, { usage, cost }) =>
+          set((state) => ({
+            chats: state.chats.map((chat) => (chat.id === id ? { ...chat, usage, cost } : chat)),
           })),
         remove: (ids) =>
           set((state) => ({ chats: state.chats.filter((chat) => !ids.includes(chat.id)) })),

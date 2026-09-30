@@ -5,9 +5,28 @@ import type {
   SessionMessageInfo,
   SessionMessageUser,
 } from "@opencode/client";
-import type { Attachment, ChatId, Message, MessageStatus, ReplyPart } from "@/src/domain";
+import {
+  addCost,
+  addUsage,
+  totalTokens,
+  type Attachment,
+  type ChatId,
+  type FormResult,
+  type Message,
+  type MessageStatus,
+  type ReplyPart,
+} from "@/src/domain";
 import type { OpenCodeClient } from "./client";
-import { toolCategory, toolSubject } from "./normalize";
+import { fromWireModel } from "./sessions";
+import { toCost, toTokenUsage } from "./usage";
+import {
+  QUESTION_TOOL,
+  askedQuestions,
+  givenAnswers,
+  isDismissal,
+  toolCategory,
+  toolSubject,
+} from "./normalize";
 
 export async function fetchMessages(client: OpenCodeClient, chatId: ChatId): Promise<Message[]> {
   const response = await client.message.list({ sessionID: chatId });
@@ -74,10 +93,39 @@ function toUserMessage(wire: SessionMessageUser): Message {
   };
 }
 
+type WireTool = Extract<SessionMessageAssistant["content"][number], { type: "tool" }>;
+
+/**
+ * A `question` call as the form it raised. Null when it never got as far as
+ * asking (its input is still being written, or it failed some other way);
+ * the call then shows as any other tool does.
+ */
+function toFormResult(part: WireTool): FormResult | null {
+  const { state } = part;
+  if (part.name !== QUESTION_TOOL || state.status === "streaming") return null;
+  const questions = askedQuestions(state.input);
+  if (!questions) return null;
+  if (state.status === "completed") {
+    const answers = givenAnswers(state.metadata);
+    return answers ? { id: part.id, status: "answered", questions, answers } : null;
+  }
+  if (state.status === "error") {
+    return isDismissal(state.error)
+      ? { id: part.id, status: "dismissed", questions, answers: [] }
+      : null;
+  }
+  return { id: part.id, status: "waiting", questions, answers: [] };
+}
+
 function toParts(step: SessionMessageAssistant): ReplyPart[] {
   const parts: ReplyPart[] = [];
   for (const part of step.content) {
     if (part.type === "tool") {
+      const form = toFormResult(part);
+      if (form) {
+        parts.push({ type: "form", form });
+        continue;
+      }
       const { state } = part;
       parts.push({
         type: "tool",
@@ -118,17 +166,33 @@ function toReply(steps: SessionMessageAssistant[], idle?: SessionMessageIdle): M
     text: parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n\n"),
     parts,
     status,
-    // The last step saw the whole conversation, so its usage is the run's.
-    usage: last.tokens
-      ? {
-          input: last.tokens.input,
-          output: last.tokens.output,
-          reasoning: last.tokens.reasoning,
-          cacheRead: last.tokens.cache?.read,
-          cacheWrite: last.tokens.cache?.write,
-        }
-      : undefined,
+    ...toStats(steps),
+    ...(last.model ? { model: fromWireModel(last.model) } : {}),
     createdAt: first.time.created,
     ...(completedAt !== undefined ? { completedAt } : {}),
   };
+}
+
+type ReplyStats = Pick<Message, "usage" | "requests" | "cost" | "contextTokens" | "generationMs">;
+
+function toStats(steps: SessionMessageAssistant[]): ReplyStats {
+  const stats: ReplyStats = {};
+  let generationMs: number | undefined = 0;
+  for (const step of steps) {
+    const usage = toTokenUsage(step.tokens);
+    if (!usage) continue;
+    stats.usage = addUsage(stats.usage, usage);
+    stats.requests = (stats.requests ?? 0) + 1;
+    stats.cost = addCost(stats.cost, toCost(step.cost));
+    // Every step reads the whole conversation again, so the last count is the context's size.
+    stats.contextTokens = totalTokens(usage);
+    // `streamed` is when the model stopped writing; the step stays open while its tools run.
+    const { created, streamed } = step.time;
+    generationMs =
+      generationMs !== undefined && streamed !== undefined
+        ? generationMs + streamed - created
+        : undefined;
+  }
+  if (stats.usage && generationMs !== undefined) stats.generationMs = generationMs;
+  return stats;
 }
