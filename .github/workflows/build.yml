@@ -3,7 +3,6 @@ name: Build & Test
 on:
   push:
     branches:
-      - main
       - upcoming
     paths:
       - "**"
@@ -51,7 +50,7 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       # The Gradle build cache doesn't cover the native (CMake) builds, which are most of the
-      # build time. Release runs restore this cache but don't save to it.
+      # build time.
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:

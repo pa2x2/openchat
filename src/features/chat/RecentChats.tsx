@@ -1,8 +1,7 @@
 /**
  * The chats used last, offered above the composer on a chat not yet started.
  * The app always opens on a new chat, and the way back to the last
- * conversation is otherwise the first row of the sidebar, at the top of the
- * screen.
+ * conversation is otherwise through the sidebar.
  */
 
 import { useMemo } from "react";

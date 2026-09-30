@@ -1,8 +1,9 @@
 /**
  * Sidebar: every conversation the server knows about except temporary ones
- * (newest first under date headings, cached locally for instant launch) and,
- * under the list where the thumb reaches them, search, new chat and the
- * connected server, which leads to Settings and to its usage.
+ * (under date headings, cached locally for instant launch) and, under the
+ * list, search, new chat and the connected server, which leads to Settings
+ * and to its usage. The list runs up from those controls, newest chat last,
+ * so the chats most likely wanted are the ones the thumb reaches.
  *
  * Long-pressing a chat opens its menu: rename, delete, or select, which starts
  * selection mode, where chats can be deleted in bulk. Its controls take the
@@ -239,12 +240,16 @@ export function ChatDrawer({
         ) : null}
       </View>
 
+      {/* Inverted: what the list calls its top is the bottom of the screen, so
+          its padding, its header and the pull that refreshes it are all down
+          by the controls. */}
       <SectionList
+        inverted
         sections={sections}
         keyExtractor={(chat) => chat.id}
         keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
-        contentContainerClassName="px-2 pb-3"
+        contentContainerClassName="px-2 pt-3"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />
         }
@@ -263,7 +268,8 @@ export function ChatDrawer({
             </Pressable>
           ) : null
         }
-        renderSectionHeader={({ section }) => (
+        // The footer, which the inversion puts above the section's chats.
+        renderSectionFooter={({ section }) => (
           <Text className="px-3 pb-1.5 pt-5 text-[13.5px] font-medium text-text-muted">
             {section.title}
           </Text>
