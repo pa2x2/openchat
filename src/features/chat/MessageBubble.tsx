@@ -9,6 +9,7 @@ import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
 import { FormResultCard } from "./FormResultCard";
+import { ReplyDetails } from "./ReplyDetails";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
@@ -194,6 +195,7 @@ export const MessageBubble = memo(function MessageBubble({
   const isUser = message.role === "user";
   const hasText = message.text.length > 0;
   const [foldOpen, setFoldOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const layout = useMemo(
     () => (isUser ? null : layoutReply(message, { showReasoning, activity })),
     [isUser, message, showReasoning, activity],
@@ -217,6 +219,9 @@ export const MessageBubble = memo(function MessageBubble({
 
   const status = statusFor(message);
   const failed = message.status === "error";
+  const hasDetails = message.usage !== undefined;
+  // Retry sits in the error card, so a failed reply offers no regenerate here.
+  const canRegenerate = Boolean(onRegenerate) && !failed;
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (
@@ -270,19 +275,12 @@ export const MessageBubble = memo(function MessageBubble({
       {streaming ? (
         // Holds the action row's place so the reply doesn't jump when it ends.
         <View className="mt-1 h-9" />
-      ) : failed ? (
-        // Retry sits in the error card.
-        layout.answer ? (
-          <View className="-ml-2 mt-1 flex-row">
-            <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
-          </View>
-        ) : null
-      ) : layout.answer || onRegenerate ? (
+      ) : layout.answer || canRegenerate || hasDetails ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
             <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
           ) : null}
-          {onRegenerate ? (
+          {canRegenerate ? (
             <Pressable
               accessibilityHint="Runs this reply again and replaces it"
               accessibilityLabel="Regenerate reply"
@@ -294,8 +292,31 @@ export const MessageBubble = memo(function MessageBubble({
               <Icon name="refresh" size={19} tone="textMuted" />
             </Pressable>
           ) : null}
+          {hasDetails ? (
+            <Pressable
+              accessibilityHint={
+                detailsOpen ? "Hides what the reply used" : "Shows what the reply used"
+              }
+              accessibilityLabel="Reply details"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: detailsOpen }}
+              className={cn(
+                "h-9 w-9 items-center justify-center rounded-full active:bg-surface",
+                detailsOpen && "bg-surface",
+              )}
+              onPress={() => setDetailsOpen((current) => !current)}
+              testID="reply-details-button"
+            >
+              <Icon
+                name="information-outline"
+                size={19}
+                tone={detailsOpen ? "text" : "textMuted"}
+              />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
+      {detailsOpen && hasDetails && !streaming ? <ReplyDetails message={message} /> : null}
     </Bubble>
   );
 });
