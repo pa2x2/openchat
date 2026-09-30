@@ -6,6 +6,11 @@
  * provider at once. Under the list, the model in use offers its variants
  * (usually its reasoning effort), or "Auto" for the model's own default.
  *
+ * The sheet is as tall as the taller of the rail and the list, up to the
+ * sheet's limit, so a short list is not left at the top of a tall sheet: that
+ * is the part of it farthest from the thumb. A list shorter than the rail
+ * sits at the bottom, next to the search field.
+ *
  * The list comes from the models store (cached locally, refreshed from the
  * server every time the sheet opens). Selecting a model or a variant reports
  * it and closes the sheet; the caller decides what the choice applies to.
@@ -93,11 +98,11 @@ export function ModelSheet({
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} height="80%" testID="model-sheet">
+    <Sheet visible={visible} onClose={onClose} testID="model-sheet">
       {loading && models.length === 0 ? (
         <ModelSheetSkeleton />
       ) : error && models.length === 0 ? (
-        <View className="flex-1 items-center justify-center gap-3 px-8">
+        <View className="items-center gap-3 px-8 py-12">
           <Text className="text-center text-sm text-danger" testID="model-error">
             {error}
           </Text>
@@ -110,7 +115,7 @@ export function ModelSheet({
           />
         </View>
       ) : models.length === 0 ? (
-        <View className="flex-1 items-center justify-center gap-3 px-8">
+        <View className="items-center gap-3 px-8 py-12">
           <Text className="text-center text-sm text-text-muted" testID="model-empty">
             No models found on this server.
           </Text>
@@ -276,8 +281,10 @@ function ModelBrowser({
       : "No models.";
 
   return (
-    <View className="flex-1">
-      <View className="flex-1 flex-row gap-2">
+    // Shrinks rather than fills, so the lists decide the sheet's height and
+    // scroll once the sheet is at its limit.
+    <View className="flex-shrink">
+      <View className="flex-shrink flex-row gap-2">
         <ProviderRail
           entries={[
             { id: FAVORITES, label: "Favorites" },
@@ -293,6 +300,7 @@ function ModelBrowser({
           ref={listRef}
           sections={sections}
           className="flex-1"
+          contentContainerClassName="flex-grow justify-end"
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
