@@ -73,6 +73,47 @@ describe("OpenCodeProvider.events", () => {
     ]);
   });
 
+  // Payloads as a v2.0.19 server sent them. The start event goes out well
+  // after the step began, and the end only once the step's tool is done, so
+  // neither one's own time bounds what the model spent writing.
+  it("times a step from when it began to when the model stopped writing", async () => {
+    const step = { sessionID: "ses_a", assistantMessageID: "msg_1" };
+    const tokens = { input: 1361, output: 25, reasoning: 42, cache: { read: 0, write: 0 } };
+    const wire = [
+      {
+        type: "session.step.started",
+        created: 1790779266804,
+        data: {
+          ...step,
+          started: 1790779265169,
+          model: { providerID: "opencode-go", id: "longcat-2.5-preview-free", variant: "default" },
+        },
+      },
+      { type: "session.step.streamed", created: 1790779268049, data: step },
+      { type: "session.step.ended", created: 1790779269365, data: { ...step, cost: 0, tokens } },
+      // A step already under way when the subscription opened.
+      {
+        type: "session.step.ended",
+        created: 1790779274689,
+        data: { ...step, assistantMessageID: "msg_2", cost: 0.25, tokens },
+      },
+    ];
+    const events = await collectEvents(async function* () {
+      yield* wire;
+    });
+    const usage = { input: 1361, output: 25, reasoning: 42, cacheRead: 0, cacheWrite: 0 };
+    expect(events).toEqual([
+      { type: "activity", activity: { kind: "thinking" } },
+      {
+        type: "message-complete",
+        usage,
+        model: { provider: "opencode-go", id: "longcat-2.5-preview-free" },
+        generationMs: 2880,
+      },
+      { type: "message-complete", usage, cost: { amount: 0.25, currency: "USD" } },
+    ]);
+  });
+
   it("yields a retryable error when the subscription fails", async () => {
     const events = await collectEvents(async function* () {
       throw clientError("Transport", new Error("boom"));

@@ -14,9 +14,9 @@ import type {
   FormOption,
   FormValue,
   StreamEvent,
-  TokenUsage,
   ToolCategory,
 } from "@/src/domain";
+import { toCost, toTokenUsage, type WireTokens } from "./usage";
 
 /** Structural subset of the client's form field union. */
 interface WireField {
@@ -193,16 +193,17 @@ const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" }
 /** Structural subset of the client's V2Event union the normalizer consumes. */
 export interface V2EventShape {
   type: string;
+  /** When the server emitted it, in epoch milliseconds. */
+  created?: number;
   data: {
     sessionID?: string;
     assistantMessageID?: string;
     delta?: string;
-    tokens?: {
-      input: number;
-      output: number;
-      reasoning: number;
-      cache: { read: number; write: number };
-    };
+    tokens?: WireTokens;
+    cost?: number;
+    model?: { providerID: string; id: string; variant?: string };
+    /** On a step's start: when the step began, which is before its event went out. */
+    started?: number;
     error?: {
       name?: string;
       type?: string;
@@ -291,19 +292,12 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     }
     case "session.compaction.started":
       return { type: "activity", activity: { kind: "compacting" } };
-    case "session.step.ended": {
-      const tokens = event.data.tokens;
-      const usage: TokenUsage | undefined = tokens
-        ? {
-            input: tokens.input,
-            output: tokens.output,
-            reasoning: tokens.reasoning,
-            cacheRead: tokens.cache?.read,
-            cacheWrite: tokens.cache?.write,
-          }
-        : undefined;
-      return { type: "message-complete", usage };
-    }
+    case "session.step.ended":
+      return {
+        type: "message-complete",
+        usage: toTokenUsage(event.data.tokens),
+        cost: toCost(event.data.cost),
+      };
     // One chat turn finished. The v2 server reports whole prompt runs via
     // `session.execution.*`; `session.idle` appears in newer builds.
     case "session.idle":

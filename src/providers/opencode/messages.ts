@@ -5,15 +5,20 @@ import type {
   SessionMessageInfo,
   SessionMessageUser,
 } from "@opencode/client";
-import type {
-  Attachment,
-  ChatId,
-  FormResult,
-  Message,
-  MessageStatus,
-  ReplyPart,
+import {
+  addCost,
+  addUsage,
+  totalTokens,
+  type Attachment,
+  type ChatId,
+  type FormResult,
+  type Message,
+  type MessageStatus,
+  type ReplyPart,
 } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
+import { fromWireModel } from "./sessions";
+import { toCost, toTokenUsage } from "./usage";
 import {
   QUESTION_TOOL,
   askedQuestions,
@@ -161,17 +166,32 @@ function toReply(steps: SessionMessageAssistant[], idle?: SessionMessageIdle): M
     text: parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n\n"),
     parts,
     status,
-    // The last step saw the whole conversation, so its usage is the run's.
-    usage: last.tokens
-      ? {
-          input: last.tokens.input,
-          output: last.tokens.output,
-          reasoning: last.tokens.reasoning,
-          cacheRead: last.tokens.cache?.read,
-          cacheWrite: last.tokens.cache?.write,
-        }
-      : undefined,
+    ...toStats(steps),
+    ...(last.model ? { model: fromWireModel(last.model) } : {}),
     createdAt: first.time.created,
     ...(completedAt !== undefined ? { completedAt } : {}),
   };
+}
+
+type ReplyStats = Pick<Message, "usage" | "cost" | "contextTokens" | "generationMs">;
+
+function toStats(steps: SessionMessageAssistant[]): ReplyStats {
+  const stats: ReplyStats = {};
+  let generationMs: number | undefined = 0;
+  for (const step of steps) {
+    const usage = toTokenUsage(step.tokens);
+    if (!usage) continue;
+    stats.usage = addUsage(stats.usage, usage);
+    stats.cost = addCost(stats.cost, toCost(step.cost));
+    // Every step reads the whole conversation again, so the last count is the context's size.
+    stats.contextTokens = totalTokens(usage);
+    // `streamed` is when the model stopped writing; the step stays open while its tools run.
+    const { created, streamed } = step.time;
+    generationMs =
+      generationMs !== undefined && streamed !== undefined
+        ? generationMs + streamed - created
+        : undefined;
+  }
+  if (stats.usage && generationMs !== undefined) stats.generationMs = generationMs;
+  return stats;
 }

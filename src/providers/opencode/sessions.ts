@@ -21,7 +21,7 @@ function toWireModel(model: ModelRef): OpenCodeModelRef {
   };
 }
 
-function fromWireModel(model: OpenCodeModelRef): ModelRef {
+export function fromWireModel(model: OpenCodeModelRef): ModelRef {
   return {
     provider: model.providerID,
     id: model.id,

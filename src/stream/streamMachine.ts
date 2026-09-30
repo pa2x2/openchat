@@ -23,18 +23,21 @@
  * responsive even when a provider iterator ignores its abort signal.
  */
 
-import type {
-  Attachment,
-  ChatForm,
-  ChatId,
-  FormAnswer,
-  FormResult,
-  Message,
-  ReplyPart,
-  StreamEvent,
-  ToolCall,
-  TurnActivity,
-  UserMessage,
+import {
+  addCost,
+  addUsage,
+  totalTokens,
+  type Attachment,
+  type ChatForm,
+  type ChatId,
+  type FormAnswer,
+  type FormResult,
+  type Message,
+  type ReplyPart,
+  type StreamEvent,
+  type ToolCall,
+  type TurnActivity,
+  type UserMessage,
 } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
@@ -788,13 +791,25 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       );
       break;
     }
-    case "message-complete":
-      // Step-level completion; usage is final for the step so far.
-      turn.draft = { ...turn.draft, ...(event.usage ? { usage: event.usage } : {}) };
-      messages.patchMessage(turn.chatId, turn.draft.id, {
-        ...(event.usage ? { usage: event.usage } : {}),
-      });
+    case "message-complete": {
+      const { draft } = turn;
+      // Usage counted without its time would make the reply look faster than
+      // it was, so one round-trip of unknown length leaves the whole unknown.
+      const timed = draft.usage === undefined || draft.generationMs !== undefined;
+      const counted: Partial<Message> = {
+        usage: addUsage(draft.usage, event.usage),
+        cost: addCost(draft.cost, event.cost),
+        contextTokens: event.usage ? totalTokens(event.usage) : draft.contextTokens,
+        generationMs:
+          timed && event.generationMs !== undefined
+            ? (draft.generationMs ?? 0) + event.generationMs
+            : undefined,
+        model: event.model ?? draft.model,
+      };
+      turn.draft = { ...draft, ...counted };
+      messages.patchMessage(turn.chatId, draft.id, counted);
       break;
+    }
     case "chat-idle": {
       // The whole prompt run finished. An assistant message that never
       // produced visible text failed silently — surface it as an error with a

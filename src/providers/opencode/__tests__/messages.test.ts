@@ -12,16 +12,21 @@ describe("toMessages", () => {
       {
         type: "assistant",
         id: "msg_3",
-        time: { created: 60, completed: 89 },
+        time: { created: 60, streamed: 88, completed: 89 },
         finish: "stop",
+        model: { providerID: "zen", id: "glm", variant: "default" },
         content: [{ type: "text", text: "Expo SDK 57 is out." }],
         tokens: { input: 900, output: 40, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.5,
       },
       {
         type: "assistant",
         id: "msg_2",
-        time: { created: 30, completed: 59 },
+        // Done writing at 40; the fetch it called ran until 59.
+        time: { created: 30, streamed: 40, completed: 59 },
         finish: "tool-calls",
+        tokens: { input: 500, output: 20, reasoning: 10, cache: { read: 100, write: 0 } },
+        cost: 0.25,
         content: [
           { type: "reasoning", text: "Fetch the changelog." },
           { type: "text", text: "Reading the changelog." },
@@ -86,7 +91,12 @@ describe("toMessages", () => {
         { type: "text", text: "Expo SDK 57 is out." },
       ],
       status: "complete",
-      usage: { input: 900, output: 40, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+      // What the steps used together, where the context holds only what the last one read.
+      usage: { input: 1400, output: 60, reasoning: 10, cacheRead: 100, cacheWrite: 0 },
+      cost: { amount: 0.75, currency: "USD" },
+      contextTokens: 940,
+      generationMs: 38,
+      model: { provider: "zen", id: "glm" },
       createdAt: 11,
       completedAt: 90,
     });

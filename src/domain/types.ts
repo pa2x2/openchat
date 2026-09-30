@@ -65,12 +65,23 @@ export interface UserMessage {
   attachments?: Attachment[];
 }
 
+/**
+ * Tokens as a backend counted them, each in one bucket only: input read from
+ * a cache is not also in `input`, and reasoning is not also in `output`. An
+ * adapter whose backend counts them inclusively subtracts.
+ */
 export interface TokenUsage {
   input?: number;
   output?: number;
   reasoning?: number;
   cacheRead?: number;
   cacheWrite?: number;
+}
+
+export interface Money {
+  amount: number;
+  /** ISO 4217 code, e.g. "USD". */
+  currency: string;
 }
 
 export type FormValue = string | number | boolean | string[];
@@ -215,7 +226,18 @@ export type StreamEvent =
   | { type: "tool"; id: string; update: Partial<Omit<ToolCall, "id">> }
   /** Starts or updates the form result `id`; fields left out keep their value. */
   | { type: "form-result"; id: string; update: Partial<Omit<FormResult, "id">> }
-  | { type: "message-complete"; usage?: TokenUsage }
+  /**
+   * One round-trip to the model is over; a reply that uses tools makes
+   * several. The figures are that round-trip's alone, and the app adds them
+   * up. Its `usage` is also how many tokens the model's context now holds.
+   */
+  | {
+      type: "message-complete";
+      usage?: TokenUsage;
+      cost?: Money;
+      generationMs?: number;
+      model?: ModelRef;
+    }
   | { type: "chat-idle" }
   /**
    * The subscription is live: nothing from here on is missed. Whatever
@@ -240,7 +262,19 @@ export interface Message {
   parts?: ReplyPart[];
   attachments?: Attachment[];
   status: MessageStatus;
+  /** What a reply used, over all of its round-trips to the model. */
   usage?: TokenUsage;
+  /** Unset when the backend doesn't know the price, which is not the same as free. */
+  cost?: Money;
+  contextTokens?: number;
+  /**
+   * Milliseconds the model spent on a reply, without the time its tools ran
+   * or a form waited. Unset unless it is known for every round-trip `usage`
+   * counts, so that the two give a speed.
+   */
+  generationMs?: number;
+  /** The model that wrote a reply; a chat can change models between replies. */
+  model?: ModelRef;
   createdAt: number;
   /** When a reply stopped running; unset while it runs or when the backend didn't say. */
   completedAt?: number;

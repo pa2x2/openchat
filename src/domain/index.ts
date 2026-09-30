@@ -16,6 +16,7 @@ export type {
   ModelInfo,
   ModelRef,
   ModelVariant,
+  Money,
   ProviderId,
   ReplyPart,
   StreamEvent,
@@ -27,3 +28,4 @@ export type {
   UserMessage,
 } from "./types";
 export { UNTITLED_CHAT } from "./types";
+export { addCost, addUsage, totalTokens } from "./usage";

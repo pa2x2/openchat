@@ -44,6 +44,8 @@ function scriptedEvents(scripts: Script[]): ChatProvider["events"] {
 
 const textDelta = (text: string): StreamEvent => ({ type: "text-delta", text });
 const chatIdle = (): StreamEvent => ({ type: "chat-idle" });
+const step = (figures: Omit<Extract<StreamEvent, { type: "message-complete" }>, "type">) =>
+  ({ type: "message-complete", ...figures }) satisfies StreamEvent;
 
 function useProvider(overrides: Partial<ChatProvider> = {}): ChatProvider {
   const provider = {
@@ -100,6 +102,57 @@ describe("sendMessage", () => {
     ]);
     expect(provider.send).toHaveBeenCalledWith("c1", expect.objectContaining({ text: "hi" }));
     expect(state().activeTurns.c1).toBe(false);
+  });
+
+  it("adds up the steps of a reply", async () => {
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            step({ usage: { input: 100, output: 10 }, cost: { amount: 0.25, currency: "USD" } }),
+            textDelta("Hello"),
+            step({
+              usage: { input: 150, output: 5, cacheRead: 100 },
+              cost: { amount: 0.5, currency: "USD" },
+            }),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    expect(state().byChat.c1[1]).toMatchObject({
+      parts: [{ type: "text", text: "Hello" }],
+      usage: { input: 250, output: 15, cacheRead: 100 },
+      cost: { amount: 0.75, currency: "USD" },
+      contextTokens: 255,
+    });
+  });
+
+  // A reply picked up mid-step gets that step's tokens but not its time;
+  // dividing by the time of the other steps would show it faster than it was.
+  it("leaves a reply's generation time unknown once a step comes without one", async () => {
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            step({ usage: { output: 10 }, generationMs: 400 }),
+            step({ usage: { output: 30 } }),
+            step({ usage: { output: 5 }, generationMs: 100 }),
+            textDelta("Done"),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    const reply = state().byChat.c1[1];
+    expect(reply.usage).toEqual({ output: 45 });
+    expect(reply.generationMs).toBeUndefined();
   });
 
   it("keeps the user message and fails the turn when delivery fails", async () => {
