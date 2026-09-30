@@ -593,6 +593,12 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
             useMessagesStore.getState().removeForm(chatId, event.formId);
             continue;
           }
+          // Kept out of `applyEvent`: totals can arrive between two deltas of
+          // one sentence, and anything applied there ends the part being written.
+          if (event.type === "chat-usage") {
+            useChatsStore.getState().setUsage(chatId, event);
+            continue;
+          }
           if (event.type === "connected") {
             // A followed run can end between the check that it runs and this
             // subscription, and its closing events are then gone for good.

@@ -85,7 +85,6 @@ describe("normalizeV2Event", () => {
       "session.inbox.enqueued",
       "session.execution.started",
       "session.text.ended",
-      "session.usage.updated",
       "session.renamed",
       "permission.asked",
       "question.asked",

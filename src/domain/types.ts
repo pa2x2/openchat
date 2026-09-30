@@ -238,6 +238,8 @@ export type StreamEvent =
       generationMs?: number;
       model?: ModelRef;
     }
+  /** The chat's totals so far, replacing the ones known before. */
+  | { type: "chat-usage"; usage?: TokenUsage; cost?: Money }
   | { type: "chat-idle" }
   /**
    * The subscription is live: nothing from here on is missed. Whatever
@@ -287,6 +289,13 @@ export interface ChatSummary {
   title: string;
   updatedAt: number;
   model?: ModelRef;
+  /**
+   * Everything the chat has used, as the backend counts it. That can be more
+   * than its replies add up to: a backend may also count work that left no
+   * reply behind, such as naming the chat or a reply that was regenerated.
+   */
+  usage?: TokenUsage;
+  cost?: Money;
 }
 
 /**

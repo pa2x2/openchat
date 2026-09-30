@@ -5,6 +5,7 @@
 import type { ModelRef as OpenCodeModelRef, SessionInfo } from "@opencode/client";
 import { UNTITLED_CHAT, type ChatId, type ChatSummary, type ModelRef } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
+import { toCost, toTokenUsage } from "./usage";
 
 /**
  * What the server reports for a session switched to a model without a
@@ -74,5 +75,7 @@ export function toChatSummary(session: SessionInfo): ChatSummary {
     title: session.title && session.title.length > 0 ? session.title : UNTITLED_CHAT,
     updatedAt: session.time?.updated ?? 0,
     model: session.model ? fromWireModel(session.model) : undefined,
+    usage: toTokenUsage(session.tokens),
+    cost: toCost(session.cost),
   };
 }

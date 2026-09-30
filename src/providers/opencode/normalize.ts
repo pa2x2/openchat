@@ -298,6 +298,13 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         usage: toTokenUsage(event.data.tokens),
         cost: toCost(event.data.cost),
       };
+    // Sent after every step, and once the chat is named: naming runs a model too.
+    case "session.usage.updated":
+      return {
+        type: "chat-usage",
+        usage: toTokenUsage(event.data.tokens),
+        cost: toCost(event.data.cost),
+      };
     // One chat turn finished. The v2 server reports whole prompt runs via
     // `session.execution.*`; `session.idle` appears in newer builds.
     case "session.idle":

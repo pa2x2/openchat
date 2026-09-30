@@ -104,13 +104,17 @@ describe("sendMessage", () => {
     expect(state().activeTurns.c1).toBe(false);
   });
 
-  it("adds up the steps of a reply", async () => {
+  it("adds up a reply's steps, and keeps a sentence whole when the chat's totals land inside it", async () => {
+    useChatsStore.setState({ chats: [{ id: "c1", title: "Greeting", updatedAt: 1 }] });
+    const totals = { usage: { input: 130, output: 12 }, cost: { amount: 0.5, currency: "USD" } };
     useProvider({
       events: scriptedEvents([
         {
           events: [
             step({ usage: { input: 100, output: 10 }, cost: { amount: 0.25, currency: "USD" } }),
-            textDelta("Hello"),
+            textDelta("Hel"),
+            { type: "chat-usage", ...totals },
+            textDelta("lo"),
             step({
               usage: { input: 150, output: 5, cacheRead: 100 },
               cost: { amount: 0.5, currency: "USD" },
@@ -129,6 +133,7 @@ describe("sendMessage", () => {
       cost: { amount: 0.75, currency: "USD" },
       contextTokens: 255,
     });
+    expect(useChatsStore.getState().chats[0]).toMatchObject(totals);
   });
 
   // A reply picked up mid-step gets that step's tokens but not its time;
