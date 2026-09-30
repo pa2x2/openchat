@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 // RNGH's ScrollView claims a sideways swipe before the drawer's pan can, so
@@ -17,6 +17,8 @@ export interface CodeBlockProps {
   /** Still streaming: the last line may be incomplete. */
   live: boolean;
 }
+
+const LINE_HEIGHT = 20;
 
 const Line = memo(function Line({ tokens }: { tokens: CodeLine }) {
   return tokens.map((token, index) =>
@@ -36,6 +38,21 @@ const Line = memo(function Line({ tokens }: { tokens: CodeLine }) {
 export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
   const lines = useCodeLines(code, language, theme.scheme, live);
   const { copied, copy } = useCopyToClipboard();
+  const { height } = useWindowDimensions();
+  // Lines scroll sideways rather than wrap, so their count is the block's height.
+  const tall = lines.length * LINE_HEIGHT > height;
+
+  const copyButton = (
+    <Pressable
+      accessibilityLabel={copied ? "Copied" : "Copy code"}
+      accessibilityRole="button"
+      hitSlop={6}
+      onPress={() => copy(code)}
+      style={{ padding: 8 }}
+    >
+      <Icon name={copied ? "check" : "content-copy"} size={15} color={theme.codeMuted} />
+    </Pressable>
+  );
 
   return (
     <View
@@ -58,15 +75,7 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
         }}
       >
         <Text style={{ color: theme.codeMuted, fontSize: 13 }}>{language ?? ""}</Text>
-        <Pressable
-          accessibilityLabel={copied ? "Copied" : "Copy code"}
-          accessibilityRole="button"
-          hitSlop={6}
-          onPress={() => copy(code)}
-          style={{ padding: 8 }}
-        >
-          <Icon name={copied ? "check" : "content-copy"} size={15} color={theme.codeMuted} />
-        </Pressable>
+        {copyButton}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Text
@@ -75,10 +84,10 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
             color: theme.codeText,
             fontFamily: MONOSPACE,
             fontSize: 13.5,
-            lineHeight: 20,
+            lineHeight: LINE_HEIGHT,
             paddingHorizontal: 14,
             paddingTop: 2,
-            paddingBottom: 14,
+            paddingBottom: tall ? 2 : 14,
           }}
         >
           {lines.map((tokens, index) => (
@@ -89,6 +98,12 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
           ))}
         </Text>
       </ScrollView>
+      {/* The button above is a screen or more back by the time the block is read. */}
+      {tall ? (
+        <View style={{ alignItems: "flex-end", paddingRight: 4, paddingBottom: 4 }}>
+          {copyButton}
+        </View>
+      ) : null}
     </View>
   );
 }
