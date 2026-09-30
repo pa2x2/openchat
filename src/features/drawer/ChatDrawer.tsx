@@ -2,7 +2,7 @@
  * Sidebar: every conversation the server knows about except temporary ones
  * (newest first under date headings, cached locally for instant launch) and,
  * under the list where the thumb reaches them, search, new chat and the
- * connected server, which leads to Settings.
+ * connected server, which leads to Settings and to its usage.
  *
  * Long-pressing a chat opens its menu: rename, delete, or select, which starts
  * selection mode, where chats can be deleted in bulk. Its controls take the
@@ -37,6 +37,7 @@ export interface ChatDrawerProps {
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
   onOpenSettings: () => void;
+  onOpenUsage: () => void;
   /** Called after the active chat is deleted, so the screen can move on. */
   onDeletedActive: () => void;
 }
@@ -47,6 +48,7 @@ export function ChatDrawer({
   onSelectChat,
   onNewChat,
   onOpenSettings,
+  onOpenUsage,
   onDeletedActive,
 }: ChatDrawerProps) {
   const insets = useSafeAreaInsets();
@@ -104,6 +106,7 @@ export function ChatDrawer({
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
+  const canShowUsage = profile !== null && capabilities?.usageReport === true;
   const toggle = useCallback(
     (id: ChatId) =>
       setSelected((current) => {
@@ -384,27 +387,51 @@ export function ChatDrawer({
           </View>
         )}
         {keyboardOpen ? null : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Settings. Server ${serverLabel}`}
-            className="flex-row items-center gap-3 rounded-[14px] p-2 active:bg-surface"
-            onPress={onOpenSettings}
-            testID="drawer-settings"
-          >
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
-              <Icon name="server-outline" size={19} tone="primaryForeground" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-[15.5px] font-medium text-text">{providerLabel}</Text>
-              <View className="flex-row items-center gap-1.5">
-                <View className={cn("h-2 w-2 rounded-full", statusTone)} />
-                <Text className="flex-1 text-[13px] text-text-muted" numberOfLines={1}>
-                  {serverLabel}
-                </Text>
+          <View className="flex-row items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Settings. Server ${serverLabel}`}
+              className="flex-1 flex-row items-center gap-3 rounded-[14px] p-2 active:bg-surface"
+              onPress={onOpenSettings}
+              testID="drawer-settings"
+            >
+              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
+                <Icon name="server-outline" size={19} tone="primaryForeground" />
               </View>
-            </View>
-            <Icon name="cog-outline" size={22} tone="textMuted" />
-          </Pressable>
+              <View className="flex-1">
+                <Text className="text-[15.5px] font-medium text-text">{providerLabel}</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <View className={cn("h-2 w-2 rounded-full", statusTone)} />
+                  <Text className="flex-1 text-[13px] text-text-muted" numberOfLines={1}>
+                    {serverLabel}
+                  </Text>
+                </View>
+              </View>
+              {/* With a usage button beside it, the cog moves out to sit after that button. */}
+              {canShowUsage ? null : <Icon name="cog-outline" size={22} tone="textMuted" />}
+            </Pressable>
+            {canShowUsage ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Usage"
+                  className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                  onPress={onOpenUsage}
+                  testID="drawer-usage"
+                >
+                  <Icon name="chart-box-outline" size={22} tone="textMuted" />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Settings"
+                  className="-mr-1 h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                  onPress={onOpenSettings}
+                >
+                  <Icon name="cog-outline" size={22} tone="textMuted" />
+                </Pressable>
+              </>
+            ) : null}
+          </View>
         )}
       </View>
 

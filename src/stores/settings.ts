@@ -5,7 +5,8 @@
  * model (new chats and chats the server reports without one), the
  * appearance and colour preferences, haptics, the mode new chats start
  * in, where the chat controls sit, the update channel and automatic checks,
- * and whether the notification permission was already asked for.
+ * whether the notification permission was already asked for, and how the
+ * usage screen was last left.
  */
 
 import Constants from "expo-constants";
@@ -38,6 +39,12 @@ export type ChatMode = "normal" | "temporary";
  */
 export type ChatControls = "top" | "bottom";
 
+/** The span the usage screen covers; the day counts include today. */
+export type UsagePeriod = "today" | "7d" | "30d" | "all";
+
+/** What the usage screen charts and orders its models by. */
+export type UsageMeasure = "tokens" | "cost" | "requests";
+
 interface SettingsStoreState {
   lastModels: Record<ProviderId, ModelRef>;
   setLastModel: (providerId: ProviderId, model: ModelRef) => void;
@@ -57,6 +64,10 @@ interface SettingsStoreState {
   setCheckUpdatesOnStartup: (checkUpdatesOnStartup: boolean) => void;
   notificationsAsked: boolean;
   markNotificationsAsked: () => void;
+  usagePeriod: UsagePeriod;
+  setUsagePeriod: (usagePeriod: UsagePeriod) => void;
+  usageMeasure: UsageMeasure;
+  setUsageMeasure: (usageMeasure: UsageMeasure) => void;
 }
 
 export function createSettingsStore(
@@ -83,6 +94,10 @@ export function createSettingsStore(
         setCheckUpdatesOnStartup: (checkUpdatesOnStartup) => set({ checkUpdatesOnStartup }),
         notificationsAsked: false,
         markNotificationsAsked: () => set({ notificationsAsked: true }),
+        usagePeriod: "30d",
+        setUsagePeriod: (usagePeriod) => set({ usagePeriod }),
+        usageMeasure: "tokens",
+        setUsageMeasure: (usageMeasure) => set({ usageMeasure }),
         setLastModel: (providerId, model) =>
           set((state) => ({
             lastModels: { ...state.lastModels, [providerId]: model },

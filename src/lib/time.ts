@@ -6,9 +6,18 @@
  */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
+}
+
+export function formatWeekday(date: Date): string {
+  return WEEKDAYS[date.getDay()];
+}
+
+export function formatMonthDay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}`;
 }
 
 /** Same-day timestamps show the time, older ones a short date. */
