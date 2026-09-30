@@ -1,6 +1,6 @@
 services:
   openchat-opencode:
-    image: ghcr.io/pa2x2/openchat-opencode:<image-tag>
+    image: ghcr.io/pa2x2/openchat-opencode:latest
     # To build locally instead of pulling the published image:
     # build:
     #   context: .

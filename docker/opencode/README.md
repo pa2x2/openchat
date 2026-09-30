@@ -10,16 +10,16 @@ docker run -d --name openchat-opencode \
   -e OPENCODE_SERVER_PASSWORD=your-secret \
   -v openchat-conversations:/conversations \
   -v openchat-data:/root/.local/share/opencode \
-  ghcr.io/pa2x2/openchat-opencode:<image-tag>
+  ghcr.io/pa2x2/openchat-opencode:latest
 ```
+
+`latest` is the newest published image. To stay on one, use a tag from the [releases page](https://github.com/pa2x2/openchat/releases) instead: the part after `server-opencode-`, for example `2.0.18-3`.
 
 ## Compose
 
 ```sh
 OPENCODE_SERVER_PASSWORD=your-secret docker compose -f docker/opencode/docker-compose.yml up -d
 ```
-
-Replace `<image-tag>` in `docker-compose.yml` with the published tag.
 
 ### Environment
 
