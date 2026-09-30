@@ -45,6 +45,38 @@ describe("normalizeV2Event", () => {
     ).toMatchObject({ message: "The server failed to complete the reply." });
   });
 
+  // Only a call's first event names its tool, and a reconnect can lose it:
+  // the later ones have to be told apart by what they carry.
+  it("tells a question call's events from any other tool's", () => {
+    const questions = [{ header: "Stay", question: "How long?", options: [] }];
+    expect(
+      normalizeV2Event(event("session.tool.called", { id: "t", input: { questions } })),
+    ).toEqual({
+      type: "form-result",
+      id: "t",
+      update: { status: "waiting", questions: ["How long?"] },
+    });
+    expect(
+      normalizeV2Event(event("session.tool.success", { id: "t", metadata: { answers: [["1"]] } })),
+    ).toEqual({ type: "form-result", id: "t", update: { status: "answered", answers: [["1"]] } });
+    const dismissed = { type: "unknown", message: "The user dismissed this question" };
+    expect(normalizeV2Event(event("session.tool.failed", { id: "t", error: dismissed }))).toEqual({
+      type: "form-result",
+      id: "t",
+      update: { status: "dismissed" },
+    });
+    const aborted = { type: "aborted", message: "Tool execution interrupted" };
+
+    expect(
+      normalizeV2Event(event("session.tool.called", { id: "t", input: { query: "expo" } })),
+    ).toEqual({ type: "tool", id: "t", update: { subject: "expo" } });
+    expect(normalizeV2Event(event("session.tool.failed", { id: "t", error: aborted }))).toEqual({
+      type: "tool",
+      id: "t",
+      update: { status: "failed" },
+    });
+  });
+
   it("drops every event the chat UI must not see", () => {
     const dropped = [
       "server.connected",

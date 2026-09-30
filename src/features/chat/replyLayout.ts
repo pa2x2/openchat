@@ -6,9 +6,19 @@
  * pages"). While the reply runs, everything stays in view and one live row at
  * the end says what it is doing now. Once it settles, everything before the
  * answer folds behind a single "Worked for 14s" row.
+ *
+ * A form the reply asked is a block of its own: what was asked and what the
+ * user answered. It never folds, since it is the user's own input.
  */
 
-import type { Message, ReplyPart, ToolCall, ToolCategory, TurnActivity } from "@/src/domain";
+import type {
+  FormResult,
+  Message,
+  ReplyPart,
+  ToolCall,
+  ToolCategory,
+  TurnActivity,
+} from "@/src/domain";
 import type { IconName } from "@/src/ui/Icon";
 
 export type WorkItem = { type: "tool"; tool: ToolCall } | { type: "reasoning"; text: string };
@@ -16,7 +26,8 @@ export type WorkItem = { type: "tool"; tool: ToolCall } | { type: "reasoning"; t
 export type ReplyBlock =
   | { type: "text"; key: string; text: string }
   /** `live` is set on the reply's trailing row while the reply runs; it may have no items yet. */
-  | { type: "work"; key: string; items: WorkItem[]; live: TurnActivity | null };
+  | { type: "work"; key: string; items: WorkItem[]; live: TurnActivity | null }
+  | { type: "form"; key: string; form: FormResult };
 
 export type WorkBlock = Extract<ReplyBlock, { type: "work" }>;
 
@@ -30,11 +41,17 @@ export interface ReplyLayout {
 
 const THINKING: TurnActivity = { kind: "thinking" };
 
-function toBlocks(parts: ReplyPart[], showReasoning: boolean): ReplyBlock[] {
+function toBlocks(parts: ReplyPart[], showReasoning: boolean, running: boolean): ReplyBlock[] {
   const blocks: ReplyBlock[] = [];
   parts.forEach((part, index) => {
     if (part.type === "text") {
       blocks.push({ type: "text", key: `text-${index}`, text: part.text });
+      return;
+    }
+    if (part.type === "form") {
+      // While the run waits on it, the form is the card above the composer.
+      if (part.form.status === "waiting" && running) return;
+      blocks.push({ type: "form", key: `form-${index}`, form: part.form });
       return;
     }
     if (part.type === "reasoning" && !showReasoning) return;
@@ -55,12 +72,13 @@ export function layoutReply(
 ): ReplyLayout {
   const parts: ReplyPart[] =
     message.parts ?? (message.text ? [{ type: "text", text: message.text }] : []);
-  const blocks = toBlocks(parts, showReasoning);
+  const running = message.status === "pending" || message.status === "streaming";
+  const blocks = toBlocks(parts, showReasoning, running);
   const answerIndex = blocks.findLastIndex((block) => block.type === "text");
   const answerBlock = blocks[answerIndex];
   const answer = answerBlock?.type === "text" ? answerBlock.text : "";
 
-  if (message.status === "pending" || message.status === "streaming") {
+  if (running) {
     // Unless it is writing text, a running reply is at least thinking.
     const live = activity ?? (blocks.at(-1)?.type === "text" ? null : THINKING);
     if (live) {
@@ -76,10 +94,17 @@ export function layoutReply(
   const after = answerIndex >= 0 ? blocks.slice(answerIndex) : [];
   // Thinking alone is not worth a fold: it keeps its own "Thought" row.
   const foldsWork = before.some(
-    (block) => block.type === "text" || block.items.some((item) => item.type === "tool"),
+    (block) =>
+      block.type === "text" ||
+      (block.type === "work" && block.items.some((item) => item.type === "tool")),
   );
   if (!foldsWork) return { fold: null, blocks, answer };
-  return { fold: { label: foldLabel(message), blocks: before }, blocks: after, answer };
+  const forms = before.filter((block) => block.type === "form");
+  return {
+    fold: { label: foldLabel(message), blocks: before.filter((block) => block.type !== "form") },
+    blocks: [...forms, ...after],
+    answer,
+  };
 }
 
 function foldLabel(message: Message): string {

@@ -8,6 +8,7 @@ import type { Message, TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
+import { FormResultCard } from "./FormResultCard";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
@@ -228,6 +229,8 @@ export const MessageBubble = memo(function MessageBubble({
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (
       <WorkRow key={block.key} block={block} />
+    ) : block.type === "form" ? (
+      <FormResultCard key={block.key} form={block.form} />
     ) : (
       <View key={block.key} className="my-0.5">
         <MarkdownContent

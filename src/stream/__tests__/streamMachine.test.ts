@@ -140,6 +140,39 @@ describe("sendMessage", () => {
   });
 });
 
+describe("forms", () => {
+  const tool = (id: string, update: object): StreamEvent => ({ type: "tool", id, update });
+
+  // The event naming a question's questions can be lost to a reconnect. An
+  // answer with no question to show under must not become an empty card.
+  it("leaves a call a plain tool when its questions never arrived", async () => {
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            tool("t1", { name: "question", status: "running" }),
+            { type: "form-result", id: "t1", update: { status: "answered", answers: [["A"]] } },
+            tool("t2", { name: "question", status: "running" }),
+            { type: "form-result", id: "t2", update: { status: "waiting", questions: ["Q?"] } },
+            { type: "form-result", id: "t2", update: { status: "answered", answers: [["B"]] } },
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "hi");
+
+    expect(state().byChat.c1.at(-1)?.parts).toEqual([
+      { type: "tool", tool: expect.objectContaining({ id: "t1", status: "done" }) },
+      {
+        type: "form",
+        form: { id: "t2", status: "answered", questions: ["Q?"], answers: [["B"]] },
+      },
+    ]);
+  });
+});
+
 describe("interruptTurn", () => {
   it("keeps the partial reply and settles even if the stream ignores abort", async () => {
     const provider = useProvider({

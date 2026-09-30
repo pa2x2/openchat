@@ -8,6 +8,7 @@ export type {
   FormCondition,
   FormField,
   FormOption,
+  FormResult,
   FormValue,
   Message,
   MessageRole,

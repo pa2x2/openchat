@@ -5,9 +5,23 @@ import type {
   SessionMessageInfo,
   SessionMessageUser,
 } from "@opencode/client";
-import type { Attachment, ChatId, Message, MessageStatus, ReplyPart } from "@/src/domain";
+import type {
+  Attachment,
+  ChatId,
+  FormResult,
+  Message,
+  MessageStatus,
+  ReplyPart,
+} from "@/src/domain";
 import type { OpenCodeClient } from "./client";
-import { toolCategory, toolSubject } from "./normalize";
+import {
+  QUESTION_TOOL,
+  askedQuestions,
+  givenAnswers,
+  isDismissal,
+  toolCategory,
+  toolSubject,
+} from "./normalize";
 
 export async function fetchMessages(client: OpenCodeClient, chatId: ChatId): Promise<Message[]> {
   const response = await client.message.list({ sessionID: chatId });
@@ -74,10 +88,39 @@ function toUserMessage(wire: SessionMessageUser): Message {
   };
 }
 
+type WireTool = Extract<SessionMessageAssistant["content"][number], { type: "tool" }>;
+
+/**
+ * A `question` call as the form it raised. Null when it never got as far as
+ * asking (its input is still being written, or it failed some other way);
+ * the call then shows as any other tool does.
+ */
+function toFormResult(part: WireTool): FormResult | null {
+  const { state } = part;
+  if (part.name !== QUESTION_TOOL || state.status === "streaming") return null;
+  const questions = askedQuestions(state.input);
+  if (!questions) return null;
+  if (state.status === "completed") {
+    const answers = givenAnswers(state.metadata);
+    return answers ? { id: part.id, status: "answered", questions, answers } : null;
+  }
+  if (state.status === "error") {
+    return isDismissal(state.error)
+      ? { id: part.id, status: "dismissed", questions, answers: [] }
+      : null;
+  }
+  return { id: part.id, status: "waiting", questions, answers: [] };
+}
+
 function toParts(step: SessionMessageAssistant): ReplyPart[] {
   const parts: ReplyPart[] = [];
   for (const part of step.content) {
     if (part.type === "tool") {
+      const form = toFormResult(part);
+      if (form) {
+        parts.push({ type: "form", form });
+        continue;
+      }
       const { state } = part;
       parts.push({
         type: "tool",

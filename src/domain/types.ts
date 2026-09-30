@@ -146,6 +146,16 @@ export interface ChatForm {
   fields: FormField[];
 }
 
+/** What a form asked and what came back, as the reply that asked it shows it. */
+export interface FormResult {
+  /** The tool call that asked, or the form itself when there was none. */
+  id: string;
+  status: "waiting" | "answered" | "dismissed";
+  questions: string[];
+  /** One list per question, in order; empty for a question left unanswered. */
+  answers: string[][];
+}
+
 export type ToolCategory =
   "command" | "read" | "search" | "edit" | "web-search" | "web-fetch" | "subtask" | "other";
 
@@ -169,7 +179,8 @@ export interface ToolCall {
 export type ReplyPart =
   | { type: "text"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "tool"; tool: ToolCall };
+  | { type: "tool"; tool: ToolCall }
+  | { type: "form"; form: FormResult };
 
 /**
  * What a running reply is doing when it isn't writing text. Tool calls and
@@ -195,6 +206,8 @@ export type StreamEvent =
   | { type: "activity"; activity: TurnActivity | null }
   /** Starts or updates the tool call `id`; fields left out keep their value. */
   | { type: "tool"; id: string; update: Partial<Omit<ToolCall, "id">> }
+  /** Starts or updates the form result `id`; fields left out keep their value. */
+  | { type: "form-result"; id: string; update: Partial<Omit<FormResult, "id">> }
   | { type: "message-complete"; usage?: TokenUsage }
   | { type: "chat-idle" }
   /**

@@ -109,6 +109,43 @@ export function toChatForm(form: WireForm): ChatForm {
   return { id: form.id, title: form.title, fields: form.fields.map(toFormField) };
 }
 
+export const QUESTION_TOOL = "question";
+
+/**
+ * The questions in a `question` call's input, or null for any other input.
+ * Live events after the first don't name their tool, so the input's shape is
+ * what tells a question call apart.
+ */
+export function askedQuestions(input: unknown): string[] | null {
+  const questions = (input as { questions?: unknown } | null)?.questions;
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const texts: string[] = [];
+  for (const entry of questions as { question?: unknown; options?: unknown }[]) {
+    if (typeof entry?.question !== "string" || !Array.isArray(entry.options)) return null;
+    texts.push(entry.question);
+  }
+  return texts;
+}
+
+/** The answers in a `question` call's result metadata: one list per question. */
+export function givenAnswers(metadata: unknown): string[][] | null {
+  const answers = (metadata as { answers?: unknown } | null | undefined)?.answers;
+  if (!Array.isArray(answers)) return null;
+  const valid = answers.every(
+    (answer) => Array.isArray(answer) && answer.every((item) => typeof item === "string"),
+  );
+  return valid ? (answers as string[][]) : null;
+}
+
+// How the question tool fails when its form is dismissed, by the user or by
+// the server dropping it. Any other failure of the call is a real one.
+const DISMISSED = "The user dismissed this question";
+
+export function isDismissal(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return typeof message === "string" && message.includes(DISMISSED);
+}
+
 // OpenCode's built-in tools. Anything else (MCP, plugins) is "other".
 const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   bash: "command",
@@ -222,10 +259,19 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       const id = event.data.id;
       if (typeof id !== "string") return null;
       if (event.type === "session.tool.called") {
+        const questions = askedQuestions(event.data.input);
+        if (questions) return { type: "form-result", id, update: { status: "waiting", questions } };
         return { type: "tool", id, update: { subject: toolSubject(event.data.input) } };
       }
-      const status = event.type === "session.tool.success" ? "done" : "failed";
-      return { type: "tool", id, update: { status } };
+      if (event.type === "session.tool.success") {
+        const answers = givenAnswers(event.data.metadata);
+        if (answers) return { type: "form-result", id, update: { status: "answered", answers } };
+        return { type: "tool", id, update: { status: "done" } };
+      }
+      if (isDismissal(event.data.error)) {
+        return { type: "form-result", id, update: { status: "dismissed" } };
+      }
+      return { type: "tool", id, update: { status: "failed" } };
     }
     case "session.retry.scheduled": {
       const attempt = event.data.attempt;

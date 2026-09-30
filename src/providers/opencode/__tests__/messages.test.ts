@@ -111,6 +111,67 @@ describe("toMessages", () => {
     expect(toMessages(stopped)[0]).toMatchObject({ status: "interrupted", completedAt: 5 });
   });
 
+  // The answers a question got live only in its tool call. Read as a plain
+  // tool, an answered question reopens as "Used question" and a dismissed
+  // one as a failure, while a call that never asked must not read as skipped.
+  it("reads a question call as the form it asked", () => {
+    const input = {
+      questions: [
+        { header: "Stay", question: "How long?", options: [{ label: "A week", description: "" }] },
+        { header: "Likes", question: "What for?", options: [], multiple: true },
+      ],
+    };
+    const question = (id: string, state: Record<string, unknown>) => ({
+      type: "tool",
+      id,
+      name: "question",
+      state: { input, ...state },
+      time: { created: 2 },
+    });
+    const reply = wire({
+      type: "assistant",
+      id: "a",
+      time: { created: 1, completed: 9 },
+      content: [
+        question("answered", {
+          status: "completed",
+          content: [{ type: "text", text: "User has answered your questions: …" }],
+          metadata: { answers: [["A week"], []] },
+        }),
+        question("dismissed", {
+          status: "error",
+          error: { type: "unknown", message: "The user dismissed this question" },
+        }),
+        question("denied", {
+          status: "error",
+          error: { type: "unknown", message: "Permission denied: question" },
+        }),
+      ],
+    });
+
+    expect(toMessages([reply])[0].parts).toEqual([
+      {
+        type: "form",
+        form: {
+          id: "answered",
+          status: "answered",
+          questions: ["How long?", "What for?"],
+          answers: [["A week"], []],
+        },
+      },
+      {
+        type: "form",
+        form: {
+          id: "dismissed",
+          status: "dismissed",
+          questions: ["How long?", "What for?"],
+          answers: [],
+        },
+      },
+      { type: "tool", tool: expect.objectContaining({ id: "denied", status: "failed" }) },
+    ]);
+  });
+
   it("drops entries the transcript must not show", () => {
     // A message steered into a still-busy session leaves an empty finished reply.
     const empty = { type: "assistant", id: "a", time: { created: 1, completed: 2 }, content: [] };

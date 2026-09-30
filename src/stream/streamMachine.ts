@@ -27,6 +27,7 @@ import type {
   Attachment,
   ChatId,
   FormAnswer,
+  FormResult,
   Message,
   ReplyPart,
   StreamEvent,
@@ -737,8 +738,12 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
     case "activity":
       setActivity(turn, event.activity);
       break;
-    case "tool": {
-      turn.draft = updateTool(turn.draft, event.id, event.update);
+    case "tool":
+    case "form-result": {
+      turn.draft =
+        event.type === "tool"
+          ? updateTool(turn.draft, event.id, event.update)
+          : updateFormResult(turn.draft, event.id, event.update);
       writeDraft(turn);
       // With calls running side by side, the latest one still going is shown.
       const running = runningTool(turn.draft);
@@ -808,9 +813,18 @@ function appendDelta(
   return { ...draft, status: "streaming", parts: nextParts, text: draft.text + joiner + delta };
 }
 
+/** A call is one part, shown as a tool until it turns out to have asked a form. */
+function callIndex(parts: ReplyPart[], id: string): number {
+  return parts.findIndex(
+    (part) =>
+      (part.type === "tool" && part.tool.id === id) ||
+      (part.type === "form" && part.form.id === id),
+  );
+}
+
 function updateTool(draft: Message, id: string, update: Partial<Omit<ToolCall, "id">>): Message {
   const parts = draft.parts ?? [];
-  const index = parts.findIndex((part) => part.type === "tool" && part.tool.id === id);
+  const index = callIndex(parts, id);
   const current = index >= 0 ? parts[index] : undefined;
   // A call's first event can be lost to a reconnect; later ones still add it.
   const tool: ToolCall = {
@@ -823,6 +837,34 @@ function updateTool(draft: Message, id: string, update: Partial<Omit<ToolCall, "
     index >= 0
       ? parts.map((part, at) => (at === index ? { type: "tool", tool } : part))
       : [...parts, { type: "tool", tool }];
+  return { ...draft, status: "streaming", parts: nextParts };
+}
+
+const TOOL_STATUS = { waiting: "running", answered: "done", dismissed: "failed" } as const;
+
+function updateFormResult(
+  draft: Message,
+  id: string,
+  update: Partial<Omit<FormResult, "id">>,
+): Message {
+  const parts = draft.parts ?? [];
+  const index = callIndex(parts, id);
+  const current = index >= 0 ? parts[index] : undefined;
+  // The event with the questions can be lost to a reconnect. With nothing to
+  // show as a form, the call stays the tool it was.
+  if (current?.type !== "form" && !update.questions) {
+    return update.status ? updateTool(draft, id, { status: TOOL_STATUS[update.status] }) : draft;
+  }
+  const form: FormResult = {
+    ...(current?.type === "form"
+      ? current.form
+      : { id, status: "waiting", questions: [], answers: [] }),
+    ...update,
+  };
+  const nextParts: ReplyPart[] =
+    index >= 0
+      ? parts.map((part, at) => (at === index ? { type: "form", form } : part))
+      : [...parts, { type: "form", form }];
   return { ...draft, status: "streaming", parts: nextParts };
 }
 
