@@ -38,7 +38,13 @@ import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/model
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import { cn } from "@/src/lib/cn";
-import type { Attachment, Message, ModelInfo, ModelRef } from "@/src/domain";
+import {
+  UNTITLED_CHAT,
+  type Attachment,
+  type Message,
+  type ModelInfo,
+  type ModelRef,
+} from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
@@ -205,6 +211,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   useEffect(() => {
     if (isDraft) useMessagesStore.getState().removeChat(NEW_CHAT);
   }, [isDraft]);
+
+  // The server names a chat once it has a message to name it after, and the
+  // chat list is otherwise only re-read when the sidebar opens.
+  const named = Boolean(chat?.title) && chat?.title !== UNTITLED_CHAT;
+  useEffect(() => {
+    if (!isDraft && !turnActive && !named) void useChatsStore.getState().refresh();
+  }, [isDraft, turnActive, named]);
 
   // Leaving a temporary chat deletes it. Read at unmount rather than render,
   // so a chat deleted some other way meanwhile is not deleted twice.
@@ -408,7 +421,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         openDrawer();
       }}
       onNewChat={handleNewChat}
-      title={(!isDraft && chat?.title) || "New chat"}
+      title={!isDraft && named && chat ? chat.title : "New chat"}
       menuItems={menuItems}
       temporaryLabel={temporary}
       temporary={
