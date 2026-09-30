@@ -1,8 +1,8 @@
 {
   "name": "openchat",
   "main": "expo-router/entry",
-  "version": "1.1.1",
-  "versionCode": 9,
+  "version": "1.1.2",
+  "versionCode": 10,
   "description": "ChatGPT-style mobile client for self-hosted AI backends. Provider-first; ships with an OpenCode V2 adapter.",
   "scripts": {
     "start": "expo start",
