@@ -90,9 +90,9 @@ description: Generate OpenChat app release notes in CHANGELOG.md. Use when asked
    Point `[Unreleased]` at the newest version tag and add a link for each numbered section.
    Omit the `[Unreleased]` link when there is no `[Unreleased]` section.
 
-3. The `release-android` workflow creates a draft GitHub release with a placeholder body.
-   After updating the file, print the new release section so it can be pasted into that
-   draft.
+3. The version's section is the release text. When the version reaches `main`, the
+   `release-android` workflow copies everything under the section's heading into a draft
+   GitHub release. A version without a section is not released.
 
 ## Guidance
 
