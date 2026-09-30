@@ -41,10 +41,10 @@ Today it talks to [OpenCode](https://opencode.ai) servers. The app keeps each ba
      -e OPENCODE_SERVER_PASSWORD=your-secret \
      -v openchat-conversations:/conversations \
      -v openchat-data:/root/.local/share/opencode \
-     ghcr.io/pa2x2/openchat-opencode:<image-tag>
+     ghcr.io/pa2x2/openchat-opencode:latest
    ```
 
-   Tags are listed on the [releases page](https://github.com/pa2x2/openchat/releases) under `server-opencode-*`. See [docker/opencode](docker/opencode/README.md) for Compose, volumes and config.
+   `latest` is the newest image; the tags to pin one are listed on the [releases page](https://github.com/pa2x2/openchat/releases) under `server-opencode-*`. See [docker/opencode](docker/opencode/README.md) for Compose, volumes and config.
 
    You can also use example [docker-compose.yml](https://github.com/pa2x2/openchat/blob/main/docker/opencode/docker-compose.yml)
 

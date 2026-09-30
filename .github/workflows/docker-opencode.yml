@@ -2,7 +2,8 @@ name: docker-opencode
 
 # Publishes the server image whenever what goes into it changes on main. The tag follows from
 # the repo: the OpenCode version for the first image of that version, then <version>-2,
-# <version>-3 and so on for later changes to the config or prompts.
+# <version>-3 and so on for later changes to the config or prompts. Each image also takes over
+# the latest tag.
 
 on:
   push:
@@ -121,7 +122,9 @@ jobs:
           file: docker/opencode/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ steps.meta.outputs.image }}:latest
           build-args: |
             OPENCODE_VERSION=${{ steps.versions.outputs.client }}
 
