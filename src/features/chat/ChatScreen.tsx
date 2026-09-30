@@ -13,6 +13,7 @@ import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { RecentChats } from "./RecentChats";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
+import { UsageSheet } from "./UsageSheet";
 import { discardTemporaryChat } from "./temporaryChats";
 import { conversationMarkdown } from "./conversationText";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
@@ -117,6 +118,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [banner, setBanner] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  const [usageSheetOpen, setUsageSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
@@ -152,6 +154,28 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   );
   const currentLabel = currentInfo?.label ?? null;
   const modelsLoading = useModelsStore((state) => state.loading);
+  // The newest reply that says how full the context is. One that failed
+  // before its first step says nothing, and must not take the meter away.
+  // Read as two plain values: the reply itself changes on every streamed frame.
+  const contextTokens = useMessagesStore(
+    (state) =>
+      state.byChat[chatId]?.findLast((message) => message.contextTokens !== undefined)
+        ?.contextTokens,
+  );
+  const contextModel = useMessagesStore(
+    (state) =>
+      state.byChat[chatId]?.findLast((message) => message.contextTokens !== undefined)?.model,
+  );
+  // The next message runs on the chat's model, so its window is the one that
+  // counts; a chat without one is measured against the model that replied.
+  const windowModel = chat?.model ?? contextModel;
+  const contextWindow = useModelsStore((state) =>
+    windowModel
+      ? state.models.find((model) => sameModelRef(model.ref, windowModel))?.contextWindow
+      : undefined,
+  );
+  const context =
+    contextTokens !== undefined ? { tokens: contextTokens, window: contextWindow } : null;
   const variants = currentInfo?.variants ?? [];
   const variantLabel = currentModel?.variant
     ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
@@ -554,6 +578,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
             editing={editing ? { onCancel: cancelEdit } : undefined}
+            context={context ? { ...context, onPress: () => setUsageSheetOpen(true) } : undefined}
             model={
               modelSelection
                 ? {
@@ -579,6 +604,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onPick={handleAddAttachment}
           />
         ) : null}
+        <UsageSheet
+          visible={usageSheetOpen}
+          onClose={() => setUsageSheetOpen(false)}
+          context={context}
+          usage={chat?.usage}
+          cost={chat?.cost}
+        />
         {modelSelection ? (
           <ModelSheet
             visible={sheetOpen}

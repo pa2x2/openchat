@@ -1,7 +1,8 @@
 /**
  * Message composer: a floating card with the text input on top and a toolbar
- * below. Each optional control (stop, attach, model chip) renders only when
- * the caller passes its prop, so capability gating stays at the call site.
+ * below. Each optional control (stop, attach, model chip, context meter)
+ * renders only when the caller passes its prop, so capability gating stays at
+ * the call site.
  */
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
@@ -16,6 +17,7 @@ import { Spinner } from "@/src/ui/Spinner";
 import { TextInput, type TextInputHandle } from "@/src/ui/TextInput";
 import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
+import { ContextMeter, type ContextUse } from "./ContextMeter";
 
 export interface ComposerProps {
   ref?: Ref<ComposerHandle>;
@@ -43,6 +45,8 @@ export interface ComposerProps {
     status?: "placeholder" | "busy";
     onPress: () => void;
   };
+  /** Present once a reply has said how full the model's context is; stays while a reply streams. */
+  context?: ContextUse & { onPress: () => void };
   /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
   editing?: { onCancel: () => void };
   autoFocus?: boolean;
@@ -72,6 +76,7 @@ export function Composer({
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
   model,
+  context,
   editing,
   autoFocus,
   placeholder = "Ask anything",
@@ -206,6 +211,7 @@ export function Composer({
           </Pressable>
         ) : null}
         <View className="flex-1" />
+        {context ? <ContextMeter context={context} onPress={context.onPress} /> : null}
         {streaming ? (
           <Pressable
             accessibilityHint="Stops the current response"
