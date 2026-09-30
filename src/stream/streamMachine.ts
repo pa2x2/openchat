@@ -25,6 +25,7 @@
 
 import type {
   Attachment,
+  ChatForm,
   ChatId,
   FormAnswer,
   FormResult,
@@ -39,6 +40,7 @@ import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
 import type { ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
+import { withFormRecords } from "@/src/stores/formRecords";
 import { useMessagesStore } from "@/src/stores/messages";
 
 const INITIAL_BACKOFF_MS = 500;
@@ -691,10 +693,13 @@ export async function syncForms(provider: ChatProvider, chatId: ChatId): Promise
 /**
  * Settles a form from the card. On failure the form list is re-synced: the
  * usual cause is a form the backend already closed, which then disappears.
+ * `result` is what the card showed and the user picked; it is kept only for
+ * a form the backend's transcript will not record.
  */
 async function settleForm(
   chatId: ChatId,
-  formId: string,
+  form: ChatForm,
+  result: FormResult,
   settle: (provider: ChatProvider) => Promise<void> | undefined,
 ): Promise<void> {
   const provider = await getProvider();
@@ -705,15 +710,45 @@ async function settleForm(
     void syncForms(provider, chatId);
     throw error;
   }
-  useMessagesStore.getState().removeForm(chatId, formId);
+  useMessagesStore.getState().removeForm(chatId, form.id);
+  if (!form.toolId) keepFormResult(chatId, result);
 }
 
-export function answerForm(chatId: ChatId, formId: string, answer: FormAnswer): Promise<void> {
-  return settleForm(chatId, formId, (provider) => provider.answerForm?.(chatId, formId, answer));
+export function answerForm(
+  chatId: ChatId,
+  form: ChatForm,
+  answer: FormAnswer,
+  result: FormResult,
+): Promise<void> {
+  return settleForm(chatId, form, result, (provider) =>
+    provider.answerForm?.(chatId, form.id, answer),
+  );
 }
 
-export function dismissForm(chatId: ChatId, formId: string): Promise<void> {
-  return settleForm(chatId, formId, (provider) => provider.dismissForm?.(chatId, formId));
+export function dismissForm(chatId: ChatId, form: ChatForm, result: FormResult): Promise<void> {
+  return settleForm(chatId, form, result, (provider) => provider.dismissForm?.(chatId, form.id));
+}
+
+/**
+ * Puts a settled form into the live reply. It is saved as a record when a
+ * tool call can anchor it, which a form raised mid-run has: the call that
+ * asked is still running. Without one it lasts until the transcript is next
+ * fetched.
+ */
+function keepFormResult(chatId: ChatId, form: FormResult): void {
+  const turn = liveTurns.get(chatId);
+  if (!turn || form.questions.length === 0) return;
+  flushDraft(turn);
+  const parts = turn.draft.parts ?? [];
+  const anchor = runningTool(turn.draft) ?? parts.findLast((part) => part.type === "tool")?.tool;
+  if (anchor) {
+    const record = { afterToolId: anchor.id, form };
+    useMessagesStore.getState().addFormRecord(chatId, record);
+    turn.draft = withFormRecords([turn.draft], [record])[0];
+  } else {
+    turn.draft = { ...turn.draft, parts: [...parts, { type: "form", form }] };
+  }
+  writeDraft(turn);
 }
 
 function applyEvent(turn: LiveTurn, event: StreamEvent): void {
@@ -897,9 +932,10 @@ async function reconcile(turn: LiveTurn, { over = false } = {}): Promise<void> {
   try {
     const provider = await getProvider();
     if (!provider) return;
-    const fetched = await provider.fetchMessages(turn.chatId);
+    const server = await provider.fetchMessages(turn.chatId);
     if (turn.finished || turn.controller.signal.aborted) return;
     const messages = useMessagesStore.getState();
+    const fetched = withFormRecords(server, messages.formRecords[turn.chatId]);
     const lastAssistant = [...fetched].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) {
       messages.setMessages(turn.chatId, fetched);

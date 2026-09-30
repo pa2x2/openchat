@@ -144,6 +144,11 @@ export interface ChatForm {
   id: string;
   title: string;
   fields: FormField[];
+  /**
+   * The tool call that raised the form, when the backend keeps the answers
+   * with that call. Unset when the transcript will hold no trace of them.
+   */
+  toolId?: string;
 }
 
 /** What a form asked and what came back, as the reply that asked it shows it. */

@@ -42,6 +42,42 @@ describe("messages store", () => {
     expect(store.getState().loading.c1).toBe(false);
   });
 
+  // The server's transcript replaces the cached one on every fetch and has
+  // no trace of a form that no tool call raised.
+  it("puts a device's form records back into a fetched transcript, once", async () => {
+    const tool = { id: "t1", name: "lookup", category: "other", subject: "", status: "done" };
+    const reply = (toolId: string) =>
+      msg({
+        id: "a1",
+        role: "assistant",
+        parts: [
+          { type: "tool", tool: { ...tool, id: toolId } as never },
+          { type: "text", text: "Done." },
+        ],
+      });
+    const fetch = jest.fn().mockResolvedValue([reply("t1")]);
+    jest.mocked(getProvider).mockResolvedValue({ fetchMessages: fetch } as never);
+    const store = createMessagesStore(createMemoryStorage(), 0);
+    const form = { id: "frm_1", status: "answered", questions: ["Name"], answers: [["Ada"]] };
+    store.getState().addFormRecord("c1", { afterToolId: "t1", form: form as never });
+
+    await store.getState().fetchMessages("c1");
+    await store.getState().fetchMessages("c1");
+
+    expect(store.getState().byChat.c1[0].parts?.map((part) => part.type)).toEqual([
+      "tool",
+      "form",
+      "text",
+    ]);
+
+    // A rerun replaced the reply: its calls are gone, and the record with them.
+    fetch.mockResolvedValue([reply("t2")]);
+    await store.getState().fetchMessages("c1");
+
+    expect(store.getState().byChat.c1[0].parts).toHaveLength(2);
+    expect(store.getState().formRecords.c1).toEqual([]);
+  });
+
   it("persists transcripts without attachment bytes or runtime turn state", async () => {
     const storage = createMemoryStorage();
     const first = createMessagesStore(storage, 0);

@@ -487,8 +487,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             <FormCard
               key={form.id}
               form={form}
-              onSubmit={(answer) => answerForm(chatId, form.id, answer)}
-              onDismiss={() => dismissForm(chatId, form.id)}
+              onSubmit={(answer, result) => answerForm(chatId, form, answer, result)}
+              onDismiss={(result) => dismissForm(chatId, form, result)}
             />
           ) : null}
           {shownError ? (

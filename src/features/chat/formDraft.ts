@@ -7,7 +7,7 @@
  * send their default.
  */
 
-import type { ChatForm, FormAnswer, FormField, FormValue } from "@/src/domain";
+import type { ChatForm, FormAnswer, FormField, FormResult, FormValue } from "@/src/domain";
 
 export type DraftValue = string | boolean | string[];
 export type FormDraft = Record<string, DraftValue>;
@@ -145,4 +145,35 @@ export function buildAnswer(form: ChatForm, draft: FormDraft): FormAnswer {
     if (value !== undefined) answer[field.key] = value;
   }
   return answer;
+}
+
+/** The field's question in full; its title is only a short label for it. */
+export function fieldQuestion(field: FormField): string {
+  return field.description ?? field.title ?? field.key;
+}
+
+/** The field's answer as the user reads it: option labels, not their values. */
+export function answerText(field: FormField, value: DraftValue | undefined): string[] {
+  const answer = toValue(field, value);
+  if (answer === undefined) return [];
+  if (typeof answer === "boolean") return [answer ? "Yes" : "No"];
+  const options = field.type === "text" || field.type === "multiselect" ? field.options : undefined;
+  const label = (item: string) => options?.find((option) => option.value === item)?.label ?? item;
+  return Array.isArray(answer) ? answer.map(label) : [label(String(answer))];
+}
+
+export function formResult(
+  form: ChatForm,
+  draft: FormDraft,
+  status: "answered" | "dismissed",
+): FormResult {
+  const asked = form.fields.filter(
+    (field) => field.type !== "link" && isFieldShown(form, field, draft),
+  );
+  return {
+    id: form.id,
+    status,
+    questions: asked.map(fieldQuestion),
+    answers: status === "answered" ? asked.map((field) => answerText(field, draft[field.key])) : [],
+  };
 }

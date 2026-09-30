@@ -45,6 +45,7 @@ interface WireField {
 export interface WireForm {
   id: string;
   title: string;
+  metadata?: Record<string, unknown>;
   fields: readonly WireField[];
 }
 
@@ -106,7 +107,15 @@ function toFormField(field: WireField): FormField {
 }
 
 export function toChatForm(form: WireForm): ChatForm {
-  return { id: form.id, title: form.title, fields: form.fields.map(toFormField) };
+  // The question tool names its own call; its result then carries the answers.
+  const tool = form.metadata?.kind === "question" ? form.metadata.tool : undefined;
+  const toolId = (tool as { id?: unknown } | undefined)?.id;
+  return {
+    id: form.id,
+    title: form.title,
+    fields: form.fields.map(toFormField),
+    ...(typeof toolId === "string" ? { toolId } : {}),
+  };
 }
 
 export const QUESTION_TOOL = "question";

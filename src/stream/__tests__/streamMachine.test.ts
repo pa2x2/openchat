@@ -3,6 +3,7 @@ import type { ChatId, Message, StreamEvent } from "@/src/domain";
 import type { ChatProvider } from "@/src/providers/types";
 import { getProvider } from "@/src/lib/providerFactory";
 import {
+  answerForm,
   discardPendingRegenerate,
   followRunningTurn,
   interruptTurn,
@@ -72,7 +73,7 @@ async function flush() {
 }
 
 beforeEach(() => {
-  useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {} });
+  useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {}, formRecords: {} });
   useChatsStore.setState({ chats: [], loading: false, error: null, pendingRegenerate: {} });
   getProviderMock.mockReset();
 });
@@ -142,6 +143,54 @@ describe("sendMessage", () => {
 
 describe("forms", () => {
   const tool = (id: string, update: object): StreamEvent => ({ type: "tool", id, update });
+  const result = { id: "frm_1", status: "answered", questions: ["Name"], answers: [["Ada"]] };
+
+  // A form no tool call raised is in no transcript: the reply has to take it
+  // at once, and it has to come back when a reconnect adopts the server's copy.
+  it("keeps the result of a form the transcript will not record", async () => {
+    const lookup = { id: "t1", name: "lookup", category: "other", subject: "", status: "running" };
+    const provider = useProvider({
+      answerForm: jest.fn().mockResolvedValue(undefined),
+      events: scriptedEvents([
+        { events: [tool("t1", { name: "lookup", status: "running" })], drop: true },
+        { events: [] },
+      ]),
+      fetchMessages: jest
+        .fn()
+        .mockResolvedValue([assistant({ parts: [{ type: "tool", tool: lookup as never }] })]),
+      isRunning: jest.fn().mockResolvedValue(true),
+    });
+    jest.useFakeTimers();
+    try {
+      const sending = sendMessage("c1", "hi");
+      await flush();
+
+      await answerForm("c1", { id: "frm_1", title: "Input", fields: [] }, {}, result as never);
+      // Answered from the transcript's own record: nothing to keep.
+      await answerForm("c1", { id: "frm_2", title: "Questions", fields: [], toolId: "t9" }, {}, {
+        ...result,
+        id: "frm_2",
+      } as never);
+
+      expect(provider.answerForm).toHaveBeenCalledTimes(2);
+      expect(state().byChat.c1.at(-1)?.parts).toMatchObject([
+        { type: "tool", tool: { id: "t1" } },
+        { type: "form", form: { id: "frm_1", answers: [["Ada"]] } },
+      ]);
+
+      // The stream dropped: the reply is now the server's, which has no form.
+      await jest.advanceTimersByTimeAsync(2_000);
+      expect(state().byChat.c1.at(-1)).toMatchObject({
+        id: "a1",
+        parts: [{ type: "tool" }, { type: "form", form: { id: "frm_1" } }],
+      });
+
+      await interruptTurn("c1");
+      await sending;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   // The event naming a question's questions can be lost to a reconnect. An
   // answer with no question to show under must not become an empty card.

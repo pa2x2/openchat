@@ -11,7 +11,7 @@ import { useState } from "react";
 import { Keyboard, Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatForm, FormAnswer, FormField, FormOption } from "@/src/domain";
+import type { ChatForm, FormAnswer, FormField, FormOption, FormResult } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { Button } from "@/src/ui/Button";
 import { Icon, type IconName } from "@/src/ui/Icon";
@@ -21,6 +21,7 @@ import {
   buildAnswer,
   canSubmit,
   fieldError,
+  formResult,
   initialDraft,
   isFieldShown,
   type DraftValue,
@@ -29,9 +30,12 @@ import {
 
 export interface FormCardProps {
   form: ChatForm;
-  /** Rejects with a user-facing message when the backend did not take it. */
-  onSubmit: (answer: FormAnswer) => Promise<void>;
-  onDismiss: () => Promise<void>;
+  /**
+   * Rejects with a user-facing message when the backend did not take it.
+   * `result` is the form as the transcript shows it afterwards.
+   */
+  onSubmit: (answer: FormAnswer, result: FormResult) => Promise<void>;
+  onDismiss: (result: FormResult) => Promise<void>;
 }
 
 export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
@@ -130,7 +134,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           size="sm"
           disabled={busy}
           loading={pending === "dismiss"}
-          onPress={() => void run("dismiss", onDismiss)}
+          onPress={() => void run("dismiss", () => onDismiss(formResult(form, draft, "dismissed")))}
           testID="form-dismiss"
         />
         <View className="flex-1" />
@@ -150,7 +154,11 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
             size="sm"
             disabled={busy || !canSubmit(form, draft)}
             loading={pending === "submit"}
-            onPress={() => void run("submit", () => onSubmit(buildAnswer(form, draft)))}
+            onPress={() =>
+              void run("submit", () =>
+                onSubmit(buildAnswer(form, draft), formResult(form, draft, "answered")),
+              )
+            }
             testID="form-submit"
           />
         ) : (
