@@ -5,6 +5,7 @@
  */
 
 import { UNTITLED_CHAT, type ChatId, type ChatSummary } from "@/src/domain";
+import { deleteChatKeepingUsage } from "@/src/features/usage/deleteChat";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
@@ -45,7 +46,7 @@ export async function deleteChats(
   }
   const chats = useChatsStore.getState();
   chats.setDeleting(ids, true);
-  const results = await Promise.allSettled(ids.map((id) => provider.deleteChat(id)));
+  const results = await Promise.allSettled(ids.map((id) => deleteChatKeepingUsage(provider, id)));
   chats.setDeleting(ids, false);
   const deleted = ids.filter((_, index) => results[index].status === "fulfilled");
   if (deleted.length > 0) {
