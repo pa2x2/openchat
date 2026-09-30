@@ -11,6 +11,7 @@ import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, HEADER_HEIGHT, StatusBarFade } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
+import { RecentChats } from "./RecentChats";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
 import { discardTemporaryChat } from "./temporaryChats";
 import { conversationMarkdown } from "./conversationText";
@@ -485,6 +486,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             paddingBottom: keyboardOpen ? 8 : insets.bottom + (controlsBelow ? 2 : 8),
           }}
         >
+          {isDraft && empty && connected && !temporary && !keyboardOpen ? (
+            <RecentChats
+              onOpen={(id) => router.replace({ pathname: "/chat/[id]", params: { id } })}
+            />
+          ) : null}
           {form ? (
             <FormCard
               key={form.id}
