@@ -173,7 +173,7 @@ function toReply(steps: SessionMessageAssistant[], idle?: SessionMessageIdle): M
   };
 }
 
-type ReplyStats = Pick<Message, "usage" | "cost" | "contextTokens" | "generationMs">;
+type ReplyStats = Pick<Message, "usage" | "requests" | "cost" | "contextTokens" | "generationMs">;
 
 function toStats(steps: SessionMessageAssistant[]): ReplyStats {
   const stats: ReplyStats = {};
@@ -182,6 +182,7 @@ function toStats(steps: SessionMessageAssistant[]): ReplyStats {
     const usage = toTokenUsage(step.tokens);
     if (!usage) continue;
     stats.usage = addUsage(stats.usage, usage);
+    stats.requests = (stats.requests ?? 0) + 1;
     stats.cost = addCost(stats.cost, toCost(step.cost));
     // Every step reads the whole conversation again, so the last count is the context's size.
     stats.contextTokens = totalTokens(usage);

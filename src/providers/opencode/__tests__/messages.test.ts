@@ -93,6 +93,7 @@ describe("toMessages", () => {
       status: "complete",
       // What the steps used together, where the context holds only what the last one read.
       usage: { input: 1400, output: 60, reasoning: 10, cacheRead: 100, cacheWrite: 0 },
+      requests: 2,
       cost: { amount: 0.75, currency: "USD" },
       contextTokens: 940,
       generationMs: 38,

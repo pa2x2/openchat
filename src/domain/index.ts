@@ -25,7 +25,19 @@ export type {
   ToolCategory,
   ToolStatus,
   TurnActivity,
+  UsageQuery,
+  UsageReport,
+  UsageTotals,
   UserMessage,
 } from "./types";
 export { UNTITLED_CHAT } from "./types";
-export { addCost, addUsage, totalTokens } from "./usage";
+export {
+  addCost,
+  addTotals,
+  addUsage,
+  localDay,
+  mergeReports,
+  totalTokens,
+  transcriptUsage,
+} from "./usage";
+export type { UsageEntry } from "./usage";

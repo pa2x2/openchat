@@ -804,6 +804,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       const timed = draft.usage === undefined || draft.generationMs !== undefined;
       const counted: Partial<Message> = {
         usage: addUsage(draft.usage, event.usage),
+        requests: event.usage ? (draft.requests ?? 0) + 1 : draft.requests,
         cost: addCost(draft.cost, event.cost),
         contextTokens: event.usage ? totalTokens(event.usage) : draft.contextTokens,
         generationMs:

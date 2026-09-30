@@ -84,6 +84,45 @@ export interface Money {
   currency: string;
 }
 
+/**
+ * The span a usage report covers, in epoch milliseconds: `from` is in it and
+ * `to` is not. Without `from` it starts at the backend's first record, and
+ * without `to` it ends now.
+ */
+export interface UsageQuery {
+  from?: number;
+  to?: number;
+  /** Also fill `UsageReport.days`. A backend may pay for every day, so ask only for a span worth charting. */
+  daily?: boolean;
+}
+
+export interface UsageTotals {
+  /** Round-trips to a model. */
+  requests?: number;
+  usage?: TokenUsage;
+  /** Unset when nothing counted had a price. */
+  cost?: Money;
+}
+
+/**
+ * What a span of time used, as the backend counts it. A backend may count
+ * only the chats it still has, so a deleted chat can be missing from it.
+ */
+export interface UsageReport extends UsageTotals {
+  /** When the first use in the span happened; unset when the backend doesn't say. */
+  from?: number;
+  chats?: number;
+  /** Messages the user sent. */
+  prompts?: number;
+  /** One entry per model and variant, in no particular order. */
+  models: (UsageTotals & { model: ModelRef })[];
+  /**
+   * The days with use, oldest first. A day is a calendar day where the device
+   * is, written "2026-09-30". Empty unless the query asked for days.
+   */
+  days: (UsageTotals & { date: string })[];
+}
+
 export type FormValue = string | number | boolean | string[];
 
 export type FormAnswer = Record<string, FormValue>;
@@ -266,6 +305,8 @@ export interface Message {
   status: MessageStatus;
   /** What a reply used, over all of its round-trips to the model. */
   usage?: TokenUsage;
+  /** How many round-trips `usage` counts. */
+  requests?: number;
   /** Unset when the backend doesn't know the price, which is not the same as free. */
   cost?: Money;
   contextTokens?: number;
@@ -312,4 +353,5 @@ export interface Capabilities {
   modelSelection: boolean;
   deleteChat: boolean;
   renameChat: boolean;
+  usageReport: boolean;
 }
