@@ -2,10 +2,6 @@ allowBuilds:
   husky: true
   msgpackr-extract: true
   unrs-resolver: true
-minimumReleaseAgeExclude:
-  - "@opencode/client@2.0.18"
-  - "@opencode/protocol@2.0.18"
-  - "@opencode/schema@2.0.18"
 packageExtensions:
   # Its math renderer needs this native module; OpenChat only uses the
   # headless parser, so keep it out of the install and the app build.

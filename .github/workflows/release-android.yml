@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - "v*"
+  # A release that is published as soon as it is built, tagged v<package.json version> at
+  # `ref`. A pushed tag still ends as a draft for its notes to be pasted into.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      notes:
+        type: string
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,24 +33,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           # Full history and tags, to compare versionCode with earlier releases.
           fetch-depth: 0
 
-      - name: Check tag matches package.json version
+      - name: Resolve the release tag
         id: version
+        env:
+          CALLED_REF: ${{ inputs.ref }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
           VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG" != "v$VERSION" ]; then
-            echo "::error::Tag $TAG does not match package.json version $VERSION (expected v$VERSION)"
-            exit 1
+          if [ -n "$CALLED_REF" ]; then
+            TAG="v$VERSION"
+            if git rev-parse --quiet --verify "refs/tags/$TAG" > /dev/null; then
+              echo "::error::$TAG is already released"
+              exit 1
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+            if [ "$TAG" != "v$VERSION" ]; then
+              echo "::error::Tag $TAG does not match package.json version $VERSION (expected v$VERSION)"
+              exit 1
+            fi
           fi
           if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
             echo "::error::Version $VERSION is not semver X.Y.Z or X.Y.Z-prerelease"
             exit 1
           fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check versionCode increased
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           version_code() {
             git show "$1:package.json" 2>/dev/null | node -e '
@@ -54,7 +78,7 @@ jobs:
             exit 1
           fi
           for TAG in $(git tag --list 'v*'); do
-            [ "$TAG" = "$GITHUB_REF_NAME" ] && continue
+            [ "$TAG" = "$RELEASE_TAG" ] && continue
             PREVIOUS=$(version_code "$TAG")
             if [ "$PREVIOUS" -ge "$CURRENT" ]; then
               echo "::error::versionCode $CURRENT must be greater than $PREVIOUS from $TAG"
@@ -136,9 +160,10 @@ jobs:
           -x lintVitalRelease
 
       - name: Rename APKs and verify signatures
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -e
-          TAG="${GITHUB_REF_NAME}"
           OUT=android/app/build/outputs/apk/release
           APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
 
@@ -156,17 +181,19 @@ jobs:
             fi
           done
 
-      - name: Create draft GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          # Creates the tag when the workflow was called; a pushed tag already exists.
+          target_commitish: ${{ inputs.ref }}
           body: |
-            Release ${{ github.ref_name }}
+            ${{ inputs.notes || format('Release {0}', steps.version.outputs.tag) }}
 
             > [!TIP]
             >
-            > If you are unsure which version to download, use `openchat-${{ github.ref_name }}.apk`.
+            > If you are unsure which version to download, use `openchat-${{ steps.version.outputs.tag }}.apk`.
           files: openchat-*.apk
-          draft: true
+          draft: ${{ inputs.ref == '' }}
           prerelease: false

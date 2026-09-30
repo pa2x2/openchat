@@ -1,0 +1,67 @@
+name: release-opencode-bump
+
+# Publishes an OpenCode bump once its pull request (opened by bump-opencode.yml) is merged. The
+# server image goes first, so it exists by the time the app that expects it reaches users.
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+# Not the group release-android.yml builds from the workflow name and ref: a called workflow
+# sees this one's name, and a caller sharing a group with its callee is cancelled as deadlocked.
+concurrency:
+  group: opencode-bump-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  image:
+    # Only the bot's branch in this repo: a fork can name its branch the same.
+    if: >-
+      github.event.pull_request.merged
+      && github.event.pull_request.head.ref == 'bump/opencode'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/docker-opencode.yml
+    with:
+      ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+  app:
+    needs: image
+    uses: ./.github/workflows/release-android.yml
+    with:
+      ref: ${{ github.event.pull_request.merge_commit_sha }}
+      notes: Updated OpenCode to ${{ needs.image.outputs.opencode_version }}.
+    secrets: inherit
+
+  sync:
+    name: Merge main into upcoming
+    needs: app
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: upcoming
+          fetch-depth: 0
+
+      - name: Merge when it is clean
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git merge --message "Merge branch 'main' into upcoming" origin/main; then
+            git push origin upcoming
+          else
+            git merge --abort
+            echo "::warning::main does not merge into upcoming without conflicts. Merge it by hand."
+          fi
+
+      - name: Delete the merged branch
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: git push origin --delete "$BRANCH" || true

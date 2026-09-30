@@ -1,0 +1,194 @@
+name: bump-opencode
+
+# Keeps one pull request open against main that moves the app and the server image to the newest
+# OpenCode release. Merging it is what publishes: see release-opencode-bump.yml.
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  HUSKY: "0"
+  BRANCH: bump/opencode
+  GIT_AUTHOR_NAME: github-actions[bot]
+  GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+  GIT_COMMITTER_NAME: github-actions[bot]
+  GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A manual run from another branch still builds the bump on top of main.
+          ref: main
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Bump OpenCode
+        id: bump
+        run: node scripts/bump-opencode.mjs
+
+      # A branch someone committed to, to fix a bump that failed its checks, is theirs until it
+      # is merged or deleted: pushing here would discard the fix.
+      # The scheduled run also stops on the days nothing moved, so the pull request is not
+      # pushed to, and its assignee not notified, without a reason. A manual run carries on:
+      # that is how to retry checks that failed for no fault of the bump.
+      - name: Compare with the open pull request
+        id: branch
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          if git fetch --depth=1 origin "$BRANCH" 2>/dev/null; then
+            if [ "$(git log -1 --format=%ce FETCH_HEAD)" != "$GIT_COMMITTER_EMAIL" ]; then
+              echo "::notice::$BRANCH has commits made by hand and is left alone."
+              exit 0
+            fi
+            if git diff --quiet FETCH_HEAD; then
+              echo "current=true" >> "$GITHUB_OUTPUT"
+              if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+                echo "$BRANCH already holds this bump."
+                exit 0
+              fi
+            fi
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      # The token that opens the pull request cannot start workflows on it, so its checks run
+      # here and are reported in the description instead.
+      - name: Check code format
+        id: format
+        if: steps.branch.outputs.proceed == 'true'
+        continue-on-error: true
+        run: pnpm format:check
+
+      - name: Typecheck
+        id: typecheck
+        if: steps.branch.outputs.proceed == 'true'
+        continue-on-error: true
+        run: pnpm typecheck
+
+      - name: Lint
+        id: lint
+        if: steps.branch.outputs.proceed == 'true'
+        continue-on-error: true
+        run: pnpm lint
+
+      - name: Run unit tests
+        id: test
+        if: steps.branch.outputs.proceed == 'true'
+        continue-on-error: true
+        run: pnpm test
+
+      - name: Boot the server image and talk to it
+        id: server
+        if: steps.branch.outputs.proceed == 'true'
+        continue-on-error: true
+        env:
+          OPENCODE: ${{ steps.bump.outputs.opencode }}
+        run: |
+          docker build --tag openchat-opencode:bump docker/opencode
+          docker run --detach --name opencode --publish 4096:4096 \
+            --env OPENCODE_SERVER_PASSWORD=smoke openchat-opencode:bump
+          if ! node scripts/smoke-opencode.mjs http://localhost:4096 smoke "$OPENCODE"; then
+            docker logs opencode
+            exit 1
+          fi
+
+      - name: Push the branch
+        if: steps.branch.outputs.proceed == 'true' && steps.branch.outputs.current != 'true'
+        env:
+          OPENCODE: ${{ steps.bump.outputs.opencode }}
+        run: |
+          git checkout -B "$BRANCH"
+          git commit --all --message "upgrade to opencode@$OPENCODE"
+          git push --force origin "$BRANCH"
+
+      - name: Open or update the pull request
+        id: pr
+        if: steps.branch.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENCODE: ${{ steps.bump.outputs.opencode }}
+          PREVIOUS_OPENCODE: ${{ steps.bump.outputs.previous_opencode }}
+          APP: ${{ steps.bump.outputs.app }}
+          PREVIOUS_APP: ${{ steps.bump.outputs.previous_app }}
+          FORMAT: ${{ steps.format.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          SERVER: ${{ steps.server.outcome }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          TITLE="upgrade to opencode@$OPENCODE"
+          PASSED=true
+          VERDICT="All checks passed."
+          for OUTCOME in "$FORMAT" "$TYPECHECK" "$LINT" "$TEST" "$SERVER"; do
+            if [ "$OUTCOME" != success ]; then
+              PASSED=false
+              VERDICT="Some checks failed; see the description."
+            fi
+          done
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Moves OpenCode from $PREVIOUS_OPENCODE to $OPENCODE and the app from $PREVIOUS_APP to $APP.
+
+          Merging publishes the server image for OpenCode $OPENCODE and then the app release \`v$APP\`, which every installed app is offered right away.
+
+          | Check | Result |
+          | --- | --- |
+          | Code format | $FORMAT |
+          | Typecheck | $TYPECHECK |
+          | Lint | $LINT |
+          | Unit tests | $TEST |
+          | Server image boots and answers the client | $SERVER |
+
+          Checks ran in [this workflow run]($RUN_URL) and do not appear as status checks here.
+          EOF
+
+          NUMBER=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "$NUMBER" ]; then
+            DRAFT=""
+            [ "$PASSED" = true ] || DRAFT="--draft"
+            gh pr create --head "$BRANCH" --base main --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/body.md" --assignee "$GITHUB_REPOSITORY_OWNER" $DRAFT
+            exit 0
+          fi
+
+          PREVIOUS_TITLE=$(gh pr view "$NUMBER" --json title --jq .title)
+          IS_DRAFT=$(gh pr view "$NUMBER" --json isDraft --jq .isDraft)
+          gh pr edit "$NUMBER" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md" \
+            --add-assignee "$GITHUB_REPOSITORY_OWNER"
+          if [ "$PASSED" = true ] && [ "$IS_DRAFT" = true ]; then
+            gh pr ready "$NUMBER"
+          elif [ "$PASSED" = false ] && [ "$IS_DRAFT" = false ]; then
+            gh pr ready "$NUMBER" --undo
+          fi
+          # Editing a pull request notifies nobody, and this one now publishes something else.
+          if [ "$PREVIOUS_TITLE" != "$TITLE" ]; then
+            gh pr comment "$NUMBER" --body "Now moves OpenCode to $OPENCODE. $VERDICT"
+          fi
+
+      - name: Fail when a check failed
+        if: steps.pr.outputs.passed == 'false'
+        run: exit 1

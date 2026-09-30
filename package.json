@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "test": "jest",
     "icons": "sh scripts/generate-icons.sh",
+    "bump:opencode": "node scripts/bump-opencode.mjs",
     "prepare": "husky"
   },
   "dependencies": {

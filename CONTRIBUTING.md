@@ -89,16 +89,17 @@ If a native build starts misbehaving, delete `android/` and regenerate. Keeping 
 
 ## Scripts
 
-| Command                             | Purpose                                               |
-| ----------------------------------- | ----------------------------------------------------- |
-| `pnpm start`                        | Metro dev server.                                     |
-| `pnpm android`                      | Build, install and launch on Android (dev client).    |
-| `pnpm ios`                          | Same for iOS. Needs macOS and Xcode.                  |
-| `pnpm web`                          | Run in the browser. Handy for quick layout checks.    |
-| `pnpm typecheck`                    | TypeScript, no emit.                                  |
-| `pnpm lint`                         | ESLint with the Expo config.                          |
-| `pnpm test`                         | Jest unit tests.                                      |
-| `pnpm format` / `pnpm format:check` | Prettier.                                             |
-| `pnpm icons`                        | Re-render the app icon PNGs from `assets/icon/*.svg`. |
+| Command                             | Purpose                                                        |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `pnpm start`                        | Metro dev server.                                              |
+| `pnpm android`                      | Build, install and launch on Android (dev client).             |
+| `pnpm ios`                          | Same for iOS. Needs macOS and Xcode.                           |
+| `pnpm web`                          | Run in the browser. Handy for quick layout checks.             |
+| `pnpm typecheck`                    | TypeScript, no emit.                                           |
+| `pnpm lint`                         | ESLint with the Expo config.                                   |
+| `pnpm test`                         | Jest unit tests.                                               |
+| `pnpm format` / `pnpm format:check` | Prettier.                                                      |
+| `pnpm icons`                        | Re-render the app icon PNGs from `assets/icon/*.svg`.          |
+| `pnpm bump:opencode [version]`      | Move the app and the server image to another OpenCode release. |
 
 Run `pnpm typecheck`, `pnpm lint` and `pnpm test` before opening a pull request. The release workflow runs the same three and fails on any of them.
