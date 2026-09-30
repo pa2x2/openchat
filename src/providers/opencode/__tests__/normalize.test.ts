@@ -65,7 +65,9 @@ describe("normalizeV2Event", () => {
       id: "t",
       update: { status: "dismissed" },
     });
-    const aborted = { type: "aborted", message: "Tool execution interrupted" };
+    // Dismissing stops the run; that is not the reply failing.
+    const aborted = { type: "aborted", message: "Step interrupted" };
+    expect(normalizeV2Event(event("session.step.failed", { error: aborted }))).toBeNull();
 
     expect(
       normalizeV2Event(event("session.tool.called", { id: "t", input: { query: "expo" } })),

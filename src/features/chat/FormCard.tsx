@@ -5,7 +5,7 @@
  * every answer, which is where Submit is. Back and Next keep the whole draft,
  * and a row of the review opens its question again, so any answer can be
  * changed until Submit sends them all. Dismiss tells the backend the user
- * won't answer, so the run moves on without it.
+ * won't answer, which stops the run.
  */
 
 import { useState } from "react";

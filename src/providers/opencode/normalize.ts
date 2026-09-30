@@ -325,6 +325,10 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     // execution failure. Surfacing it directly means the reason reaches the
     // user even if the execution-level event never arrives.
     case "session.step.failed":
+      // An aborted step is the run being stopped, not failing: by an
+      // interrupt, or by the user dismissing a question. The execution event
+      // that follows ends the turn.
+      if (event.data.error?.type === "aborted") return null;
       return {
         type: "error",
         message: errorMessage(event.data.error, "The reply step failed."),
