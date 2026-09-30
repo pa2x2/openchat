@@ -4,13 +4,14 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { Message, TurnActivity } from "@/src/domain";
+import { totalTokens, type Message, type TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
 import { FormResultCard } from "./FormResultCard";
 import { ReplyDetails } from "./ReplyDetails";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
+import { formatCost, formatTokensShort } from "./usageFormat";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
 import { Button } from "@/src/ui/Button";
@@ -53,6 +54,16 @@ function CopyButton({ text, label, testID }: { text: string; label: string; test
       <Icon name={copied ? "check" : "content-copy"} size={17} tone="textMuted" />
     </Pressable>
   );
+}
+
+/** What a running reply has used so far; it moves when a step ends, not as text arrives. */
+function runningCount(message: Message): string | null {
+  if (!message.usage) return null;
+  const cost = formatCost(message.cost);
+  return [`${formatTokensShort(totalTokens(message.usage))} tokens`, cost]
+    .filter(Boolean)
+    .join(" · ")
+    .concat(" so far");
 }
 
 function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => void }) {
@@ -222,6 +233,7 @@ export const MessageBubble = memo(function MessageBubble({
   const hasDetails = message.usage !== undefined;
   // Retry sits in the error card, so a failed reply offers no regenerate here.
   const canRegenerate = Boolean(onRegenerate) && !failed;
+  const running = streaming ? runningCount(message) : null;
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (
@@ -274,7 +286,13 @@ export const MessageBubble = memo(function MessageBubble({
       {failed ? <ReplyError error={error} onRetry={onRegenerate} /> : null}
       {streaming ? (
         // Holds the action row's place so the reply doesn't jump when it ends.
-        <View className="mt-1 h-9" />
+        <View className="mt-1 h-9 justify-center">
+          {running ? (
+            <Text className="text-[13px] text-text-muted" testID="reply-running-count">
+              {running}
+            </Text>
+          ) : null}
+        </View>
       ) : layout.answer || canRegenerate || hasDetails ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
