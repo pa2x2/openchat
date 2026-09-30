@@ -12,6 +12,7 @@ import { FormResultCard } from "./FormResultCard";
 import { layoutReply, type ReplyBlock } from "./replyLayout";
 import { WorkRow } from "./WorkRow";
 import { Bubble } from "@/src/ui";
+import { Button } from "@/src/ui/Button";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
 import { Menu, type MenuItem } from "@/src/ui/Menu";
@@ -96,22 +97,10 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        <View className="h-14 flex-row items-center gap-2 px-2">
-          <Pressable
-            accessibilityLabel="Close"
-            accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-            onPress={onClose}
-            testID="select-text-close"
-          >
-            <Icon name="close" size={22} />
-          </Pressable>
+        <View className="h-14 justify-center px-5">
           <Text className="text-lg font-medium text-text">Select text</Text>
         </View>
-        <ScrollView
-          contentContainerClassName="px-5 pt-2"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        >
+        <ScrollView contentContainerClassName="px-5 pb-6 pt-2">
           <Text
             selectable
             selectionColor={withAlpha(colors.primary, 0.35)}
@@ -121,6 +110,9 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
             {text}
           </Text>
         </ScrollView>
+        <View className="px-4 pt-2" style={{ paddingBottom: insets.bottom + 12 }}>
+          <Button label="Done" variant="secondary" onPress={onClose} testID="select-text-close" />
+        </View>
       </View>
     </Modal>
   );
