@@ -423,11 +423,16 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
   }, [chatId]);
 
+  // The icon stays tappable while the fork is made; a second tap would make a second chat.
+  const branchingNow = useRef(false);
   const handleBranch = useCallback(
     (reply: Message) => {
+      if (branchingNow.current) return;
+      branchingNow.current = true;
       setBanner(null);
       setBranching(true);
       void branchChat(chatId, reply).then((outcome) => {
+        branchingNow.current = false;
         setBranching(false);
         if (outcome.ok) router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
         else setBanner(outcome.error);

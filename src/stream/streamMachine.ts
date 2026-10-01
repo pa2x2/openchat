@@ -43,7 +43,7 @@ import {
 } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
-import type { ChatProvider } from "@/src/providers/types";
+import { ConnectionError, type ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
 import { withFormRecords } from "@/src/stores/formRecords";
 import { useMessagesStore } from "@/src/stores/messages";
@@ -463,10 +463,10 @@ export async function branchChat(chatId: ChatId, reply: Message): Promise<Branch
   try {
     chat = await provider.branchChat(chatId, before);
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error && error.message ? error.message : t("errors.branchFailed"),
-    };
+    // Only a connection problem is worth naming: the server's own reasons
+    // ("Cannot fork empty session: ses_…") are not worded for the user.
+    const known = error instanceof ConnectionError && error.code !== "unknown";
+    return { ok: false, error: known ? error.message : t("errors.branchFailed") };
   }
   useChatsStore.getState().upsert(chat);
   // The new chat opens on what it was copied from instead of a skeleton; its

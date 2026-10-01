@@ -4,7 +4,7 @@
 
 import type { ModelRef as OpenCodeModelRef, SessionInfo } from "@opencode/client";
 import { UNTITLED_CHAT, type ChatId, type ChatSummary, type ModelRef } from "@/src/domain";
-import type { OpenCodeClient } from "./client";
+import { toConnectionError, type OpenCodeClient } from "./client";
 import { toCost, toTokenUsage } from "./usage";
 
 /**
@@ -65,8 +65,12 @@ export async function branchChat(
   id: ChatId,
   before?: string,
 ): Promise<ChatSummary> {
-  const session = await client.session.fork({ sessionID: id, ...(before ? { before } : {}) });
-  return toChatSummary(session);
+  try {
+    const session = await client.session.fork({ sessionID: id, ...(before ? { before } : {}) });
+    return toChatSummary(session);
+  } catch (error) {
+    throw toConnectionError(error);
+  }
 }
 
 export async function isRunning(client: OpenCodeClient, id: ChatId): Promise<boolean> {
