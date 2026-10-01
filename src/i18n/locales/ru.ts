@@ -18,6 +18,7 @@ export default {
     retry: "Повторить",
     save: "Сохранить",
     tryAgain: "Попробовать снова",
+    undo: "Отменить",
   },
   errors: {
     notConnected: "Нет подключения. Подключитесь к серверу в настройках.",
@@ -203,6 +204,7 @@ export default {
     sendFailed: "Не удалось отправить.",
     attachFailed: "Не удалось прикрепить.",
     switchModelFailed: "Не удалось сменить модель.",
+    branched: "Создана ветка в новом чате",
     menu: {
       keep: "Сохранить чат",
       rename: "Переименовать",

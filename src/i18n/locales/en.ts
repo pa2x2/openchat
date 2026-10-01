@@ -15,6 +15,7 @@ export default {
     retry: "Retry",
     save: "Save",
     tryAgain: "Try again",
+    undo: "Undo",
   },
   errors: {
     notConnected: "Not connected. Open Settings to connect to a server.",
@@ -196,6 +197,7 @@ export default {
     sendFailed: "Could not send.",
     attachFailed: "Could not attach.",
     switchModelFailed: "Could not switch model.",
+    branched: "Branched into a new chat",
     menu: {
       keep: "Keep this chat",
       rename: "Rename",

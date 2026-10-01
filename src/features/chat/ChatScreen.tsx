@@ -16,6 +16,14 @@ import { RecentChats } from "./RecentChats";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
 import { UsageSheet } from "./UsageSheet";
 import { discardTemporaryChat } from "./temporaryChats";
+import {
+  BranchUndoBar,
+  heldForUndo,
+  offerBranchUndo,
+  settleBranchUndo,
+  undoBranch,
+  useBranchUndo,
+} from "./branchUndo";
 import { conversationMarkdown } from "./conversationText";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat, promptRenameChat } from "@/src/features/drawer/chatActions";
@@ -147,8 +155,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const canAttach = capabilities?.attachments === true;
   const canQueue = capabilities?.queue === true;
   const modelSelection = capabilities?.modelSelection === true;
+  const canDelete = capabilities?.deleteChat === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
-  const canTemporary = capabilities?.deleteChat === true;
+  const canTemporary = canDelete;
   const controls = useSettingsStore((state) => state.chatControls);
   const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : TITLE_BAR_HEIGHT);
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
@@ -258,14 +267,25 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (!isDraft && !turnActive && !named) void useChatsStore.getState().refresh();
   }, [isDraft, turnActive, named]);
 
-  // Leaving a temporary chat deletes it. Read at unmount rather than render,
-  // so a chat deleted some other way meanwhile is not deleted twice.
+  // Leaving a temporary chat deletes it, unless a branch made from it can
+  // still be undone back to it. Read at unmount rather than render, so a chat
+  // deleted some other way meanwhile is not deleted twice.
   useEffect(() => {
     if (isDraft) return;
     return () => {
-      if (useChatsStore.getState().temporary[chatId]) void discardTemporaryChat(chatId);
+      settleBranchUndo(chatId);
+      if (useChatsStore.getState().temporary[chatId] && !heldForUndo(chatId)) {
+        void discardTemporaryChat(chatId);
+      }
     };
   }, [chatId, isDraft]);
+
+  // Undo would delete whatever the branch has gained since.
+  const undoOffered = useBranchUndo((state) => state.offer?.branchId === chatId);
+  useEffect(() => {
+    if (turnActive) settleBranchUndo(chatId);
+  }, [chatId, turnActive]);
+  const expireUndo = useCallback(() => settleBranchUndo(chatId), [chatId]);
 
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
@@ -434,12 +454,21 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       void branchChat(chatId, reply).then((outcome) => {
         branchingNow.current = false;
         setBranching(false);
-        if (outcome.ok) router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
-        else setBanner(outcome.error);
+        if (!outcome.ok) {
+          setBanner(outcome.error);
+          return;
+        }
+        if (canDelete) offerBranchUndo({ branchId: outcome.chat.id, sourceId: chatId });
+        router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
       });
     },
-    [chatId, router],
+    [chatId, router, canDelete],
   );
+
+  function handleUndoBranch() {
+    const sourceId = undoBranch(chatId);
+    if (sourceId) router.replace({ pathname: "/chat/[id]", params: { id: sourceId } });
+  }
 
   function handleSelectModel(model: ModelInfo) {
     // The reasoning level carries over when the new model offers it too.
@@ -507,7 +536,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       testID: "menu-copy-conversation",
     });
   }
-  if (!isDraft && !temporary && capabilities?.deleteChat) {
+  if (!isDraft && !temporary && canDelete) {
     menuItems.push({
       label: t("chat.menu.delete"),
       icon: "trash-can-outline",
@@ -615,6 +644,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               onOpen={(id) => router.replace({ pathname: "/chat/[id]", params: { id } })}
             />
           ) : null}
+          {undoOffered ? <BranchUndoBar onUndo={handleUndoBranch} onExpire={expireUndo} /> : null}
           {form ? (
             <FormCard
               key={form.id}
