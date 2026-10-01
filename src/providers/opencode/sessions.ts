@@ -31,8 +31,14 @@ export function fromWireModel(model: OpenCodeModelRef): ModelRef {
 }
 
 export async function listChats(client: OpenCodeClient): Promise<ChatSummary[]> {
-  const response = await client.session.list({ limit: 100, order: "desc" });
-  return response.data.filter((session) => !session.time?.archived).map(toChatSummary);
+  const sessions: SessionInfo[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await client.session.list({ limit: 100, order: "desc", cursor });
+    sessions.push(...page.data);
+    cursor = page.data.length > 0 ? (page.cursor.next ?? undefined) : undefined;
+  } while (cursor);
+  return sessions.filter((session) => !session.time?.archived).map(toChatSummary);
 }
 
 export async function createChat(
