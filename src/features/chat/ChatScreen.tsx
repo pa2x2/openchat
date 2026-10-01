@@ -23,11 +23,12 @@ import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import { dismissTurnNotification } from "@/src/features/notifications/turnNotifications";
 import {
   answerForm,
+  branchChat,
   cancelQueuedMessage,
   compactChat,
   discardPendingRegenerate,
   dismissForm,
-  editLastMessage,
+  editMessage,
   followRunningTurn,
   interruptTurn,
   isTurnLive,
@@ -131,6 +132,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
   const [switchingModel, setSwitchingModel] = useState(false);
+  const [branching, setBranching] = useState(false);
   // A sent message being edited in the composer, with what the composer held
   // before, which comes back if the edit is cancelled.
   const [editing, setEditing] = useState<{
@@ -363,7 +365,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
     try {
-      const outcome = await editLastMessage(chatId, target.message.text, text);
+      const outcome = await editMessage(chatId, target.message, text);
       if (outcome.ok) return true;
       if (outcome.error) setBanner(outcome.error);
       // Back to editing with the edited text, so nothing typed is lost.
@@ -420,6 +422,19 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (!outcome.ok && outcome.error) setBanner(outcome.error);
     });
   }, [chatId]);
+
+  const handleBranch = useCallback(
+    (reply: Message) => {
+      setBanner(null);
+      setBranching(true);
+      void branchChat(chatId, reply).then((outcome) => {
+        setBranching(false);
+        if (outcome.ok) router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
+        else setBanner(outcome.error);
+      });
+    },
+    [chatId, router],
+  );
 
   function handleSelectModel(model: ModelInfo) {
     // The reasoning level carries over when the new model offers it too.
@@ -559,6 +574,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
+              onBranch={!isDraft && capabilities?.branch ? handleBranch : undefined}
               editingId={editing?.message.id ?? null}
               onSendQueuedNow={handleSendQueuedNow}
               onCancelQueued={handleCancelQueued}
@@ -572,13 +588,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           )}
 
           {/* The skeleton already says an uncached transcript is loading. */}
-          {(transcriptLoading && !empty) || deleting ? (
+          {(transcriptLoading && !empty) || deleting || branching ? (
             <View
               pointerEvents="none"
               className="absolute left-0 right-0"
               style={{ top: insets.top }}
             >
-              <LinearProgress immediate={deleting} testID="chat-progress" />
+              <LinearProgress immediate={deleting || branching} testID="chat-progress" />
             </View>
           ) : null}
         </View>

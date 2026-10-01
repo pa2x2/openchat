@@ -30,6 +30,7 @@ import {
   type Attachment,
   type ChatForm,
   type ChatId,
+  type ChatSummary,
   type FormAnswer,
   type FormResult,
   type Message,
@@ -291,22 +292,22 @@ export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome
 }
 
 /**
- * Replaces the chat's last user message with `text` and runs the turn again:
- * a rerun of the last turn that sends the edited text. `original` is the
- * text the user chose to edit; if the server's last message no longer reads
- * that (another client wrote since), nothing is sent. Needs the backend's
- * native rerun: re-sending instead would leave the old turn standing above.
+ * Replaces one of the chat's user messages with `text` and runs it again;
+ * everything after it is dropped, as a rerun drops the old reply. If the
+ * server's copy of `message` no longer reads the same (another client wrote
+ * since), nothing is sent. Needs the backend's native rerun: re-sending
+ * instead would leave the old turns standing above.
  */
-export async function editLastMessage(
+export async function editMessage(
   chatId: ChatId,
-  original: string,
+  message: Message,
   text: string,
 ): Promise<RegenerateOutcome> {
-  return startRerun(chatId, { original, text });
+  return startRerun(chatId, { message, text });
 }
 
 interface Edit {
-  original: string;
+  message: Message;
   text: string;
 }
 
@@ -336,14 +337,16 @@ async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   // The transcript has to come from the server first: a native rerun
   // addresses the turn by its backend message id, and the ids of a message
   // sent in this session are still local ones.
-  const store = useMessagesStore.getState();
-  await store.fetchMessages(chatId);
+  // The edited message is found again by its place in the transcript.
+  const index = edit ? indexOf(chatId, edit.message) : -1;
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const messages = useMessagesStore.getState().byChat[chatId] ?? [];
 
-  const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
-  if (!target) return { ok: false, error: t("errors.nothingToRegenerate") };
-  if (edit && target.user.text !== edit.original) {
+  const target = edit ? turnAt(messages, index) : lastTurn(messages);
+  if (edit && target?.user.text !== edit.message.text) {
     return { ok: false, error: t("errors.chatChanged") };
   }
+  if (!target) return { ok: false, error: t("errors.nothingToRegenerate") };
   if (!canResendAttachments(target.user.attachments)) {
     return {
       ok: false,
@@ -396,6 +399,18 @@ interface TurnTarget {
   replaceIds: string[];
 }
 
+function turnAt(messages: Message[], index: number): TurnTarget | null {
+  const user = messages[index];
+  if (user?.role !== "user") return null;
+  return { user, replaceIds: messages.slice(index).map((candidate) => candidate.id) };
+}
+
+function indexOf(chatId: ChatId, message: Message): number {
+  return (useMessagesStore.getState().byChat[chatId] ?? []).findIndex(
+    (candidate) => candidate.id === message.id,
+  );
+}
+
 function lastTurn(messages: Message[]): TurnTarget | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -417,6 +432,47 @@ export async function discardPendingRegenerate(chatId: ChatId): Promise<void> {
   const provider = await getProvider().catch(() => null);
   await provider?.discardRegenerate?.(chatId).catch(() => undefined);
   useChatsStore.getState().clearPendingRegenerate(chatId);
+}
+
+export type BranchOutcome = { ok: true; chat: ChatSummary } | { ok: false; error: string };
+
+/**
+ * Copies the chat into a new one that ends with `reply`. A branch is cut at a
+ * backend message id, which a message sent in this session may not have yet,
+ * so the transcript is read again and the reply found by its place in it.
+ */
+export async function branchChat(chatId: ChatId, reply: Message): Promise<BranchOutcome> {
+  if (startingTurns.has(chatId) || isTurnLive(chatId)) {
+    return { ok: false, error: t("errors.turnLive") };
+  }
+  const provider = await getProvider();
+  if (!provider) return { ok: false, error: t("errors.notConnected") };
+  if (!provider.branchChat) return { ok: false, error: t("errors.branchFailed") };
+  const index = indexOf(chatId, reply);
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const transcript = useMessagesStore.getState().byChat[chatId] ?? [];
+  if (transcript[index]?.role !== "assistant") {
+    return { ok: false, error: t("errors.chatChanged") };
+  }
+  const cut = index + 1;
+  const before = transcript[cut]?.id;
+  if (before?.startsWith(LOCAL_ID_PREFIX)) {
+    return { ok: false, error: t("errors.transcriptUnavailable") };
+  }
+  let chat: ChatSummary;
+  try {
+    chat = await provider.branchChat(chatId, before);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error && error.message ? error.message : t("errors.branchFailed"),
+    };
+  }
+  useChatsStore.getState().upsert(chat);
+  // The new chat opens on what it was copied from instead of a skeleton; its
+  // own transcript replaces this once it is read.
+  useMessagesStore.getState().setMessages(chat.id, transcript.slice(0, cut));
+  return { ok: true, chat };
 }
 
 function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[] = []): void {

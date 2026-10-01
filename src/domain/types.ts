@@ -387,4 +387,6 @@ export interface Capabilities {
   queue: boolean;
   /** The chat can be summarized on request to free up the model's context. */
   compact: boolean;
+  /** A chat can be copied, up to any of its messages, into a new chat. */
+  branch: boolean;
 }

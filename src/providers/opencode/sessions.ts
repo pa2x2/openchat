@@ -60,6 +60,15 @@ export async function renameChat(client: OpenCodeClient, id: ChatId, title: stri
   await client.session.update({ sessionID: id, title });
 }
 
+export async function branchChat(
+  client: OpenCodeClient,
+  id: ChatId,
+  before?: string,
+): Promise<ChatSummary> {
+  const session = await client.session.fork({ sessionID: id, ...(before ? { before } : {}) });
+  return toChatSummary(session);
+}
+
 export async function isRunning(client: OpenCodeClient, id: ChatId): Promise<boolean> {
   // Lists only the sessions that are running right now.
   const active = await client.session.active();

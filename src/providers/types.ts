@@ -79,6 +79,12 @@ export interface ChatProvider {
   deleteChat(id: ChatId): Promise<void>;
   /** Only present when `capabilities.renameChat` is true. */
   renameChat?(id: ChatId, title: string): Promise<void>;
+  /**
+   * A new chat holding the messages of `id` that come before `before`, a
+   * backend-native message id; without it, the whole chat. Only present when
+   * `capabilities.branch` is true.
+   */
+  branchChat?(id: ChatId, before?: string): Promise<ChatSummary>;
 
   /** Fire-and-forget prompt delivery; streaming arrives via events(). */
   send(chatId: ChatId, msg: UserMessage): Promise<void>;

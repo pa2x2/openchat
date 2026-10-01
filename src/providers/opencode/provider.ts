@@ -43,7 +43,15 @@ import {
   send,
   steerQueued,
 } from "./prompt";
-import { createChat, deleteChat, isRunning, listChats, renameChat, switchModel } from "./sessions";
+import {
+  branchChat,
+  createChat,
+  deleteChat,
+  isRunning,
+  listChats,
+  renameChat,
+  switchModel,
+} from "./sessions";
 import { usageReport } from "./stats";
 
 export const openCodeCapabilities: Capabilities = {
@@ -59,6 +67,7 @@ export const openCodeCapabilities: Capabilities = {
   usageReport: true,
   queue: true,
   compact: true,
+  branch: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -112,6 +121,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   renameChat(id: ChatId, title: string): Promise<void> {
     return renameChat(this.client(), id, title);
+  }
+
+  branchChat(id: ChatId, before?: string): Promise<ChatSummary> {
+    return branchChat(this.client(), id, before);
   }
 
   setChatModel(id: ChatId, model: ModelRef): Promise<void> {

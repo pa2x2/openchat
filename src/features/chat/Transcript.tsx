@@ -84,6 +84,7 @@ export interface TranscriptProps {
   onRegenerate: () => void;
   /** Present when the backend can edit a sent message. */
   onEditMessage?: (message: Message) => void;
+  onBranch?: (message: Message) => void;
   editingId?: string | null;
   onSendQueuedNow: (message: QueuedMessage) => void;
   onCancelQueued: (message: QueuedMessage) => void;
@@ -98,6 +99,7 @@ export function Transcript({
   showReasoning,
   onRegenerate,
   onEditMessage,
+  onBranch,
   editingId = null,
   onSendQueuedNow,
   onCancelQueued,
@@ -127,9 +129,8 @@ export function Transcript({
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const questionIndex = reversed.findIndex((message) => message.role === "user");
   const questionId = reversed[questionIndex]?.id ?? null;
-  // Editing reruns the last turn, so it is offered on the newest user message
-  // only, and like a rerun only while no turn is live.
-  const editableId = turnActive ? null : questionId;
+  // The list is newest first: everything up to the edited message is replaced by the edit.
+  const editingIndex = editingId ? reversed.findIndex((message) => message.id === editingId) : -1;
   const replyPending =
     lastMessage?.role === "assistant" &&
     (lastMessage.status === "pending" || lastMessage.status === "streaming");
@@ -216,8 +217,11 @@ export function Transcript({
               showReasoning={showReasoning}
               activity={item.id === liveId ? activity : null}
               onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
-              onEdit={item.id === editableId ? onEditMessage : undefined}
-              dimmed={item.id === editingId}
+              // An edit rolls the chat back to the message, which cannot be
+              // done while a run is still going.
+              onEdit={!turnActive && item.role === "user" ? onEditMessage : undefined}
+              onBranch={!turnActive && item.role === "assistant" ? onBranch : undefined}
+              dimmed={index <= editingIndex}
               // The store keeps the reason for the latest turn only.
               error={item.id === lastMessage?.id ? turnError : null}
             />
@@ -231,9 +235,10 @@ export function Transcript({
       activity,
       regenerableId,
       onRegenerate,
-      editableId,
       onEditMessage,
-      editingId,
+      onBranch,
+      turnActive,
+      editingIndex,
       lastMessage?.id,
       turnError,
       pinned,

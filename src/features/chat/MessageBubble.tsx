@@ -30,9 +30,11 @@ export interface MessageBubbleProps {
   activity?: TurnActivity | null;
   /** Set only on the newest reply while no turn is live. */
   onRegenerate?: () => void;
-  /** Set only on the user message that can be edited: the newest, while no turn is live. */
+  /** Set only on user messages that can be edited, which is none while a turn is live. */
   onEdit?: (message: Message) => void;
-  /** The message is being edited in the composer. */
+  /** Set only on replies while no turn is live. */
+  onBranch?: (message: Message) => void;
+  /** The message is being edited in the composer, or comes after one that is and goes with the edit. */
   dimmed?: boolean;
   /** Why a failed reply failed, when it is known. */
   error?: string | null;
@@ -211,6 +213,7 @@ export const MessageBubble = memo(function MessageBubble({
   activity = null,
   onRegenerate,
   onEdit,
+  onBranch,
   dimmed = false,
   error = null,
 }: MessageBubbleProps) {
@@ -250,6 +253,7 @@ export const MessageBubble = memo(function MessageBubble({
   const hasDetails = message.usage !== undefined;
   // Retry sits in the error card, so a failed reply offers no regenerate here.
   const canRegenerate = Boolean(onRegenerate) && !failed;
+  const canBranch = Boolean(onBranch) && !failed;
   const running = streaming ? runningCount(message) : null;
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
@@ -268,7 +272,11 @@ export const MessageBubble = memo(function MessageBubble({
       </View>
     );
   return (
-    <Bubble role="assistant" className="mb-5 mt-1" testID={`bubble-${message.role}`}>
+    <Bubble
+      role="assistant"
+      className={cn("mb-5 mt-1", dimmed && "opacity-50")}
+      testID={`bubble-${message.role}`}
+    >
       {layout.fold ? (
         <View className="mb-1 self-stretch">
           <Pressable
@@ -308,7 +316,7 @@ export const MessageBubble = memo(function MessageBubble({
             </Text>
           ) : null}
         </View>
-      ) : layout.answer || canRegenerate || hasDetails ? (
+      ) : layout.answer || canRegenerate || canBranch || hasDetails ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
             <CopyButton label={t("reply.copy")} testID="copy-reply-button" text={layout.answer} />
@@ -323,6 +331,18 @@ export const MessageBubble = memo(function MessageBubble({
               testID="regenerate-button"
             >
               <Icon name="refresh" size={19} tone="textMuted" />
+            </Pressable>
+          ) : null}
+          {canBranch ? (
+            <Pressable
+              accessibilityHint={t("reply.branchHint")}
+              accessibilityLabel={t("reply.branch")}
+              accessibilityRole="button"
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+              onPress={() => onBranch?.(message)}
+              testID="branch-button"
+            >
+              <Icon name="source-branch" size={19} tone="textMuted" />
             </Pressable>
           ) : null}
           {hasDetails ? (
