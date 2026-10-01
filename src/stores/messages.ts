@@ -1,11 +1,13 @@
 /**
  * Messages store — per-chat message transcripts.
  *
- * Chats persist to MMKV (keyed per chat) so history survives restarts and
- * feeds reconciliation: a chat opened offline still shows its cached
- * transcript until the server answers. All backend work goes through
- * `ChatProvider`; the streaming state machine (src/stream/) drives the
- * live updates.
+ * Every chat's transcript persists to MMKV under one key, so history survives
+ * restarts and a chat opened offline still shows its cached transcript until
+ * the server answers. That key is rewritten whole on each persist, so it holds
+ * only chats the server still lists: a chat-list refresh evicts the rest via
+ * `retainChats`, including chats deleted from another client. All backend
+ * work goes through `ChatProvider`; the streaming state machine (src/stream/)
+ * drives the live updates.
  */
 
 import type { ChatForm, ChatId, Message, QueuedMessage, TurnActivity } from "@/src/domain";
@@ -43,6 +45,8 @@ interface MessagesStoreState {
   removeMessage: (chatId: ChatId, messageId: string) => void;
   removeMessages: (chatId: ChatId, messageIds: string[]) => void;
   removeChat: (chatId: ChatId) => void;
+  /** Evicts every cached chat outside `chatIds`, except one with a live turn. */
+  retainChats: (chatIds: ReadonlySet<ChatId>) => void;
   setTurnActive: (chatId: ChatId, active: boolean) => void;
   setTurnError: (chatId: ChatId, error: string | null) => void;
   setActivity: (chatId: ChatId, activity: TurnActivity | null) => void;
@@ -109,7 +113,7 @@ export function createMessagesStore(
 ) {
   return create<MessagesStoreState>()(
     persist(
-      (set) => ({
+      (set, get) => ({
         byChat: {},
         loading: {},
         activeTurns: {},
@@ -235,6 +239,23 @@ export function createMessagesStore(
             delete formRecords[chatId];
             return { byChat, formRecords };
           }),
+        retainChats: (chatIds) => {
+          const { byChat, formRecords, activeTurns } = get();
+          const gone = [...Object.keys(byChat), ...Object.keys(formRecords)].filter(
+            (chatId) => !chatIds.has(chatId) && !activeTurns[chatId],
+          );
+          // Persist writes on every set, even one that changes nothing.
+          if (gone.length === 0) return;
+          set((state) => {
+            const nextByChat = { ...state.byChat };
+            const nextFormRecords = { ...state.formRecords };
+            for (const chatId of gone) {
+              delete nextByChat[chatId];
+              delete nextFormRecords[chatId];
+            }
+            return { byChat: nextByChat, formRecords: nextFormRecords };
+          });
+        },
         fetchMessages: async (chatId) => {
           set((state) => ({ loading: { ...state.loading, [chatId]: true } }));
           try {

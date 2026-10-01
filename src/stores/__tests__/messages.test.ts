@@ -78,6 +78,19 @@ describe("messages store", () => {
     expect(store.getState().formRecords.c1).toEqual([]);
   });
 
+  // Chats deleted from another client never pass through removeChat.
+  it("evicts chats the server no longer lists, but not one mid-reply", () => {
+    const store = createMessagesStore(createMemoryStorage(), 0);
+    for (const chatId of ["kept", "gone", "live"]) store.getState().appendMessage(chatId, msg({}));
+    store.getState().addFormRecord("gone", { afterToolId: "t1" } as never);
+    store.getState().setTurnActive("live", true);
+
+    store.getState().retainChats(new Set(["kept"]));
+
+    expect(Object.keys(store.getState().byChat).sort()).toEqual(["kept", "live"]);
+    expect(store.getState().formRecords.gone).toBeUndefined();
+  });
+
   it("persists transcripts without attachment bytes or runtime turn state", async () => {
     const storage = createMemoryStorage();
     const first = createMessagesStore(storage, 0);

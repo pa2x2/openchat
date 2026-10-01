@@ -12,6 +12,7 @@ import type { ChatId, ChatSummary } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
+import { useMessagesStore } from "./messages";
 import { mmkvStorage } from "./storage";
 import { t } from "@/src/i18n";
 
@@ -125,6 +126,7 @@ export function createChatsStore(storage = mmkvStorage) {
             }
             const chats = await provider.listChats();
             set({ chats: sortChats(chats), loading: false });
+            useMessagesStore.getState().retainChats(new Set(chats.map((chat) => chat.id)));
           } catch (error) {
             set({
               loading: false,
