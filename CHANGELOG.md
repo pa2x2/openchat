@@ -2,6 +2,26 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-01
+
+### ✨ Added
+
+- Send a message while a reply is still running. It waits under the reply and goes once the reply is done. Tap its arrow to send it sooner, as soon as the current step ends, and the reply carries on under your message. Its cross takes it back into the composer.
+- Branch a chat from any reply. The branch button under a reply opens a new chat with the conversation up to that reply, and Undo takes it back for a few seconds. Branches have a branch icon in the chat lists. A branch says under its title which chat it came from, and a tap opens that chat. A branch of a temporary chat is temporary too.
+- When the context ring turns amber, the chat's usage sheet offers Compact now. It replaces the conversation so far with a summary, so the model has room to keep going.
+- A web search in a reply's steps lists the pages it found. Tap one to open it in your browser.
+
+### 🧩 Improved
+
+- You can edit any of your messages, not only the last one. Sending the edit removes the messages after it. While you edit, the message has a ring, the messages that will go are dimmed, and the bar above the composer says how many. Switch the bar from Here to New chat to send the edit to a new chat instead and leave this one as it is.
+- Each chat keeps what you typed but didn't send, across chat switches and app restarts.
+- A table wider than the screen scrolls sideways, and each column is as wide as its content.
+
+### 🐛 Fixed
+
+- Long chats showed only their newest 50 messages. They now load in full.
+- The sidebar listed only the newest 100 chats. It now lists all of them.
+
 ## [1.2.1] - 2026-09-30
 
 ### 🔄 Changed
@@ -192,6 +212,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.3.0]: https://github.com/pa2x2/openchat/releases/tag/v1.3.0
 [1.2.1]: https://github.com/pa2x2/openchat/releases/tag/v1.2.1
 [1.2.0]: https://github.com/pa2x2/openchat/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pa2x2/openchat/releases/tag/v1.1.0
