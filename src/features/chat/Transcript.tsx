@@ -15,12 +15,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatId, Message, TurnActivity } from "@/src/domain";
+import type { ChatId, Message, QueuedMessage, TurnActivity } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 import { MessageBubble } from "./MessageBubble";
+import { QueuedMessages } from "./QueuedMessages";
 
 /** How far up the transcript the "jump to latest" button appears. */
 const SCROLL_BUTTON_OFFSET = 300;
@@ -84,7 +85,11 @@ export interface TranscriptProps {
   /** Present when the backend can edit a sent message. */
   onEditMessage?: (message: Message) => void;
   editingId?: string | null;
+  onSendQueuedNow: (message: QueuedMessage) => void;
+  onCancelQueued: (message: QueuedMessage) => void;
 }
+
+const NO_QUEUED: QueuedMessage[] = [];
 
 export function Transcript({
   chatId,
@@ -94,6 +99,8 @@ export function Transcript({
   onRegenerate,
   onEditMessage,
   editingId = null,
+  onSendQueuedNow,
+  onCancelQueued,
 }: TranscriptProps) {
   const { t } = useTranslation();
   const { colors, floatingShadow } = useAppTheme();
@@ -105,6 +112,7 @@ export function Transcript({
     state.forms[chatId]?.length ? ASKING : (state.activity[chatId] ?? null),
   );
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
+  const queued = useMessagesStore((state) => state.queued[chatId] ?? NO_QUEUED);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [following, setFollowing] = useState(true);
 
@@ -170,11 +178,13 @@ export function Transcript({
 
   const [listHeight, setListHeight] = useState(0);
   const [questionHeight, setQuestionHeight] = useState(0);
+  const [queuedHeight, setQueuedHeight] = useState(0);
   // What the reply is stretched to, so that the question above it lands at
-  // the top of the list. Zero until both are measured.
+  // the top of the list, with the queued messages under the reply. Zero
+  // until the question is measured.
   const slotHeight =
     pinned && listHeight > 0 && questionHeight > 0
-      ? Math.max(0, listHeight - topInset - TOP_GAP - questionHeight - BOTTOM_GAP)
+      ? Math.max(0, listHeight - topInset - TOP_GAP - questionHeight - queuedHeight - BOTTOM_GAP)
       : 0;
   const pinnedReplyId = pinned && questionIndex === 1 ? reversed[0].id : null;
   const [reply, setReply] = useState<{ id: string; height: number } | null>(null);
@@ -279,6 +289,15 @@ export function Transcript({
             <View style={pinned && questionIndex === 0 ? { minHeight: slotHeight } : undefined}>
               {starting ? (
                 <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
+              ) : null}
+            </View>
+            <View onLayout={(event) => setQueuedHeight(event.nativeEvent.layout.height)}>
+              {queued.length > 0 ? (
+                <QueuedMessages
+                  messages={queued}
+                  onSendNow={onSendQueuedNow}
+                  onCancel={onCancelQueued}
+                />
               ) : null}
             </View>
             <View style={{ height: BOTTOM_GAP }} />

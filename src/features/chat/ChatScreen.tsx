@@ -23,15 +23,19 @@ import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import { dismissTurnNotification } from "@/src/features/notifications/turnNotifications";
 import {
   answerForm,
+  cancelQueuedMessage,
   discardPendingRegenerate,
   dismissForm,
   editLastMessage,
   followRunningTurn,
   interruptTurn,
   isTurnLive,
+  queueMessage,
   regenerateReply,
   sendMessage,
+  sendQueuedNow,
   settleOrphanedStreams,
+  syncQueue,
 } from "@/src/stream/streamMachine";
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
@@ -46,6 +50,7 @@ import {
   type Message,
   type ModelInfo,
   type ModelRef,
+  type QueuedMessage,
 } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
@@ -137,6 +142,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
   const canAttach = capabilities?.attachments === true;
+  const canQueue = capabilities?.queue === true;
   const modelSelection = capabilities?.modelSelection === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = capabilities?.deleteChat === true;
@@ -196,6 +202,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void messagesStore.fetchMessages(chatId).then(() => {
       if (cancelled) return;
       settleOrphanedStreams(chatId);
+      void syncQueue(chatId);
       void followRunningTurn(chatId);
     });
     const subscription = AppState.addEventListener("change", (state) => {
@@ -203,7 +210,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         void useMessagesStore
           .getState()
           .fetchMessages(chatId)
-          .then(() => followRunningTurn(chatId));
+          .then(() => {
+            void syncQueue(chatId);
+            return followRunningTurn(chatId);
+          });
       }
     });
     return () => {
@@ -300,6 +310,46 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       busy.current = false;
     }
   }
+
+  async function handleQueue(text: string, files: Attachment[]): Promise<boolean> {
+    // The reply can end between the last render and the tap.
+    if (!isTurnLive(chatId)) return handleSend(text, files);
+    setBanner(null);
+    setAttachments([]);
+    try {
+      await queueMessage(chatId, text, files);
+      return true;
+    } catch (error) {
+      setAttachments(files);
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
+      return false;
+    }
+  }
+
+  const handleSendQueuedNow = useCallback(
+    (message: QueuedMessage) => {
+      setBanner(null);
+      sendQueuedNow(chatId, message.id).catch(() => setBanner(t("queue.sendNowFailed")));
+    },
+    [chatId, t],
+  );
+
+  /** Takes the message back into the composer, after whatever is typed there. */
+  const handleCancelQueued = useCallback(
+    (message: QueuedMessage) => {
+      setBanner(null);
+      cancelQueuedMessage(chatId, message.id).then(
+        (taken) => {
+          const draft = composer.current?.read().trim() ?? "";
+          composer.current?.insert(draft ? `${draft}\n\n${taken.text}` : taken.text);
+          const files = taken.attachments;
+          if (files) setAttachments((current) => [...current, ...files]);
+        },
+        () => setBanner(t("queue.cancelFailed")),
+      );
+    },
+    [chatId, t],
+  );
 
   async function sendEdit(text: string): Promise<boolean> {
     const target = editing;
@@ -503,6 +553,8 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
               editingId={editing?.message.id ?? null}
+              onSendQueuedNow={handleSendQueuedNow}
+              onCancelQueued={handleCancelQueued}
             />
           )}
 
@@ -574,6 +626,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             }
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
+            onQueue={turnActive && canQueue ? handleQueue : undefined}
             onAttach={canAttach && !editing ? () => setAttachSheetOpen(true) : undefined}
             attachments={attachments}
             onRemoveAttachment={(attachment) =>

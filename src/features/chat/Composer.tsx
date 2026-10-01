@@ -29,6 +29,12 @@ export interface ComposerProps {
   onSend: (text: string, attachments: Attachment[]) => void | boolean | Promise<void | boolean>;
   /** Present while a turn is live; replaces the send button. */
   onStop?: () => void;
+  /**
+   * Present while a turn is live and the backend can hold a message until the
+   * reply is done. The send button then comes back beside stop once there is
+   * something to send, and sends here instead of `onSend`.
+   */
+  onQueue?: (text: string, attachments: Attachment[]) => boolean | Promise<boolean>;
   /** Present when the backend accepts attachments; shows the attach button. */
   onAttach?: () => void;
   /** Files staged for the next message. */
@@ -73,6 +79,7 @@ export function Composer({
   ref,
   onSend,
   onStop,
+  onQueue,
   onAttach,
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
@@ -107,19 +114,40 @@ export function Composer({
     if (locked) input.current?.blur();
   }, [locked]);
 
+  const empty = text.trim().length === 0 && attachments.length === 0;
+  const queueing = streaming && Boolean(onQueue);
+
   async function handleSend() {
     const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || streaming || locked) return;
+    if (empty || (streaming && !onQueue) || locked) return;
     setText("");
     Keyboard.dismiss();
-    const sent = await onSend(trimmed, attachments);
+    const sent = await (streaming && onQueue ? onQueue : onSend)(trimmed, attachments);
     if (sent === false) setText((current) => current || text);
   }
 
-  const sendDisabled = (text.trim().length === 0 && attachments.length === 0) || locked;
-  // Attach and the model chip step aside while a reply streams.
-  const showAttach = Boolean(onAttach) && !streaming;
+  const sendDisabled = empty || locked;
+  // The model chip steps aside while a reply streams; attach stays only for
+  // a message to queue.
+  const showAttach = Boolean(onAttach) && (!streaming || queueing);
   const showModel = Boolean(model) && !streaming;
+  const sendButton = (
+    <Pressable
+      accessibilityHint={queueing ? t("composer.queueHint") : t("composer.sendHint")}
+      accessibilityLabel={queueing ? t("composer.queue") : t("composer.send")}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: sendDisabled }}
+      className={cn(
+        "h-10 w-10 items-center justify-center rounded-full",
+        sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
+      )}
+      disabled={sendDisabled}
+      onPress={() => void handleSend()}
+      testID="composer-send"
+    >
+      <Icon name="arrow-up" size={22} tone={sendDisabled ? "textFaint" : "primaryForeground"} />
+    </Pressable>
+  );
 
   return (
     <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
@@ -220,33 +248,23 @@ export function Composer({
             accessibilityLabel={t("composer.stop")}
             accessibilityRole="button"
             accessibilityState={{ busy: true }}
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
+            className={cn(
+              "h-10 w-10 items-center justify-center rounded-full active:opacity-80",
+              // Beside a send button, stop is the quieter of the two.
+              queueing && !sendDisabled ? "bg-raised-hover" : "bg-primary",
+            )}
             onPress={onStop}
             testID="composer-stop"
           >
-            <View className="h-3 w-3 rounded-[2px] bg-primary-foreground" />
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityHint={t("composer.sendHint")}
-            accessibilityLabel={t("composer.send")}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: sendDisabled }}
-            className={cn(
-              "h-10 w-10 items-center justify-center rounded-full",
-              sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
-            )}
-            disabled={sendDisabled}
-            onPress={() => void handleSend()}
-            testID="composer-send"
-          >
-            <Icon
-              name="arrow-up"
-              size={22}
-              tone={sendDisabled ? "textFaint" : "primaryForeground"}
+            <View
+              className={cn(
+                "h-3 w-3 rounded-[2px]",
+                queueing && !sendDisabled ? "bg-text" : "bg-primary-foreground",
+              )}
             />
           </Pressable>
-        )}
+        ) : null}
+        {!streaming || (queueing && !sendDisabled) ? sendButton : null}
       </View>
     </View>
   );

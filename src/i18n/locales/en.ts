@@ -223,10 +223,21 @@ export default {
     stopHint: "Stops the current response",
     send: "Send message",
     sendHint: "Sends the message",
+    queue: "Queue message",
+    queueHint: "Sends the message once the current reply is done",
     locked: {
       notConnected: "Connect a server to start chatting",
       form: "Answer the question above",
     },
+  },
+  queue: {
+    queued: "Queued",
+    sending: "Sending",
+    sendNow: "Send now",
+    sendNowHint: "Sends the message as soon as the reply’s current step ends",
+    cancel: "Cancel and return to the composer",
+    sendNowFailed: "Couldn’t send the message now. It’s still queued.",
+    cancelFailed: "Couldn’t take the message back. It may have been sent already.",
   },
   message: {
     copy: "Copy",
