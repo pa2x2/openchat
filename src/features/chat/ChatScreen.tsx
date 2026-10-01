@@ -9,7 +9,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, ChatTitleBar, HEADER_HEIGHT, TITLE_BAR_HEIGHT } from "./ChatHeader";
+import {
+  ChatHeader,
+  ChatTitleBar,
+  HEADER_HEIGHT,
+  TITLE_BAR_HEIGHT,
+  type BranchSource,
+} from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { RecentChats } from "./RecentChats";
@@ -53,6 +59,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
+import { chatTitle } from "@/src/lib/chatTitle";
 import { cn } from "@/src/lib/cn";
 import {
   UNTITLED_CHAT,
@@ -116,6 +123,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [focusOnMount] = useState(() => Keyboard.isVisible());
 
   const chat = useChatsStore((state) => state.chats.find((candidate) => candidate.id === chatId));
+  const sourceId = chat?.branchedFrom;
+  const source = useChatsStore((state) =>
+    sourceId ? state.chats.find((candidate) => candidate.id === sourceId) : undefined,
+  );
   // Only whether there is a transcript: the transcript itself changes on
   // every streamed frame, and only `Transcript` should re-render for that.
   const empty = useMessagesStore((state) => (state.byChat[chatId]?.length ?? 0) === 0);
@@ -550,6 +561,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
 
   const title = !isDraft && named && chat ? chat.title : null;
+  // A source missing from the list has been deleted.
+  const branchedFrom: BranchSource | undefined = !sourceId
+    ? undefined
+    : source
+      ? {
+          title: chatTitle(source.title),
+          onOpen: () => router.replace({ pathname: "/chat/[id]", params: { id: source.id } }),
+        }
+      : { title: null };
   const header = (
     <ChatHeader
       placement={controls}
@@ -561,6 +581,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       title={title}
       menuItems={menuItems}
       temporaryLabel={temporary}
+      branchedFrom={branchedFrom}
       temporary={
         isDraft && canTemporary
           ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
@@ -618,7 +639,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           {controls === "top" ? (
             header
           ) : (
-            <ChatTitleBar title={title} temporaryLabel={temporary} onRename={rename} />
+            <ChatTitleBar
+              title={title}
+              temporaryLabel={temporary}
+              branchedFrom={branchedFrom}
+              onRename={rename}
+            />
           )}
 
           {/* The skeleton already says an uncached transcript is loading. */}

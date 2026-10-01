@@ -43,6 +43,16 @@ export interface ChatHeaderProps {
   /** Present on a chat not yet started; replaces the new chat button. */
   temporary?: { on: boolean; onToggle: () => void };
   temporaryLabel?: boolean;
+  branchedFrom?: BranchSource;
+}
+
+/**
+ * Where a branch came from, shown under its title. `title` is null when the
+ * source is gone; `onOpen` is present while it can be opened.
+ */
+export interface BranchSource {
+  title: string | null;
+  onOpen?: () => void;
 }
 
 export function ChatHeader({
@@ -53,6 +63,7 @@ export function ChatHeader({
   menuItems,
   temporary,
   temporaryLabel = false,
+  branchedFrom,
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
@@ -67,7 +78,8 @@ export function ChatHeader({
   // A title on two lines, or with the label under it, reaches down into the
   // fade, where the transcript's text would show through it. The solid part
   // grows to hold it.
-  const solid = titleLines > 1 || temporaryLabel ? 1 - 16 / (insets.top + HEADER_HEIGHT) : 0.65;
+  const solid =
+    titleLines > 1 || temporaryLabel || branchedFrom ? 1 - 16 / (insets.top + HEADER_HEIGHT) : 0.65;
 
   function openMenu() {
     if (top) {
@@ -162,13 +174,19 @@ export function ChatHeader({
 
       {top ? (
         <View
-          // A drag that starts on the title still scrolls the transcript under it.
-          pointerEvents="none"
+          // A drag that starts on the title still scrolls the transcript
+          // under it; only the branch's source line takes a tap.
+          pointerEvents="box-none"
           // Centred on the screen, not between the buttons, which differ in
           // width; the padding clears the wider side.
           className="absolute bottom-0 left-0 right-0 h-[72px] items-center justify-center px-[108px]"
         >
-          <ChatTitle title={title} temporaryLabel={temporaryLabel} onLines={setTitleLines} />
+          <ChatTitle
+            title={title}
+            temporaryLabel={temporaryLabel}
+            branchedFrom={branchedFrom}
+            onLines={setTitleLines}
+          />
         </View>
       ) : null}
 
@@ -205,11 +223,13 @@ const TITLE_BAR_FADE = 12;
 export function ChatTitleBar({
   title,
   temporaryLabel = false,
+  branchedFrom,
   onRename,
 }: {
   /** Null until the chat has a name. */
   title: string | null;
   temporaryLabel?: boolean;
+  branchedFrom?: BranchSource;
   /** Present on a chat that can be renamed; a tap on the title calls it. */
   onRename?: () => void;
 }) {
@@ -229,7 +249,12 @@ export function ChatTitleBar({
         experimental_backgroundImage: `linear-gradient(to bottom, ${colors.background} ${Math.round((solid / (solid + TITLE_BAR_FADE)) * 100)}%, ${withAlpha(colors.background, 0)})`,
       }}
     >
-      <ChatTitle title={title} temporaryLabel={temporaryLabel} onPress={onRename} />
+      <ChatTitle
+        title={title}
+        temporaryLabel={temporaryLabel}
+        branchedFrom={branchedFrom}
+        onPress={onRename}
+      />
     </View>
   );
 }
@@ -237,46 +262,75 @@ export function ChatTitleBar({
 function ChatTitle({
   title,
   temporaryLabel,
+  branchedFrom,
   onPress,
   onLines,
 }: {
   title: string | null;
   temporaryLabel: boolean;
+  branchedFrom?: BranchSource;
   onPress?: () => void;
   onLines?: (lines: number) => void;
 }) {
   const { t } = useTranslation();
   const shown = title ?? t("chat.newChat");
+  // A temporary chat's branch is temporary too, which matters more.
+  const source = temporaryLabel ? undefined : branchedFrom;
   return (
-    <Pressable
-      accessibilityHint={onPress ? t("chat.renameHint") : undefined}
-      accessibilityLabel={temporaryLabel ? t("chat.titleTemporary", { title: shown }) : shown}
-      accessibilityRole={onPress ? "button" : "header"}
-      className="items-center active:opacity-60"
-      hitSlop={10}
-      // Where a tap does nothing, a drag that starts on the title scrolls the
-      // transcript under it.
-      pointerEvents={onPress ? "auto" : "none"}
-      onPress={onPress}
-      testID="chat-title"
-    >
-      <Text
-        className={cn(
-          "text-center text-[15px] font-medium leading-[18px]",
-          title === null && "text-text-muted",
-        )}
-        // The label takes the second line's place.
-        numberOfLines={temporaryLabel ? 1 : 2}
-        onTextLayout={onLines && ((event) => onLines(event.nativeEvent.lines.length))}
+    <View className="items-center" pointerEvents="box-none">
+      <Pressable
+        accessibilityHint={onPress ? t("chat.renameHint") : undefined}
+        accessibilityLabel={temporaryLabel ? t("chat.titleTemporary", { title: shown }) : shown}
+        accessibilityRole={onPress ? "button" : "header"}
+        className="items-center active:opacity-60"
+        hitSlop={10}
+        // Where a tap does nothing, a drag that starts on the title scrolls the
+        // transcript under it.
+        pointerEvents={onPress ? "auto" : "none"}
+        onPress={onPress}
+        testID="chat-title"
       >
-        {shown}
-      </Text>
-      {temporaryLabel ? (
-        <View className="flex-row items-center gap-1" testID="temporary-label">
-          <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
-          <Text className="text-xs text-text-muted">{t("chat.temporary")}</Text>
-        </View>
+        <Text
+          className={cn(
+            "text-center text-[15px] font-medium leading-[18px]",
+            title === null && "text-text-muted",
+          )}
+          // The line under it takes the second line's place.
+          numberOfLines={temporaryLabel || source ? 1 : 2}
+          onTextLayout={onLines && ((event) => onLines(event.nativeEvent.lines.length))}
+        >
+          {shown}
+        </Text>
+        {temporaryLabel ? (
+          <View className="flex-row items-center gap-1" testID="temporary-label">
+            <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
+            <Text className="text-xs text-text-muted">{t("chat.temporary")}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+      {source ? (
+        <Pressable
+          accessibilityHint={source.onOpen ? t("chat.openSourceHint") : undefined}
+          accessibilityRole={source.onOpen ? "link" : "text"}
+          className="max-w-full flex-row items-center gap-1 active:opacity-60"
+          disabled={!source.onOpen}
+          hitSlop={8}
+          onPress={source.onOpen}
+          testID="branch-source"
+        >
+          <Icon name="source-branch" size={12} tone="textMuted" />
+          <Text className="shrink text-xs text-text-muted" numberOfLines={1}>
+            {source.title === null ? (
+              t("chat.branchedFromDeleted")
+            ) : (
+              <>
+                {t("chat.branchedFrom")}{" "}
+                <Text className="text-xs text-primary">{source.title}</Text>
+              </>
+            )}
+          </Text>
+        </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
