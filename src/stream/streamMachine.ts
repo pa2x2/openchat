@@ -468,7 +468,10 @@ export async function branchChat(chatId: ChatId, reply: Message): Promise<Branch
     const known = error instanceof ConnectionError && error.code !== "unknown";
     return { ok: false, error: known ? error.message : t("errors.branchFailed") };
   }
-  useChatsStore.getState().upsert(chat);
+  const chats = useChatsStore.getState();
+  // Before it is listed: a temporary chat's branch must never reach the sidebar.
+  if (chats.temporary[chatId]) chats.markTemporary(chat.id);
+  chats.upsert(chat);
   // The new chat opens on what it was copied from instead of a skeleton; its
   // own transcript replaces this once it is read.
   useMessagesStore.getState().setMessages(chat.id, transcript.slice(0, cut));
