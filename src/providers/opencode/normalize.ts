@@ -345,6 +345,21 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         retryable: false,
       };
     }
+    case "session.inbox.delivered":
+    case "session.inbox.cancelled": {
+      const id = event.data.inboxID;
+      if (typeof id !== "string") return null;
+      return {
+        type: event.type === "session.inbox.delivered" ? "queued-delivered" : "queued-cancelled",
+        id,
+      };
+    }
+    case "session.inbox.delivery.changed": {
+      const { inboxID: id, delivery } = event.data;
+      return typeof id === "string" && (delivery === "steer" || delivery === "queue")
+        ? { type: "queued-delivery", id, delivery }
+        : null;
+    }
     case "form.created":
       return event.data.form ? { type: "form", form: toChatForm(event.data.form) } : null;
     // Answered or dismissed by any client, or dropped by the server when the

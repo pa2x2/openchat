@@ -48,7 +48,7 @@ function base64ByteLength(base64: string): number {
   return Math.floor((base64.length * 3) / 4) - padding;
 }
 
-function toAttachment(file: PromptFileAttachment): Attachment {
+export function toAttachment(file: PromptFileAttachment): Attachment {
   // The server hands the payload back itself, whether the file was sent
   // inline or fetched from a uri, so a transcript read back from the server
   // can render an attachment without a second request.

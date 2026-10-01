@@ -8,10 +8,12 @@ import type {
   ChatId,
   ChatSummary,
   Capabilities,
+  Delivery,
   FormAnswer,
   Message,
   ModelInfo,
   ModelRef,
+  QueuedMessage,
   StreamEvent,
   UsageQuery,
   UsageReport,
@@ -28,7 +30,18 @@ import { catalogChanges, chatEvents } from "./events";
 import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
-import { interrupt, send, regenerate, prepareRegenerate, discardRegenerate } from "./prompt";
+import {
+  cancelQueued,
+  discardRegenerate,
+  interrupt,
+  newMessageId,
+  prepareRegenerate,
+  queue,
+  queuedMessages,
+  regenerate,
+  send,
+  steerQueued,
+} from "./prompt";
 import { createChat, deleteChat, isRunning, listChats, renameChat, switchModel } from "./sessions";
 import { usageReport } from "./stats";
 
@@ -43,6 +56,7 @@ export const openCodeCapabilities: Capabilities = {
   deleteChat: true,
   renameChat: true,
   usageReport: true,
+  queue: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -104,6 +118,26 @@ export class OpenCodeProvider implements ChatProvider {
 
   send(chatId: ChatId, msg: UserMessage): Promise<void> {
     return send(this.client(), chatId, msg);
+  }
+
+  queueMessage(chatId: ChatId, msg: UserMessage, delivery: Delivery): Promise<void> {
+    return queue(this.client(), chatId, msg, delivery);
+  }
+
+  newMessageId(): string {
+    return newMessageId();
+  }
+
+  queuedMessages(chatId: ChatId): Promise<QueuedMessage[]> {
+    return queuedMessages(this.client(), chatId);
+  }
+
+  cancelQueued(chatId: ChatId, id: string): Promise<void> {
+    return cancelQueued(this.client(), chatId, id);
+  }
+
+  steerQueued(chatId: ChatId, id: string): Promise<void> {
+    return steerQueued(this.client(), chatId, id);
   }
 
   regenerate(chatId: ChatId, msg: UserMessage): Promise<void> {

@@ -8,7 +8,7 @@
  * live updates.
  */
 
-import type { ChatForm, ChatId, Message, TurnActivity } from "@/src/domain";
+import type { ChatForm, ChatId, Message, QueuedMessage, TurnActivity } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
@@ -34,6 +34,8 @@ interface MessagesStoreState {
   formRecords: Record<ChatId, FormRecord[]>;
   /** What the live turn is doing; null while it writes text or no turn runs (runtime only). */
   activity: Record<ChatId, TurnActivity | null>;
+  /** Messages waiting on the backend to join the transcript, oldest first (runtime only). */
+  queued: Record<ChatId, QueuedMessage[]>;
   /** Replaces the whole transcript of a chat (reconcile / cold open). */
   setMessages: (chatId: ChatId, messages: Message[]) => void;
   appendMessage: (chatId: ChatId, message: Message) => void;
@@ -49,6 +51,10 @@ interface MessagesStoreState {
   addForm: (chatId: ChatId, form: ChatForm) => void;
   removeForm: (chatId: ChatId, formId: string) => void;
   addFormRecord: (chatId: ChatId, record: FormRecord) => void;
+  setQueued: (chatId: ChatId, queued: QueuedMessage[]) => void;
+  addQueued: (chatId: ChatId, message: QueuedMessage) => void;
+  patchQueued: (chatId: ChatId, id: string, patch: Partial<QueuedMessage>) => void;
+  removeQueued: (chatId: ChatId, id: string) => void;
 }
 
 function sortMessages(messages: Message[]): Message[] {
@@ -111,6 +117,37 @@ export function createMessagesStore(
         forms: {},
         formRecords: {},
         activity: {},
+        queued: {},
+        setQueued: (chatId, queued) =>
+          set((state) => ({ queued: { ...state.queued, [chatId]: queued } })),
+        addQueued: (chatId, message) =>
+          set((state) => ({
+            queued: { ...state.queued, [chatId]: [...(state.queued[chatId] ?? []), message] },
+          })),
+        patchQueued: (chatId, id, patch) =>
+          set((state) => {
+            const existing = state.queued[chatId];
+            if (!existing?.some((message) => message.id === id)) return state;
+            return {
+              queued: {
+                ...state.queued,
+                [chatId]: existing.map((message) =>
+                  message.id === id ? { ...message, ...patch } : message,
+                ),
+              },
+            };
+          }),
+        removeQueued: (chatId, id) =>
+          set((state) => {
+            const existing = state.queued[chatId];
+            if (!existing?.some((message) => message.id === id)) return state;
+            return {
+              queued: {
+                ...state.queued,
+                [chatId]: existing.filter((message) => message.id !== id),
+              },
+            };
+          }),
         setForms: (chatId, forms) =>
           set((state) => ({ forms: { ...state.forms, [chatId]: forms } })),
         // The same form can arrive live and from a pending-forms sync.

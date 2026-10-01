@@ -1,5 +1,5 @@
 import type { OpenCodeClient } from "../client";
-import { prepareRegenerate, regenerate, send } from "../prompt";
+import { newMessageId, prepareRegenerate, regenerate, send } from "../prompt";
 
 function stubClient(failing: { prompt?: boolean } = {}) {
   const calls: { name: string; input: unknown }[] = [];
@@ -54,4 +54,9 @@ it("drops the staged rollback when the rerun cannot be delivered", async () => {
     "offline",
   );
   expect(calls.map((call) => call.name)).toEqual(["prompt", "clear"]);
+});
+
+it("makes message ids in the server's shape, which sorts them with the server's own", () => {
+  // The server made msg_0f5941fa5001zPQxuuzsf6LDTB at this millisecond.
+  expect(newMessageId(1790826520485)).toMatch(/^msg_0f5941fa5001[0-9A-Za-z]{14}$/);
 });
