@@ -11,6 +11,7 @@ import { Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Attachment } from "@/src/domain";
+import { useDraftsStore } from "@/src/stores/drafts";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
@@ -56,6 +57,12 @@ export interface ComposerProps {
   context?: ContextUse & { onPress: () => void };
   /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
   editing?: { onCancel: () => void };
+  /**
+   * The chat the typed text is saved as a draft for, restored when the
+   * composer mounts again. Unset while the field holds something that is not
+   * a draft, such as a message being edited; the saved draft stays as it was.
+   */
+  draftKey?: string;
   autoFocus?: boolean;
   placeholder?: string;
   /**
@@ -86,12 +93,15 @@ export function Composer({
   model,
   context,
   editing,
+  draftKey,
   autoFocus,
   placeholder,
   lockedReason,
 }: ComposerProps) {
   const { t } = useTranslation();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() =>
+    draftKey === undefined ? "" : (useDraftsStore.getState().byChat[draftKey] ?? ""),
+  );
   const input = useRef<TextInputHandle>(null);
   const streaming = Boolean(onStop);
   const { floatingShadow } = useAppTheme();
@@ -108,6 +118,10 @@ export function Composer({
     }),
     [text],
   );
+
+  useEffect(() => {
+    if (draftKey !== undefined) useDraftsStore.getState().setDraft(draftKey, text);
+  }, [draftKey, text]);
 
   const locked = lockedReason !== undefined;
   useEffect(() => {

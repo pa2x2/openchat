@@ -616,6 +616,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           ) : null}
           <Composer
             ref={composer}
+            draftKey={editing ? undefined : chatId}
             autoFocus={focusOnMount}
             lockedReason={
               !connected
