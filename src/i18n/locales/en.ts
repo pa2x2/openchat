@@ -411,6 +411,10 @@ export default {
     used: "Context: {{share}} used",
     tokenCount: "{{tokens}} tokens",
     tokensOf: "{{used}} of {{window}} tokens",
+    compact: "Compact now",
+    compactNote:
+      "Replaces the conversation so far with a summary, so the model has room to keep going.",
+    compactFailed: "Couldn’t compact the chat",
   },
   models: {
     auto: "Auto",

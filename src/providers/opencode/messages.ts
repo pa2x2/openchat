@@ -84,6 +84,9 @@ export function toMessages(wire: readonly SessionMessageInfo[]): Message[] {
     } else if (entry.type === "user") {
       closeRun();
       messages.push(toUserMessage(entry));
+    } else if (entry.type === "compaction" && entry.status === "completed") {
+      // The summary replaced the context these replies measured.
+      for (const message of messages) delete message.contextTokens;
     }
     // Other entries (model switches, compaction, …) are not chat messages.
   }

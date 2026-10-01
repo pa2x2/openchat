@@ -104,6 +104,12 @@ export interface ChatProvider {
   steerQueued?(chatId: ChatId, id: string): Promise<void>;
   interrupt(chatId: ChatId): Promise<void>;
   /**
+   * Summarizes the chat to free up the model's context. Only present when
+   * `capabilities.compact` is true. On an idle chat it starts a run, which
+   * `isRunning` and the event stream report as they would a reply.
+   */
+  compact?(chatId: ChatId): Promise<void>;
+  /**
    * Whether the backend is still working on a run in this chat, whoever
    * started it. Without it the app can only guess from the transcript, and
    * cannot pick up runs it did not start.

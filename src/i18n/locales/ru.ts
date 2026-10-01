@@ -443,6 +443,9 @@ export default {
     used: "Контекст: занято {{share}}",
     tokenCount: "{{tokens}} токенов",
     tokensOf: "{{used}} из {{window}} токенов",
+    compact: "Сжать сейчас",
+    compactNote: "Заменяет переписку кратким пересказом, чтобы модели хватило места продолжить.",
+    compactFailed: "Не удалось сжать чат",
   },
   models: {
     auto: "Авто",

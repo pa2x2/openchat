@@ -24,6 +24,7 @@ import { dismissTurnNotification } from "@/src/features/notifications/turnNotifi
 import {
   answerForm,
   cancelQueuedMessage,
+  compactChat,
   discardPendingRegenerate,
   dismissForm,
   editLastMessage,
@@ -394,6 +395,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void interruptTurn(chatId);
   }
 
+  function handleCompact() {
+    setUsageSheetOpen(false);
+    setBanner(null);
+    compactChat(chatId).catch(() => setBanner(t("context.compactFailed")));
+  }
+
   async function handleAddAttachment(source: AttachmentSource) {
     setAttachSheetOpen(false);
     setBanner(null);
@@ -666,6 +673,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           context={context}
           usage={chat?.usage}
           cost={chat?.cost}
+          onCompact={capabilities?.compact && connected && !turnActive ? handleCompact : undefined}
         />
         {modelSelection ? (
           <ModelSheet

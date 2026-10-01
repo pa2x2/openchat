@@ -1135,6 +1135,16 @@ function stillRunning(provider: ChatProvider, chatId: ChatId): Promise<boolean> 
   return provider.isRunning(chatId).catch(() => true);
 }
 
+export async function compactChat(chatId: ChatId): Promise<void> {
+  const provider = await getProvider();
+  if (!provider?.compact) throw new Error(t("errors.notConnected"));
+  await provider.compact(chatId);
+  await followRunningTurn(chatId);
+  // A quick compaction can be over before it is followed, which leaves the
+  // transcript still counting the context it replaced.
+  if (!isTurnLive(chatId)) await useMessagesStore.getState().fetchMessages(chatId);
+}
+
 /**
  * User-initiated interrupt: stop consuming, mark the optimistic message,
  * and tell the server. The server's own interrupted confirmation is not

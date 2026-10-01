@@ -7,6 +7,7 @@
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import type { Money, TokenUsage } from "@/src/domain";
+import { Button } from "@/src/ui/Button";
 import { Group, GroupLabel } from "@/src/ui/ListGroup";
 import { Sheet } from "@/src/ui/Sheet";
 import { Text } from "@/src/ui/Text";
@@ -27,6 +28,8 @@ export interface UsageSheetProps {
   context: ContextUse | null;
   usage?: TokenUsage;
   cost?: Money;
+  /** Offered only once the context meter warns; unset when compacting isn't possible now. */
+  onCompact?: () => void;
 }
 
 function FigureRow({ label, value }: Figure) {
@@ -81,8 +84,11 @@ function ContextCard({ context }: { context: ContextUse }) {
   );
 }
 
-export function UsageSheet({ visible, onClose, context, usage, cost }: UsageSheetProps) {
+export function UsageSheet({ visible, onClose, context, usage, cost, onCompact }: UsageSheetProps) {
   const { t } = useTranslation();
+  const nearlyFull =
+    context?.window !== undefined &&
+    contextTone(contextShare(context.tokens, context.window)) !== "textMuted";
   const costText = formatCost(cost);
   const totals: Figure[] = [
     ...tokenFigures(usage),
@@ -94,6 +100,20 @@ export function UsageSheet({ visible, onClose, context, usage, cost }: UsageShee
         <>
           <GroupLabel>{t("usage.sheet.context")}</GroupLabel>
           <ContextCard context={context} />
+          {onCompact && nearlyFull ? (
+            <View className="items-start gap-2.5 px-3 pt-2">
+              <Text className="text-[12.5px] leading-[17px] text-text-muted">
+                {t("context.compactNote")}
+              </Text>
+              <Button
+                label={t("context.compact")}
+                onPress={onCompact}
+                variant="secondary"
+                size="sm"
+                testID="usage-compact"
+              />
+            </View>
+          ) : null}
         </>
       ) : null}
       {totals.length > 0 ? (

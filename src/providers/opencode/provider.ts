@@ -32,6 +32,7 @@ import { fetchMessages } from "./messages";
 import { listModels } from "./models";
 import {
   cancelQueued,
+  compact,
   discardRegenerate,
   interrupt,
   newMessageId,
@@ -57,6 +58,7 @@ export const openCodeCapabilities: Capabilities = {
   renameChat: true,
   usageReport: true,
   queue: true,
+  compact: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -154,6 +156,10 @@ export class OpenCodeProvider implements ChatProvider {
 
   interrupt(chatId: ChatId): Promise<void> {
     return interrupt(this.client(), chatId);
+  }
+
+  compact(chatId: ChatId): Promise<void> {
+    return compact(this.client(), chatId);
   }
 
   isRunning(chatId: ChatId): Promise<boolean> {

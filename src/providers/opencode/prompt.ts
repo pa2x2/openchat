@@ -196,6 +196,15 @@ export async function discardRegenerate(client: OpenCodeClient, chatId: ChatId):
   }
 }
 
+export async function compact(client: OpenCodeClient, chatId: ChatId): Promise<void> {
+  const timeout = timeoutSignal(CONTROL_TIMEOUT_MS);
+  try {
+    await client.session.compact({ sessionID: chatId }, { signal: timeout.signal });
+  } finally {
+    timeout.done();
+  }
+}
+
 export async function interrupt(client: OpenCodeClient, chatId: ChatId): Promise<void> {
   const timeout = timeoutSignal(CONTROL_TIMEOUT_MS);
   try {

@@ -378,4 +378,6 @@ export interface Capabilities {
   usageReport: boolean;
   /** Messages can be sent while a reply runs, and wait their turn on the backend. */
   queue: boolean;
+  /** The chat can be summarized on request to free up the model's context. */
+  compact: boolean;
 }
