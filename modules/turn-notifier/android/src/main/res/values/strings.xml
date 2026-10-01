@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="turn_notifier_channel_work">Replies in progress</string>
+  <string name="turn_notifier_channel_replies">Finished replies</string>
+  <string name="turn_notifier_channel_replies_description">A reply is ready, failed, or needs your answer</string>
+</resources>

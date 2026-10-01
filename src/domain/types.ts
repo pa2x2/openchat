@@ -66,6 +66,19 @@ export interface UserMessage {
 }
 
 /**
+ * When a message sent during a reply joins the conversation: "steer" as soon
+ * as the reply's current step ends, so the reply changes course; "queue" once
+ * the reply is done, as the next turn.
+ */
+export type Delivery = "steer" | "queue";
+
+/** A message sent during a reply that the backend holds until its delivery comes. */
+export interface QueuedMessage extends UserMessage {
+  delivery: Delivery;
+  createdAt: number;
+}
+
+/**
  * Tokens as a backend counted them, each in one bucket only: input read from
  * a cache is not also in `input`, and reasoning is not also in `output`. An
  * adapter whose backend counts them inclusively subtracts.
@@ -224,6 +237,13 @@ export interface ToolCall {
   /** What the call works on (a query, URL, command or path); empty until its input arrives. */
   subject: string;
   status: ToolStatus;
+  /** The pages a web search found; set once it succeeds. */
+  sources?: WebSource[];
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
 }
 
 /**
@@ -288,6 +308,15 @@ export type StreamEvent =
   | { type: "form"; form: ChatForm }
   /** The form was answered, dismissed or dropped, here or elsewhere. */
   | { type: "form-closed"; formId: string }
+  /**
+   * A queued message joined the transcript. What the run writes from here on
+   * answers it. The id can also be the turn's own prompt, which the backend
+   * delivers the same way.
+   */
+  | { type: "queued-delivered"; id: string }
+  /** A queued message was cancelled, here or elsewhere. */
+  | { type: "queued-cancelled"; id: string }
+  | { type: "queued-delivery"; id: string; delivery: Delivery }
   | { type: "error"; message: string; retryable: boolean };
 
 export type MessageRole = "user" | "assistant";
@@ -330,6 +359,8 @@ export interface ChatSummary {
   title: string;
   updatedAt: number;
   model?: ModelRef;
+  /** The chat this one was branched from, which may since have been deleted. */
+  branchedFrom?: ChatId;
   /**
    * Everything the chat has used, as the backend counts it. That can be more
    * than its replies add up to: a backend may also count work that left no
@@ -354,4 +385,10 @@ export interface Capabilities {
   deleteChat: boolean;
   renameChat: boolean;
   usageReport: boolean;
+  /** Messages can be sent while a reply runs, and wait their turn on the backend. */
+  queue: boolean;
+  /** The chat can be summarized on request to free up the model's context. */
+  compact: boolean;
+  /** A chat can be copied, up to any of its messages, into a new chat. */
+  branch: boolean;
 }

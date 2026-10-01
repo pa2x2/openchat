@@ -1,6 +1,7 @@
 export { createConnectionStore, useConnectionStore } from "./connection";
 export type { ConnectionProfile, ConnectionState } from "./connection";
 export { createChatsStore, useChatsStore } from "./chats";
+export { createDraftsStore, useDraftsStore } from "./drafts";
 export { createMessagesStore, useMessagesStore } from "./messages";
 export {
   createModelsStore,

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   Easing,
@@ -55,6 +56,7 @@ export function Sheet({
   className,
   testID,
 }: SheetProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const keyboardOpen = useKeyboardOpen();
@@ -153,7 +155,11 @@ export function Sheet({
             },
           ]}
         >
-          <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close sheet" />
+          <Pressable
+            className="flex-1"
+            onPress={onClose}
+            accessibilityLabel={t("common.closeSheet")}
+          />
         </Animated.View>
         {/* The Modal is its own window, so the screen's keyboard avoidance
             cannot reach the card: this one has to live in here. The card then

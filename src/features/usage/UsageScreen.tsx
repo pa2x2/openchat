@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { UsageReport } from "@/src/domain";
@@ -43,9 +44,11 @@ function Totals({
   measure: UsageMeasure;
   onChange: (measure: UsageMeasure) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View accessibilityRole="radiogroup" className="mt-3 flex-row gap-2">
-      {MEASURES.map(({ value, label }) => {
+      {MEASURES.map((value) => {
+        const label = t(`usage.measure.${value}`);
         const figure = formatMeasured(report, value);
         if (figure === null) return null;
         const active = value === measure;
@@ -82,6 +85,7 @@ function Totals({
 }
 
 function Report({ report }: { report: UsageReport }) {
+  const { t } = useTranslation();
   const period = useSettingsStore((state) => state.usagePeriod);
   const chosen = useSettingsStore((state) => state.usageMeasure);
   const setMeasure = useSettingsStore((state) => state.setUsageMeasure);
@@ -103,7 +107,7 @@ function Report({ report }: { report: UsageReport }) {
       ) : null}
       {models.length > 0 ? (
         <>
-          <GroupLabel>Models</GroupLabel>
+          <GroupLabel>{t("usage.models")}</GroupLabel>
           <Group testID="usage-models">
             {models.map((model) => (
               <Row
@@ -118,7 +122,7 @@ function Report({ report }: { report: UsageReport }) {
       ) : null}
       {tokens.length > 0 ? (
         <>
-          <GroupLabel>Tokens</GroupLabel>
+          <GroupLabel>{t("usage.measure.tokens")}</GroupLabel>
           <Group testID="usage-tokens">
             {tokens.map((figure) => (
               <Row key={figure.label} title={figure.label} value={figure.value} />
@@ -127,15 +131,16 @@ function Report({ report }: { report: UsageReport }) {
         </>
       ) : null}
       <Text className="px-3 pt-3 text-[12.5px] leading-[17px] text-text-muted">
-        Every chat on this server, and chats deleted from this phone.
+        {t("usage.note")}
       </Text>
     </>
   );
 }
 
 function LoadingReport() {
+  const { t } = useTranslation();
   return (
-    <SkeletonGroup label="Loading usage" className="mt-3 gap-3" testID="usage-loading">
+    <SkeletonGroup label={t("usage.loading")} className="mt-3 gap-3" testID="usage-loading">
       <View className="flex-row gap-2">
         <Skeleton className="h-[68px] flex-1 rounded-2xl" />
         <Skeleton className="h-[68px] flex-1 rounded-2xl" />
@@ -148,6 +153,7 @@ function LoadingReport() {
 }
 
 export function UsageScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const period = useSettingsStore((state) => state.usagePeriod);
   const setPeriod = useSettingsStore((state) => state.setUsagePeriod);
@@ -178,7 +184,7 @@ export function UsageScreen() {
       }
     >
       <Segmented
-        options={PERIODS}
+        options={PERIODS.map((value) => ({ value, label: t(`usage.period.${value}`) }))}
         value={period}
         onChange={setPeriod}
         testIDPrefix="usage-period"
@@ -186,14 +192,14 @@ export function UsageScreen() {
       {failed ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Couldn't load usage. Retry"
+          accessibilityLabel={`${t("usage.loadFailed")}. ${t("common.retry")}`}
           className="mt-3 flex-row items-center gap-2.5 rounded-[14px] bg-danger/10 px-3 py-2.5"
           onPress={() => void reload()}
           testID="usage-error"
         >
           <Icon name="alert-circle-outline" size={18} tone="danger" />
-          <Text className="flex-1 text-sm text-danger">Couldn’t load usage</Text>
-          <Text className="text-sm font-medium text-primary">Retry</Text>
+          <Text className="flex-1 text-sm text-danger">{t("usage.loadFailed")}</Text>
+          <Text className="text-sm font-medium text-primary">{t("common.retry")}</Text>
         </Pressable>
       ) : null}
       {report ? (

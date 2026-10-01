@@ -11,11 +11,13 @@ import type {
   ChatForm,
   ChatId,
   ChatSummary,
+  Delivery,
   FormAnswer,
   Message,
   ModelInfo,
   ModelRef,
   ProviderId,
+  QueuedMessage,
   StreamEvent,
   UsageQuery,
   UsageReport,
@@ -77,10 +79,42 @@ export interface ChatProvider {
   deleteChat(id: ChatId): Promise<void>;
   /** Only present when `capabilities.renameChat` is true. */
   renameChat?(id: ChatId, title: string): Promise<void>;
+  /**
+   * A new chat holding the messages of `id` that come before `before`, a
+   * backend-native message id; without it, the whole chat. Only present when
+   * `capabilities.branch` is true.
+   */
+  branchChat?(id: ChatId, before?: string): Promise<ChatSummary>;
 
   /** Fire-and-forget prompt delivery; streaming arrives via events(). */
   send(chatId: ChatId, msg: UserMessage): Promise<void>;
+
+  /**
+   * The queue: only present when `capabilities.queue` is true. A message sent
+   * while a reply runs waits on the backend, and the run's events say when it
+   * joins the transcript (`queued-delivered`).
+   *
+   * `msg.id` must come from `newMessageId()`: it is the id the message keeps
+   * in the transcript, so the delivery can be matched even when it is
+   * announced before the request that queued it returns.
+   */
+  queueMessage?(chatId: ChatId, msg: UserMessage, delivery: Delivery): Promise<void>;
+  newMessageId?(): string;
+  /** Oldest first. */
+  queuedMessages?(chatId: ChatId): Promise<QueuedMessage[]>;
+  cancelQueued?(chatId: ChatId, id: string): Promise<void>;
+  /**
+   * Delivers a queued message as soon as the reply's current step ends. On an
+   * idle chat that starts a run, as a sent message would.
+   */
+  steerQueued?(chatId: ChatId, id: string): Promise<void>;
   interrupt(chatId: ChatId): Promise<void>;
+  /**
+   * Summarizes the chat to free up the model's context. Only present when
+   * `capabilities.compact` is true. On an idle chat it starts a run, which
+   * `isRunning` and the event stream report as they would a reply.
+   */
+  compact?(chatId: ChatId): Promise<void>;
   /**
    * Whether the backend is still working on a run in this chat, whoever
    * started it. Without it the app can only guess from the transcript, and

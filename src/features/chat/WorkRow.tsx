@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Linking, View } from "react-native";
+import type { WebSource } from "@/src/domain";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";
-import { toolLabel, workItemIcon, workRow, type WorkBlock, type WorkItem } from "./replyLayout";
+import {
+  searchSources,
+  sourceSite,
+  toolLabel,
+  workItemIcon,
+  workRow,
+  type WorkBlock,
+  type WorkItem,
+} from "./replyLayout";
 
 function ReasoningText({ text }: { text: string }) {
   return (
@@ -19,12 +29,13 @@ function ReasoningText({ text }: { text: string }) {
 }
 
 function ThoughtItem({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
     <View>
       <Pressable
-        accessibilityHint={expanded ? "Hides the model reasoning" : "Shows the model reasoning"}
-        accessibilityLabel="Thought"
+        accessibilityHint={expanded ? t("reply.hideReasoning") : t("reply.showReasoning")}
+        accessibilityLabel={t("reply.thought")}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-2 self-start py-1"
@@ -32,7 +43,7 @@ function ThoughtItem({ text }: { text: string }) {
         onPress={() => setExpanded((current) => !current)}
       >
         <Icon name="brain" size={15} tone="textMuted" />
-        <Text className="text-[14.5px] text-text-muted">Thought</Text>
+        <Text className="text-[14.5px] text-text-muted">{t("reply.thought")}</Text>
         <Icon name={expanded ? "chevron-down" : "chevron-right"} size={16} tone="textMuted" />
       </Pressable>
       {expanded ? <ReasoningText text={text} /> : null}
@@ -40,7 +51,34 @@ function ThoughtItem({ text }: { text: string }) {
   );
 }
 
+function SourceList({ sources }: { sources: WebSource[] }) {
+  const { t } = useTranslation();
+  if (sources.length === 0) return null;
+  return (
+    <View className="mb-1 ml-[23px]" testID="search-sources">
+      {sources.map((source) => (
+        <Pressable
+          key={source.url}
+          accessibilityHint={t("reply.openSource")}
+          accessibilityLabel={`${source.title}, ${sourceSite(source.url)}`}
+          accessibilityRole="link"
+          className="py-1.5"
+          onPress={() => void Linking.openURL(source.url).catch(() => undefined)}
+        >
+          <Text numberOfLines={1} className="text-[14.5px] text-text">
+            {source.title}
+          </Text>
+          <Text numberOfLines={1} className="text-[12.5px] text-text-muted">
+            {sourceSite(source.url)}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function WorkItems({ items }: { items: WorkItem[] }) {
+  const { t } = useTranslation();
   // A row of thinking alone opens straight onto the thought.
   if (items.length === 1 && items[0].type === "reasoning") {
     return (
@@ -55,20 +93,23 @@ function WorkItems({ items }: { items: WorkItem[] }) {
         item.type === "reasoning" ? (
           <ThoughtItem key={index} text={item.text} />
         ) : (
-          <View key={item.tool.id} className="flex-row items-start gap-2 py-1">
-            <View className="pt-0.5">
-              <Icon
-                name={workItemIcon(item)}
-                size={15}
-                tone={item.tool.status === "failed" ? "danger" : "textMuted"}
-              />
+          <View key={item.tool.id}>
+            <View className="flex-row items-start gap-2 py-1">
+              <View className="pt-0.5">
+                <Icon
+                  name={workItemIcon(item)}
+                  size={15}
+                  tone={item.tool.status === "failed" ? "danger" : "textMuted"}
+                />
+              </View>
+              <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
+                {toolLabel(item.tool)}
+                {item.tool.status === "failed" ? (
+                  <Text className="text-danger"> · {t("reply.toolFailed")}</Text>
+                ) : null}
+              </Text>
             </View>
-            <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
-              {toolLabel(item.tool)}
-              {item.tool.status === "failed" ? (
-                <Text className="text-danger"> · Failed</Text>
-              ) : null}
-            </Text>
+            <SourceList sources={searchSources(item.tool)} />
           </View>
         ),
       )}
@@ -82,6 +123,8 @@ function WorkItems({ items }: { items: WorkItem[] }) {
  * what the reply is doing now.
  */
 export function WorkRow({ block }: { block: WorkBlock }) {
+  // Re-renders the labels `workRow` builds when the language changes.
+  useTranslation();
   const [expanded, setExpanded] = useState(false);
   const { icon, label } = workRow(block);
   const expandable = block.items.length > 0;

@@ -6,30 +6,35 @@
  * concrete adapter directly.
  */
 
-import type { ConnectionConfig, ProviderDescriptor } from "./types";
+import { t } from "@/src/i18n";
+import type { ConfigField, ConnectionConfig, ProviderDescriptor } from "./types";
 import { OpenCodeProvider, openCodeCapabilities } from "./opencode/provider";
 
 const openCodeDescriptor: ProviderDescriptor = {
   id: "opencode",
   label: "OpenCode",
-  fields: [
-    {
-      key: "baseUrl",
-      label: "Server URL",
-      description: "The address of your OpenCode server, e.g. http://192.168.1.10:4096.",
-      required: true,
-      placeholder: "https://opencode.example.com",
-      keyboardType: "url",
-    },
-    {
-      key: "password",
-      label: "Password",
-      description: "The server's password (opencode serve prints one on startup).",
-      required: false,
-      secure: true,
-      placeholder: "Server password",
-    },
-  ],
+  // A getter, so the labels are in the language of the moment, not the
+  // one the app started in.
+  get fields(): ConfigField[] {
+    return [
+      {
+        key: "baseUrl",
+        label: t("connection.opencode.url.label"),
+        description: t("connection.opencode.url.description"),
+        required: true,
+        placeholder: "https://opencode.example.com",
+        keyboardType: "url",
+      },
+      {
+        key: "password",
+        label: t("connection.opencode.password.label"),
+        description: t("connection.opencode.password.description"),
+        required: false,
+        secure: true,
+        placeholder: t("connection.opencode.password.placeholder"),
+      },
+    ];
+  },
   capabilities: openCodeCapabilities,
   create(cfg: ConnectionConfig) {
     return new OpenCodeProvider(cfg);

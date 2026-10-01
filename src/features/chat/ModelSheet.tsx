@@ -17,6 +17,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatNumber } from "@/src/i18n/format";
+import { useTranslation } from "react-i18next";
 import { ScrollView, SectionList, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -35,13 +37,11 @@ import { favoriteModels, groupByProvider, monogram, searchGroups } from "./model
 /** A context window as a short size, e.g. 200000 → "200K", 1048576 → "1M". */
 export function formatContextWindow(tokens: number): string {
   if (tokens >= 1_000_000) {
-    return `${Number((tokens / 1_000_000).toFixed(1))}M`;
+    const millions = Number((tokens / 1_000_000).toFixed(1));
+    return `${formatNumber(millions, Number.isInteger(millions) ? 0 : 1)}M`;
   }
   return `${Math.round(tokens / 1_000)}K`;
 }
-
-/** Label for running without a variant: the model's own default. */
-export const AUTO_LABEL = "Auto";
 
 /** Rail entry for the starred models; never clashes with a provider id in practice. */
 const FAVORITES = "favorites";
@@ -73,6 +73,7 @@ export function ModelSheet({
   variants = NO_VARIANTS,
   onSelectVariant,
 }: ModelSheetProps) {
+  const { t } = useTranslation();
   const models = useModelsStore((state) => state.models);
   const loading = useModelsStore((state) => state.loading);
   const error = useModelsStore((state) => state.error);
@@ -107,7 +108,7 @@ export function ModelSheet({
             {error}
           </Text>
           <Button
-            label="Retry"
+            label={t("common.retry")}
             variant="secondary"
             loading={loading}
             onPress={() => void refresh()}
@@ -117,10 +118,10 @@ export function ModelSheet({
       ) : models.length === 0 ? (
         <View className="items-center gap-3 px-8 py-12">
           <Text className="text-center text-sm text-text-muted" testID="model-empty">
-            No models found on this server.
+            {t("models.noneOnServer")}
           </Text>
           <Button
-            label="Retry"
+            label={t("common.retry")}
             variant="secondary"
             loading={loading}
             onPress={() => void refresh()}
@@ -154,9 +155,10 @@ export function ModelSheet({
 const SKELETON_ROWS = ["w-[62%]", "w-[48%]", "w-[70%]", "w-[54%]", "w-[66%]", "w-[44%]"];
 
 function ModelSheetSkeleton() {
+  const { t } = useTranslation();
   return (
     <SkeletonGroup
-      label="Loading models"
+      label={t("models.loading")}
       className="flex-row gap-2 pt-[11px]"
       testID="model-loading"
     >
@@ -197,6 +199,7 @@ function ModelBrowser({
 }) {
   const favorites = useModelsStore((state) => state.favorites);
   const toggleFavorite = useModelsStore((state) => state.toggleFavorite);
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
   const groups = useMemo(() => groupByProvider(models, favoriteSet), [models, favoriteSet]);
@@ -235,11 +238,13 @@ function ModelBrowser({
       }));
     }
     if (activeTab === FAVORITES) {
-      return [{ key: FAVORITES, title: "Favorites", data: favoriteModels(models, favorites) }];
+      return [
+        { key: FAVORITES, title: t("models.favorites"), data: favoriteModels(models, favorites) },
+      ];
     }
     const group = groups.find((each) => each.id === activeTab);
     return group ? [{ key: group.id, title: group.label, data: group.models }] : [];
-  }, [searching, groups, query, activeTab, models, favorites]);
+  }, [searching, groups, query, activeTab, models, favorites, t]);
 
   const labelOf = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
 
@@ -275,10 +280,10 @@ function ModelBrowser({
   }
 
   const emptyText = searching
-    ? "No models match."
+    ? t("models.noMatches")
     : activeTab === FAVORITES
-      ? "Tap the star on a model to keep it here."
-      : "No models.";
+      ? t("models.favoritesEmpty")
+      : t("models.none");
 
   return (
     // Shrinks rather than fills, so the lists decide the sheet's height and
@@ -287,7 +292,7 @@ function ModelBrowser({
       <View className="flex-shrink flex-row gap-2">
         <ProviderRail
           entries={[
-            { id: FAVORITES, label: "Favorites" },
+            { id: FAVORITES, label: t("models.favorites") },
             ...groups.map((group) => ({ id: group.id, label: group.label })),
           ]}
           active={searching ? null : activeTab}
@@ -360,15 +365,18 @@ function VariantRow({
   selected: string | undefined;
   onSelect: (variant: string | undefined) => void;
 }) {
+  const { t } = useTranslation();
   const options: { id: string | undefined; label: string; hint?: string }[] = [
-    { id: undefined, label: AUTO_LABEL, hint: "The model's default" },
+    { id: undefined, label: t("models.auto"), hint: t("models.autoHint") },
     ...variants,
   ];
   const row = useRef<ScrollView>(null);
   const rowWidth = useRef(0);
   return (
     <View className="mt-2" testID="model-variants">
-      <Text className="px-3 pb-1.5 text-[13px] font-medium text-text-muted">Reasoning</Text>
+      <Text className="px-3 pb-1.5 text-[13px] font-medium text-text-muted">
+        {t("models.reasoning")}
+      </Text>
       {/* Scrolls, as a model can offer more levels than fit across the sheet. */}
       <ScrollView
         ref={row}
@@ -432,17 +440,18 @@ function SearchField({
   value: string;
   onChangeText: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View className="mt-2 h-11 flex-row items-center gap-2 rounded-full bg-raised pl-3.5 pr-1">
       <Icon name="magnify" size={20} tone="textMuted" />
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder="Search models"
+        placeholder={t("models.search")}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
-        accessibilityLabel="Search models"
+        accessibilityLabel={t("models.search")}
         className="flex-1 py-0 text-[15px] text-text"
         testID="model-search"
       />
@@ -450,7 +459,7 @@ function SearchField({
         <Pressable
           onPress={() => onChangeText("")}
           accessibilityRole="button"
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t("models.clearSearch")}
           className="h-9 w-9 items-center justify-center rounded-full active:bg-raised-hover"
           testID="model-search-clear"
         >
@@ -473,12 +482,13 @@ function ProviderRail({
   disabled: boolean;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <ScrollView
       className={cn("w-[60px] flex-grow-0", disabled && "opacity-40")}
       contentContainerClassName="gap-1 pb-2"
       showsVerticalScrollIndicator={false}
-      accessibilityLabel="Providers"
+      accessibilityLabel={t("models.providers")}
     >
       {entries.map((entry) => {
         const on = entry.id === active;
@@ -552,6 +562,7 @@ function ModelRow({
   onPress: () => void;
   onToggleFavorite: () => void;
 }) {
+  const { t } = useTranslation();
   const detail = [
     providerLabel,
     model.ref.id,
@@ -600,7 +611,9 @@ function ModelRow({
           onPress={onToggleFavorite}
           accessibilityRole="button"
           accessibilityLabel={
-            favorite ? `Remove ${model.label} from favorites` : `Add ${model.label} to favorites`
+            favorite
+              ? t("models.unfavorite", { model: model.label })
+              : t("models.favorite", { model: model.label })
           }
           accessibilityState={{ selected: favorite }}
           className="h-11 w-11 items-center justify-center rounded-full active:bg-raised-hover"

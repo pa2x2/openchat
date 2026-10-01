@@ -12,7 +12,10 @@ import type { ChatId, ChatSummary } from "@/src/domain";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
+import { useDraftsStore } from "./drafts";
+import { useMessagesStore } from "./messages";
 import { mmkvStorage } from "./storage";
+import { t } from "@/src/i18n";
 
 interface ChatsStoreState {
   chats: ChatSummary[];
@@ -80,8 +83,10 @@ export function createChatsStore(storage = mmkvStorage) {
           set((state) => ({
             chats: state.chats.map((chat) => (chat.id === id ? { ...chat, usage, cost } : chat)),
           })),
-        remove: (ids) =>
-          set((state) => ({ chats: state.chats.filter((chat) => !ids.includes(chat.id)) })),
+        remove: (ids) => {
+          useDraftsStore.getState().remove(ids);
+          set((state) => ({ chats: state.chats.filter((chat) => !ids.includes(chat.id)) }));
+        },
         markPendingRegenerate: (id, messageId) =>
           set((state) => ({ pendingRegenerate: { ...state.pendingRegenerate, [id]: messageId } })),
         clearPendingRegenerate: (id) =>
@@ -92,12 +97,14 @@ export function createChatsStore(storage = mmkvStorage) {
             return { pendingRegenerate };
           }),
         markTemporary: (id) => set((state) => ({ temporary: { ...state.temporary, [id]: true } })),
-        forgetTemporary: (id) =>
+        forgetTemporary: (id) => {
+          useDraftsStore.getState().remove([id]);
           set((state) => {
             const temporary = { ...state.temporary };
             delete temporary[id];
             return { temporary, chats: state.chats.filter((chat) => chat.id !== id) };
-          }),
+          });
+        },
         keepTemporary: (id) =>
           set((state) => {
             const temporary = { ...state.temporary };
@@ -119,20 +126,22 @@ export function createChatsStore(storage = mmkvStorage) {
           try {
             const provider = await getProvider();
             if (!provider) {
-              set({ loading: false, error: "Not connected." });
+              set({ loading: false, error: t("errors.notConnectedShort") });
               return;
             }
             const chats = await provider.listChats();
             set({ chats: sortChats(chats), loading: false });
+            useMessagesStore.getState().retainChats(new Set(chats.map((chat) => chat.id)));
           } catch (error) {
             set({
               loading: false,
               error:
-                error instanceof Error && error.message ? error.message : "Could not load chats.",
+                error instanceof Error && error.message ? error.message : t("drawer.loadFailed"),
             });
           }
         },
-        clear: () =>
+        clear: () => {
+          useDraftsStore.getState().clear();
           set({
             chats: [],
             loading: false,
@@ -140,7 +149,8 @@ export function createChatsStore(storage = mmkvStorage) {
             pendingRegenerate: {},
             temporary: {},
             deleting: {},
-          }),
+          });
+        },
       }),
       {
         name: "chats",

@@ -6,10 +6,12 @@
  */
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useTranslation } from "react-i18next";
 import { Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import type { Attachment } from "@/src/domain";
+import { useDraftsStore } from "@/src/stores/drafts";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
@@ -28,6 +30,12 @@ export interface ComposerProps {
   onSend: (text: string, attachments: Attachment[]) => void | boolean | Promise<void | boolean>;
   /** Present while a turn is live; replaces the send button. */
   onStop?: () => void;
+  /**
+   * Present while a turn is live and the backend can hold a message until the
+   * reply is done. The send button then comes back beside stop once there is
+   * something to send, and sends here instead of `onSend`.
+   */
+  onQueue?: (text: string, attachments: Attachment[]) => boolean | Promise<boolean>;
   /** Present when the backend accepts attachments; shows the attach button. */
   onAttach?: () => void;
   /** Files staged for the next message. */
@@ -47,8 +55,22 @@ export interface ComposerProps {
   };
   /** Present once a reply has said how full the model's context is; stays while a reply streams. */
   context?: ContextUse & { onPress: () => void };
-  /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
-  editing?: { onCancel: () => void };
+  /**
+   * Present while the field holds a sent message being edited; shows a bar
+   * to cancel it, with a switch between sending the edit here and to a new
+   * chat when `target` is set.
+   */
+  editing?: {
+    label: string;
+    onCancel: () => void;
+    target?: { value: EditTarget; onChange: (target: EditTarget) => void };
+  };
+  /**
+   * The chat the typed text is saved as a draft for, restored when the
+   * composer mounts again. Unset while the field holds something that is not
+   * a draft, such as a message being edited; the saved draft stays as it was.
+   */
+  draftKey?: string;
   autoFocus?: boolean;
   placeholder?: string;
   /**
@@ -61,6 +83,11 @@ export interface ComposerProps {
 
 const NO_ATTACHMENTS: Attachment[] = [];
 
+/** Where an edit goes: in place of the message, or to a branch cut just before it. */
+export type EditTarget = "here" | "new";
+
+const EDIT_TARGETS: EditTarget[] = ["here", "new"];
+
 export interface ComposerHandle {
   /** Replaces the draft with `text`, and focuses the field unless told not to. */
   insert: (text: string, focus?: boolean) => void;
@@ -72,17 +99,22 @@ export function Composer({
   ref,
   onSend,
   onStop,
+  onQueue,
   onAttach,
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
   model,
   context,
   editing,
+  draftKey,
   autoFocus,
-  placeholder = "Ask anything",
+  placeholder,
   lockedReason,
 }: ComposerProps) {
-  const [text, setText] = useState("");
+  const { t } = useTranslation();
+  const [text, setText] = useState(() =>
+    draftKey === undefined ? "" : (useDraftsStore.getState().byChat[draftKey] ?? ""),
+  );
   const input = useRef<TextInputHandle>(null);
   const streaming = Boolean(onStop);
   const { floatingShadow } = useAppTheme();
@@ -100,24 +132,49 @@ export function Composer({
     [text],
   );
 
+  useEffect(() => {
+    if (draftKey !== undefined) useDraftsStore.getState().setDraft(draftKey, text);
+  }, [draftKey, text]);
+
   const locked = lockedReason !== undefined;
   useEffect(() => {
     if (locked) input.current?.blur();
   }, [locked]);
 
+  const empty = text.trim().length === 0 && attachments.length === 0;
+  const queueing = streaming && Boolean(onQueue);
+
   async function handleSend() {
     const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || streaming || locked) return;
+    if (empty || (streaming && !onQueue) || locked) return;
     setText("");
     Keyboard.dismiss();
-    const sent = await onSend(trimmed, attachments);
+    const sent = await (streaming && onQueue ? onQueue : onSend)(trimmed, attachments);
     if (sent === false) setText((current) => current || text);
   }
 
-  const sendDisabled = (text.trim().length === 0 && attachments.length === 0) || locked;
-  // Attach and the model chip step aside while a reply streams.
-  const showAttach = Boolean(onAttach) && !streaming;
+  const sendDisabled = empty || locked;
+  // The model chip steps aside while a reply streams; attach stays only for
+  // a message to queue.
+  const showAttach = Boolean(onAttach) && (!streaming || queueing);
   const showModel = Boolean(model) && !streaming;
+  const sendButton = (
+    <Pressable
+      accessibilityHint={queueing ? t("composer.queueHint") : t("composer.sendHint")}
+      accessibilityLabel={queueing ? t("composer.queue") : t("composer.send")}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: sendDisabled }}
+      className={cn(
+        "h-10 w-10 items-center justify-center rounded-full",
+        sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
+      )}
+      disabled={sendDisabled}
+      onPress={() => void handleSend()}
+      testID="composer-send"
+    >
+      <Icon name="arrow-up" size={22} tone={sendDisabled ? "textFaint" : "primaryForeground"} />
+    </Pressable>
+  );
 
   return (
     <View className="rounded-[28px] bg-elevated p-1.5" style={{ boxShadow: floatingShadow }}>
@@ -127,9 +184,46 @@ export function Composer({
           testID="composer-editing"
         >
           <Icon name="pencil-outline" size={17} tone="textMuted" />
-          <Text className="flex-1 text-sm text-text-muted">Editing message</Text>
+          <Text className="flex-1 text-sm text-text-muted" numberOfLines={2}>
+            {editing.label}
+          </Text>
+          {editing.target ? (
+            <View
+              accessibilityRole="radiogroup"
+              className="flex-row rounded-full bg-raised-hover p-0.5"
+            >
+              {EDIT_TARGETS.map((target) => {
+                const chosen = editing.target?.value === target;
+                const label =
+                  target === "here" ? t("composer.editHere") : t("composer.editNewChat");
+                return (
+                  <Pressable
+                    key={target}
+                    accessibilityRole="radio"
+                    accessibilityLabel={label}
+                    accessibilityState={{ checked: chosen }}
+                    className={cn(
+                      "h-7 justify-center rounded-full px-2.5",
+                      chosen && "bg-elevated",
+                    )}
+                    onPress={() => editing.target?.onChange(target)}
+                    testID={`composer-edit-${target}`}
+                  >
+                    <Text
+                      className={cn(
+                        "text-[13px]",
+                        chosen ? "font-medium text-text" : "text-text-muted",
+                      )}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <Pressable
-            accessibilityLabel="Cancel editing"
+            accessibilityLabel={t("composer.cancelEditing")}
             accessibilityRole="button"
             className="h-8 w-8 items-center justify-center rounded-full active:bg-raised-hover"
             onPress={editing.onCancel}
@@ -151,18 +245,18 @@ export function Composer({
         autoFocus={autoFocus}
         value={text}
         onChangeText={setText}
-        placeholder={lockedReason ?? placeholder}
+        placeholder={lockedReason ?? placeholder ?? t("composer.placeholder")}
         editable={!locked}
         multiline
-        accessibilityLabel="Message"
+        accessibilityLabel={t("composer.message")}
         className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"
         testID="composer-input"
       />
       <View className="mx-2 mb-1 flex-row items-center gap-1">
         {showAttach ? (
           <Pressable
-            accessibilityHint="Attaches a photo or a file to your message"
-            accessibilityLabel="Add attachment"
+            accessibilityHint={t("composer.attachHint")}
+            accessibilityLabel={t("composer.attach")}
             accessibilityRole="button"
             className="h-10 w-10 items-center justify-center rounded-full active:bg-raised"
             onPress={onAttach}
@@ -173,10 +267,10 @@ export function Composer({
         ) : null}
         {showModel && model ? (
           <Pressable
-            accessibilityHint="Chooses the model and how much it thinks before answering"
+            accessibilityHint={t("composer.modelHint")}
             accessibilityLabel={[
-              `Model: ${model.label}`,
-              model.level && `Reasoning: ${model.level}`,
+              t("composer.modelLabel", { model: model.label }),
+              model.level && t("composer.reasoningLabel", { level: model.level }),
             ]
               .filter(Boolean)
               .join(". ")}
@@ -189,7 +283,7 @@ export function Composer({
             testID="model-button"
           >
             {model.status === "placeholder" ? (
-              <SkeletonGroup label="Loading model" testID="model-button-skeleton">
+              <SkeletonGroup label={t("models.loadingOne")} testID="model-button-skeleton">
                 <Skeleton className="h-4 w-28 bg-raised" />
               </SkeletonGroup>
             ) : (
@@ -214,37 +308,27 @@ export function Composer({
         {context ? <ContextMeter context={context} onPress={context.onPress} /> : null}
         {streaming ? (
           <Pressable
-            accessibilityHint="Stops the current response"
-            accessibilityLabel="Stop generating"
+            accessibilityHint={t("composer.stopHint")}
+            accessibilityLabel={t("composer.stop")}
             accessibilityRole="button"
             accessibilityState={{ busy: true }}
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
+            className={cn(
+              "h-10 w-10 items-center justify-center rounded-full active:opacity-80",
+              // Beside a send button, stop is the quieter of the two.
+              queueing && !sendDisabled ? "bg-raised-hover" : "bg-primary",
+            )}
             onPress={onStop}
             testID="composer-stop"
           >
-            <View className="h-3 w-3 rounded-[2px] bg-primary-foreground" />
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityHint="Sends the message"
-            accessibilityLabel="Send message"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: sendDisabled }}
-            className={cn(
-              "h-10 w-10 items-center justify-center rounded-full",
-              sendDisabled ? "bg-raised-hover" : "bg-primary active:opacity-80",
-            )}
-            disabled={sendDisabled}
-            onPress={() => void handleSend()}
-            testID="composer-send"
-          >
-            <Icon
-              name="arrow-up"
-              size={22}
-              tone={sendDisabled ? "textFaint" : "primaryForeground"}
+            <View
+              className={cn(
+                "h-3 w-3 rounded-[2px]",
+                queueing && !sendDisabled ? "bg-text" : "bg-primary-foreground",
+              )}
             />
           </Pressable>
-        )}
+        ) : null}
+        {!streaming || (queueing && !sendDisabled) ? sendButton : null}
       </View>
     </View>
   );

@@ -4,30 +4,37 @@
  * launch check or from Settings; all state lives in the updates store.
  */
 
+import { useTranslation } from "react-i18next";
 import { Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
+import { t } from "@/src/i18n";
+import { formatNumber } from "@/src/i18n/format";
 import { useUpdatesStore } from "@/src/stores/updates";
 import { Button } from "@/src/ui/Button";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import { Sheet } from "@/src/ui/Sheet";
 
 export function formatSize(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return t("format.megabytes", { value: formatNumber(bytes / (1024 * 1024), 1) });
 }
 
 function ProgressBar({ progress }: { progress: number | null }) {
+  const { t } = useTranslation();
   return (
     <View className="gap-2" testID="update-progress">
       <LinearProgress progress={progress} immediate className="h-1.5" />
       <Text className="text-sm text-text-muted">
-        {progress === null ? "Downloading…" : `Downloading… ${Math.round(progress * 100)}%`}
+        {progress === null
+          ? t("settings.updates.downloading")
+          : t("settings.updates.downloadingPercent", { percent: Math.round(progress * 100) })}
       </Text>
     </View>
   );
 }
 
 export function UpdateSheet() {
+  const { t } = useTranslation();
   const sheetOpen = useUpdatesStore((state) => state.sheetOpen);
   const release = useUpdatesStore((state) => state.release);
   const status = useUpdatesStore((state) => state.status);
@@ -40,9 +47,9 @@ export function UpdateSheet() {
 
   const subtitle = release
     ? [
-        `Version ${release.version}`,
+        t("updates.version", { version: release.version }),
         formatSize(release.apk.size),
-        release.prerelease ? "Pre-release" : null,
+        release.prerelease ? t("settings.updates.channel.prerelease") : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -52,7 +59,7 @@ export function UpdateSheet() {
     <Sheet
       visible={sheetOpen && release !== null}
       onClose={closeSheet}
-      title="Update available"
+      title={t("settings.updates.updateAvailable")}
       subtitle={subtitle}
       testID="update-sheet"
     >
@@ -83,17 +90,11 @@ export function UpdateSheet() {
       <View className="gap-3 px-1">
         {status === "downloading" ? <ProgressBar progress={progress} /> : null}
         {status === "installing" ? (
-          <Text className="text-sm text-text-muted">
-            {
-              "Installing… OpenChat closes to finish the update. Open it again to use the new version."
-            }
-          </Text>
+          <Text className="text-sm text-text-muted">{t("updates.installingNote")}</Text>
         ) : null}
         {status === "needsPermission" ? (
           <Text className="text-sm leading-5 text-text-muted" testID="update-permission">
-            {
-              "Android needs your permission for OpenChat to install updates. Turn on “Allow from this source”, then come back. You only need to do this once."
-            }
+            {t("updates.permissionNote")}
           </Text>
         ) : null}
         {status === "error" && error ? (
@@ -104,32 +105,41 @@ export function UpdateSheet() {
 
         {status === "downloading" ? (
           <Button
-            label="Cancel download"
+            label={t("updates.cancelDownload")}
             variant="secondary"
             onPress={cancelDownload}
             testID="update-cancel"
           />
         ) : status === "installing" ? (
-          <Button label="Installing" loading testID="update-installing" />
+          <Button label={t("updates.installing")} loading testID="update-installing" />
         ) : status === "needsPermission" ? (
-          <Button label="Allow installs" onPress={requestInstallPermission} testID="update-allow" />
+          <Button
+            label={t("updates.allowInstalls")}
+            onPress={requestInstallPermission}
+            testID="update-allow"
+          />
         ) : (
           <Button
-            label={status === "error" ? "Try again" : "Update now"}
+            label={status === "error" ? t("common.tryAgain") : t("updates.updateNow")}
             onPress={() => void startUpdate()}
             testID="update-start"
           />
         )}
         {status === "error" && release ? (
           <Button
-            label="Open release page"
+            label={t("updates.openReleasePage")}
             variant="ghost"
             onPress={() => void Linking.openURL(release.pageUrl)}
             testID="update-release-page"
           />
         ) : null}
         {status === "available" || status === "error" || status === "needsPermission" ? (
-          <Button label="Not now" variant="ghost" onPress={closeSheet} testID="update-later" />
+          <Button
+            label={t("updates.notNow")}
+            variant="ghost"
+            onPress={closeSheet}
+            testID="update-later"
+          />
         ) : null}
       </View>
     </Sheet>

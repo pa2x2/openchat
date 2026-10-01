@@ -9,6 +9,8 @@
  */
 
 import type { Attachment } from "@/src/domain";
+import { t } from "@/src/i18n";
+import { formatNumber } from "@/src/i18n/format";
 
 /** Largest single attachment the app will send, in bytes. */
 export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -44,7 +46,7 @@ export function describeAttachment(attachment: Attachment): string {
 
 export function formatBytes(bytes: number | undefined): string {
   if (bytes === undefined || bytes <= 0) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return t("format.bytes", { value: bytes });
+  if (bytes < 1024 * 1024) return t("format.kilobytes", { value: Math.round(bytes / 1024) });
+  return t("format.megabytes", { value: formatNumber(bytes / (1024 * 1024), 1) });
 }

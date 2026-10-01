@@ -12,14 +12,16 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatId, Message, TurnActivity } from "@/src/domain";
+import type { ChatId, Message, QueuedMessage, TurnActivity } from "@/src/domain";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 import { MessageBubble } from "./MessageBubble";
+import { QueuedMessages } from "./QueuedMessages";
 
 /** How far up the transcript the "jump to latest" button appears. */
 const SCROLL_BUTTON_OFFSET = 300;
@@ -32,6 +34,9 @@ const LIVE_SCROLL_BUTTON_OFFSET = 48;
 
 /** Within this many px of the newest message, the list follows a streaming reply. */
 const FOLLOW_OFFSET = 8;
+
+/** How much of what follows a message being edited stays in view under it. */
+const EDIT_PEEK = 120;
 
 /** Space the list keeps above the oldest message and below the newest. */
 const TOP_GAP = 4;
@@ -82,8 +87,15 @@ export interface TranscriptProps {
   onRegenerate: () => void;
   /** Present when the backend can edit a sent message. */
   onEditMessage?: (message: Message) => void;
+  onBranch?: (message: Message) => void;
   editingId?: string | null;
+  /** The edit replaces what follows the message, rather than going to a new chat. */
+  editReplaces?: boolean;
+  onSendQueuedNow: (message: QueuedMessage) => void;
+  onCancelQueued: (message: QueuedMessage) => void;
 }
+
+const NO_QUEUED: QueuedMessage[] = [];
 
 export function Transcript({
   chatId,
@@ -92,8 +104,13 @@ export function Transcript({
   showReasoning,
   onRegenerate,
   onEditMessage,
+  onBranch,
   editingId = null,
+  editReplaces = true,
+  onSendQueuedNow,
+  onCancelQueued,
 }: TranscriptProps) {
+  const { t } = useTranslation();
   const { colors, floatingShadow } = useAppTheme();
   const listRef = useRef<FlatList<Message>>(null);
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
@@ -103,6 +120,7 @@ export function Transcript({
     state.forms[chatId]?.length ? ASKING : (state.activity[chatId] ?? null),
   );
   const turnError = useMessagesStore((state) => state.turnErrors[chatId] ?? null);
+  const queued = useMessagesStore((state) => state.queued[chatId] ?? NO_QUEUED);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [following, setFollowing] = useState(true);
 
@@ -117,9 +135,8 @@ export function Transcript({
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const questionIndex = reversed.findIndex((message) => message.role === "user");
   const questionId = reversed[questionIndex]?.id ?? null;
-  // Editing reruns the last turn, so it is offered on the newest user message
-  // only, and like a rerun only while no turn is live.
-  const editableId = turnActive ? null : questionId;
+  // The list is newest first: everything before the edited message is replaced by the edit.
+  const editingIndex = editingId ? reversed.findIndex((message) => message.id === editingId) : -1;
   const replyPending =
     lastMessage?.role === "assistant" &&
     (lastMessage.status === "pending" || lastMessage.status === "streaming");
@@ -158,6 +175,18 @@ export function Transcript({
     if (turnStarts > 0) listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [turnStarts]);
 
+  // The edit is typed in the composer, so the message goes just above it,
+  // with the start of what the edit replaces under it. Placed from the
+  // bottom, it stays in view as the keyboard opens and the list shrinks.
+  useEffect(() => {
+    if (editingIndex >= 0) scrollToEdited(editingIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per edit, not as the list changes under it
+  }, [editingId]);
+
+  function scrollToEdited(index: number) {
+    listRef.current?.scrollToIndex({ index, viewPosition: 0, viewOffset: EDIT_PEEK });
+  }
+
   const dragged = useRef(false);
   const wandered = useRef(false);
   useEffect(() => {
@@ -168,11 +197,13 @@ export function Transcript({
 
   const [listHeight, setListHeight] = useState(0);
   const [questionHeight, setQuestionHeight] = useState(0);
+  const [queuedHeight, setQueuedHeight] = useState(0);
   // What the reply is stretched to, so that the question above it lands at
-  // the top of the list. Zero until both are measured.
+  // the top of the list, with the queued messages under the reply. Zero
+  // until the question is measured.
   const slotHeight =
     pinned && listHeight > 0 && questionHeight > 0
-      ? Math.max(0, listHeight - topInset - TOP_GAP - questionHeight - BOTTOM_GAP)
+      ? Math.max(0, listHeight - topInset - TOP_GAP - questionHeight - queuedHeight - BOTTOM_GAP)
       : 0;
   const pinnedReplyId = pinned && questionIndex === 1 ? reversed[0].id : null;
   const [reply, setReply] = useState<{ id: string; height: number } | null>(null);
@@ -204,8 +235,12 @@ export function Transcript({
               showReasoning={showReasoning}
               activity={item.id === liveId ? activity : null}
               onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
-              onEdit={item.id === editableId ? onEditMessage : undefined}
-              dimmed={item.id === editingId}
+              // An edit rolls the chat back to the message, which cannot be
+              // done while a run is still going.
+              onEdit={!turnActive && item.role === "user" ? onEditMessage : undefined}
+              onBranch={!turnActive && item.role === "assistant" ? onBranch : undefined}
+              editing={index === editingIndex}
+              dimmed={editReplaces && index < editingIndex}
               // The store keeps the reason for the latest turn only.
               error={item.id === lastMessage?.id ? turnError : null}
             />
@@ -219,9 +254,11 @@ export function Transcript({
       activity,
       regenerableId,
       onRegenerate,
-      editableId,
       onEditMessage,
-      editingId,
+      onBranch,
+      turnActive,
+      editingIndex,
+      editReplaces,
       lastMessage?.id,
       turnError,
       pinned,
@@ -279,11 +316,25 @@ export function Transcript({
                 <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
               ) : null}
             </View>
+            <View onLayout={(event) => setQueuedHeight(event.nativeEvent.layout.height)}>
+              {queued.length > 0 ? (
+                <QueuedMessages
+                  messages={queued}
+                  onSendNow={onSendQueuedNow}
+                  onCancel={onCancelQueued}
+                />
+              ) : null}
+            </View>
             <View style={{ height: BOTTOM_GAP }} />
           </>
         }
         ListFooterComponent={<View style={{ height: topInset + TOP_GAP }} />}
         renderItem={renderMessage}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          // A message far up has not been laid out yet: get near it, then aim again.
+          listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+          setTimeout(() => scrollToEdited(index), 100);
+        }}
       />
 
       {/* Fade the transcript out into the composer. */}
@@ -296,7 +347,7 @@ export function Transcript({
       />
       {showScrollButton ? (
         <Pressable
-          accessibilityLabel="Scroll to latest"
+          accessibilityLabel={t("chat.scrollToLatest")}
           accessibilityRole="button"
           className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full bg-elevated"
           style={{ boxShadow: floatingShadow }}
@@ -314,11 +365,16 @@ export function Transcript({
 }
 
 export function TranscriptSkeleton() {
+  const { t } = useTranslation();
   // Bottom-anchored like the inverted list, so the transcript lands where
   // its placeholder was.
   return (
     <View className="flex-1 justify-end pb-3">
-      <SkeletonGroup label="Loading messages" className="px-4" testID="transcript-skeleton">
+      <SkeletonGroup
+        label={t("chat.loadingMessages")}
+        className="px-4"
+        testID="transcript-skeleton"
+      >
         <Skeleton className="h-10 w-[58%] self-end rounded-[22px]" />
         <View className="mt-9 gap-3">
           <Skeleton className="h-3.5 w-[92%]" />

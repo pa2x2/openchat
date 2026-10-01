@@ -11,6 +11,8 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { chatTitle } from "@/src/lib/chatTitle";
+import { useTranslation } from "react-i18next";
 import { BackHandler, SectionList, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -52,13 +54,14 @@ export function ChatDrawer({
   onOpenUsage,
   onDeletedActive,
 }: ChatDrawerProps) {
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardOpen();
   const allChats = useChatsStore((state) => state.chats);
   const temporary = useChatsStore((state) => state.temporary);
   const refreshChats = useChatsStore((state) => state.refresh);
   const capabilities = useProviderCapabilities();
-  const providerLabel = useProviderDescriptor()?.label ?? "Server";
+  const providerLabel = useProviderDescriptor()?.label ?? t("drawer.server");
   const profile = useConnectionStore((state) => state.profile);
   const chatsError = useChatsStore((state) => state.error);
   const chatsLoading = useChatsStore((state) => state.loading);
@@ -96,14 +99,19 @@ export function ChatDrawer({
     const needle = query.trim().toLowerCase();
     return allChats.filter(
       (chat) =>
-        !temporary[chat.id] &&
-        (!needle || (chat.title || "Untitled").toLowerCase().includes(needle)),
+        !temporary[chat.id] && (!needle || chatTitle(chat.title).toLowerCase().includes(needle)),
     );
   }, [allChats, temporary, query]);
 
   // The layout re-reads the list at every opening, which regroups it, so
   // "Today" moves on once the day does.
-  const sections = useMemo(() => groupChatsByDate(visible, new Date()), [visible]);
+  // The group titles are in the language they were made in.
+  const language = i18n.language;
+  const sections = useMemo(
+    () => groupChatsByDate(visible, new Date()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visible, language],
+  );
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
@@ -161,7 +169,7 @@ export function ChatDrawer({
     const { chat } = rowMenu;
     if (canRename) {
       rowMenuItems.push({
-        label: "Rename",
+        label: t("chat.menu.rename"),
         icon: "pencil-outline",
         onPress: () => promptRenameChat(chat),
         testID: "row-menu-rename",
@@ -170,13 +178,13 @@ export function ChatDrawer({
     if (canDelete) {
       rowMenuItems.push(
         {
-          label: "Select",
+          label: t("drawer.select"),
           icon: "checkbox-multiple-marked-outline",
           onPress: () => toggle(chat.id),
           testID: "row-menu-select",
         },
         {
-          label: "Delete",
+          label: t("common.delete"),
           icon: "trash-can-outline",
           destructive: true,
           onPress: () =>
@@ -222,7 +230,9 @@ export function ChatDrawer({
     setRefreshing(false);
   }
 
-  const serverLabel = profile ? profile.baseUrl.replace(/^https?:\/\//, "") : "Not connected";
+  const serverLabel = profile
+    ? profile.baseUrl.replace(/^https?:\/\//, "")
+    : t("connection.status.notConnected");
   // Live connection status resets on restart, so the last chat-list refresh
   // is the better signal of whether the server is reachable.
   const statusTone = !profile ? "bg-text-faint" : chatsError ? "bg-danger" : "bg-success";
@@ -257,14 +267,14 @@ export function ChatDrawer({
           profile && chatsError ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Couldn't refresh chats. Retry"
+              accessibilityLabel={`${t("drawer.refreshFailed")}. ${t("common.retry")}`}
               className="mx-1 mt-2 flex-row items-center gap-2.5 rounded-[14px] bg-danger/10 px-3 py-2.5"
               onPress={() => void refreshChats()}
               testID="drawer-refresh-error"
             >
               <Icon name="alert-circle-outline" size={18} tone="danger" />
-              <Text className="flex-1 text-sm text-danger">Couldn’t refresh chats</Text>
-              <Text className="text-sm font-medium text-primary">Retry</Text>
+              <Text className="flex-1 text-sm text-danger">{t("drawer.refreshFailed")}</Text>
+              <Text className="text-sm font-medium text-primary">{t("common.retry")}</Text>
             </Pressable>
           ) : null
         }
@@ -279,23 +289,23 @@ export function ChatDrawer({
           <View className="pt-3">
             {!profile ? (
               <View className="px-3 py-2">
-                <Text className="text-sm leading-5 text-text-muted">
-                  Connect a server to see your chats.
-                </Text>
+                <Text className="text-sm leading-5 text-text-muted">{t("drawer.connectHint")}</Text>
                 <Pressable
                   accessibilityRole="button"
                   className="mt-1 self-start py-1"
                   onPress={onOpenSettings}
                   testID="drawer-open-settings"
                 >
-                  <Text className="text-sm font-medium text-primary">Open settings</Text>
+                  <Text className="text-sm font-medium text-primary">
+                    {t("chat.empty.openSettings")}
+                  </Text>
                 </Pressable>
               </View>
             ) : chatsLoading && !query ? (
               <ChatListSkeleton />
             ) : (
               <Text className="px-3 py-2 text-sm text-text-muted">
-                {query ? "No matching chats" : "No chats yet"}
+                {query ? t("drawer.noMatches") : t("drawer.empty")}
               </Text>
             )}
           </View>
@@ -310,7 +320,7 @@ export function ChatDrawer({
           <View className="-mx-1 h-11 flex-row items-center gap-1" testID="drawer-selection-bar">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel selection"
+              accessibilityLabel={t("drawer.cancelSelection")}
               className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
               onPress={() => setSelected(new Set())}
             >
@@ -320,11 +330,13 @@ export function ChatDrawer({
               className="flex-1 text-[17px] font-medium text-text"
               accessibilityLiveRegion="polite"
             >
-              {selectedIds.length} selected
+              {t("drawer.selectedCount", { count: selectedIds.length })}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={allVisibleSelected ? "Deselect all" : "Select all"}
+              accessibilityLabel={
+                allVisibleSelected ? t("drawer.deselectAll") : t("drawer.selectAll")
+              }
               className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
               onPress={toggleAllVisible}
               testID="drawer-select-all"
@@ -341,7 +353,7 @@ export function ChatDrawer({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Delete ${selectedIds.length} selected`}
+              accessibilityLabel={t("drawer.deleteSelected", { count: selectedIds.length })}
               accessibilityState={{
                 disabled: selectedIds.length === 0 || deletingSelected,
                 busy: deletingSelected,
@@ -365,15 +377,15 @@ export function ChatDrawer({
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search"
-                accessibilityLabel="Search chats"
+                placeholder={t("drawer.search")}
+                accessibilityLabel={t("drawer.searchChats")}
                 className="h-11 flex-1 text-base text-text"
                 returnKeyType="search"
                 testID="drawer-search"
               />
               {query ? (
                 <Pressable
-                  accessibilityLabel="Clear search"
+                  accessibilityLabel={t("models.clearSearch")}
                   hitSlop={8}
                   onPress={() => setQuery("")}
                 >
@@ -383,7 +395,7 @@ export function ChatDrawer({
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="New chat"
+              accessibilityLabel={t("chat.newChat")}
               className="-mr-1 h-11 w-11 items-center justify-center rounded-full active:bg-surface"
               onPress={onNewChat}
               testID="drawer-new-chat"
@@ -396,7 +408,7 @@ export function ChatDrawer({
           <View className="flex-row items-center">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Settings. Server ${serverLabel}`}
+              accessibilityLabel={t("drawer.settingsServer", { server: serverLabel })}
               className="flex-1 flex-row items-center gap-3 rounded-[14px] p-2 active:bg-surface"
               onPress={onOpenSettings}
               testID="drawer-settings"
@@ -420,7 +432,7 @@ export function ChatDrawer({
               <>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Usage"
+                  accessibilityLabel={t("usage.title")}
                   className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
                   onPress={onOpenUsage}
                   testID="drawer-usage"
@@ -429,7 +441,7 @@ export function ChatDrawer({
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Settings"
+                  accessibilityLabel={t("settings.title")}
                   className="-mr-1 h-11 w-11 items-center justify-center rounded-full active:bg-surface"
                   onPress={onOpenSettings}
                 >
@@ -473,11 +485,18 @@ const ChatRow = memo(function ChatRow({
   // Per row, so a turn starting or ending re-renders only its own chat.
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
   const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
-  const title = chat.title || "Untitled";
+  const { t } = useTranslation();
+  const title = chatTitle(chat.title);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={live ? `${title}, replying` : title}
+      accessibilityLabel={
+        live
+          ? t("drawer.replying", { title })
+          : chat.branchedFrom
+            ? t("chat.titleBranch", { title })
+            : title
+      }
       accessibilityState={{
         ...(selection === undefined ? { selected: active } : { checked: selection }),
         busy: deleting,
@@ -503,6 +522,7 @@ const ChatRow = memo(function ChatRow({
         />
       ) : null}
       {live ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
+      {chat.branchedFrom ? <Icon name="source-branch" size={17} tone="textMuted" /> : null}
       <Text
         className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
         numberOfLines={1}
@@ -517,8 +537,9 @@ const ChatRow = memo(function ChatRow({
 const SKELETON_TITLE_WIDTHS = ["w-[72%]", "w-[54%]", "w-[80%]", "w-[46%]", "w-[64%]", "w-[58%]"];
 
 function ChatListSkeleton() {
+  const { t } = useTranslation();
   return (
-    <SkeletonGroup label="Loading chats" testID="drawer-skeleton">
+    <SkeletonGroup label={t("drawer.loading")} testID="drawer-skeleton">
       {SKELETON_TITLE_WIDTHS.map((width) => (
         <View key={width} className="px-3 py-[15px]">
           <Skeleton className={cn("h-3.5", width)} />

@@ -3,6 +3,7 @@ import { Pressable } from "@/src/ui/Pressable";
 import { ProgressRing } from "@/src/ui/ProgressRing";
 import type { PaletteKey } from "@/src/ui/theme";
 import { contextShare, formatShare, formatTokensShort } from "./usageFormat";
+import { useTranslation } from "react-i18next";
 
 export interface ContextUse {
   /** Tokens the model's context holds after the latest reply. */
@@ -23,13 +24,16 @@ export function contextTone(share: number): PaletteKey {
  * share in use, or the token count alone when the window is unknown.
  */
 export function ContextMeter({ context, onPress }: { context: ContextUse; onPress: () => void }) {
+  const { t } = useTranslation();
   const short = formatTokensShort(context.tokens);
   const share = context.window ? contextShare(context.tokens, context.window) : null;
   return (
     <Pressable
-      accessibilityHint="Shows what this chat has used"
+      accessibilityHint={t("context.hint")}
       accessibilityLabel={
-        share === null ? `Context: ${short} tokens` : `Context: ${formatShare(share)} used`
+        share === null
+          ? t("context.tokens", { tokens: short })
+          : t("context.used", { share: formatShare(share) })
       }
       accessibilityRole="button"
       className="h-10 min-w-10 items-center justify-center rounded-full px-1 active:bg-raised"

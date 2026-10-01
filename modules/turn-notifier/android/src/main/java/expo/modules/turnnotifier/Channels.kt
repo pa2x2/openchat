@@ -17,14 +17,14 @@ internal object Channels {
     val manager = NotificationManagerCompat.from(context)
     manager.createNotificationChannel(
       NotificationChannelCompat.Builder(WORK, NotificationManagerCompat.IMPORTANCE_LOW)
-        .setName("Replies in progress")
+        .setName(context.getString(R.string.turn_notifier_channel_work))
         .setShowBadge(false)
         .build(),
     )
     manager.createNotificationChannel(
       NotificationChannelCompat.Builder(REPLIES, NotificationManagerCompat.IMPORTANCE_HIGH)
-        .setName("Finished replies")
-        .setDescription("A reply is ready, failed, or needs your answer")
+        .setName(context.getString(R.string.turn_notifier_channel_replies))
+        .setDescription(context.getString(R.string.turn_notifier_channel_replies_description))
         .build(),
     )
   }

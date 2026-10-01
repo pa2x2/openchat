@@ -16,6 +16,7 @@
 import { AppRegistry, AppState, PermissionsAndroid, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import { UNTITLED_CHAT, type ChatForm, type ChatId } from "@/src/domain";
+import { t } from "@/src/i18n";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
 import { useSettingsStore } from "@/src/stores/settings";
@@ -42,7 +43,7 @@ export function watchTurns(): () => void {
   const syncWork = () => {
     if (live > 0) {
       if (!working) void askPermissionOnce();
-      notifier.startWork(live === 1 ? "Working on a reply" : `Working on ${live} replies`);
+      notifier.startWork(t("notifications.working", { count: live }));
       working = true;
     } else if (preparing === 0 && working) {
       notifier.stopWork();
@@ -95,9 +96,11 @@ function endedBody(chatId: ChatId): string | null {
   const { byChat, turnErrors } = useMessagesStore.getState();
   const reply = (byChat[chatId] ?? []).findLast((message) => message.role === "assistant");
   // A stopped reply was stopped by the user; nothing to tell them.
-  if (reply?.status === "complete") return snippet(reply.text, SNIPPET_LENGTH) || "Reply ready";
+  if (reply?.status === "complete") {
+    return snippet(reply.text, SNIPPET_LENGTH) || t("notifications.replyReady");
+  }
   if (reply?.status === "error" || turnErrors[chatId]) {
-    return turnErrors[chatId] ?? "The reply failed.";
+    return turnErrors[chatId] ?? t("errors.replyFailed");
   }
   return null;
 }
@@ -109,7 +112,7 @@ function endedBody(chatId: ChatId): string | null {
 function formBody(form: ChatForm): string {
   const shown = form.fields.filter((field) => !field.hidden && field.type !== "link");
   const lone = shown.length === 1 ? (shown[0].description ?? shown[0].title) : undefined;
-  return `Needs your answer: ${snippet(lone || form.title, SNIPPET_LENGTH)}`;
+  return t("notifications.needsAnswer", { question: snippet(lone || form.title, SNIPPET_LENGTH) });
 }
 
 async function notify(notifier: TurnNotifierModule, chatId: ChatId, body: string): Promise<void> {

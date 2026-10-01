@@ -1,4 +1,4 @@
-import { normalizeV2Event, type V2EventShape } from "../normalize";
+import { normalizeV2Event, webSources, type V2EventShape } from "../normalize";
 
 const event = (type: string, data: V2EventShape["data"] = {}): V2EventShape => ({
   type,
@@ -93,5 +93,30 @@ describe("normalizeV2Event", () => {
       expect(normalizeV2Event(event(type))).toBeNull();
     }
     expect(normalizeV2Event(event("session.text.delta", { delta: "" }))).toBeNull();
+  });
+});
+
+describe("webSources", () => {
+  it("lists the hits of a search result, not the links in their snippets", () => {
+    // Trimmed from a real `websearch` result (provider: firecrawl, server 2.0.19).
+    const text = [
+      "## [React Native 0.82 - A New Era](https://reactnative.dev/blog/2025/10/08/react-native-0.82)",
+      "",
+      "Today we're excited to release React Native 0.82.",
+      "",
+      "## Other changes [\u200b](https://reactnative.dev/blog/2025/10/08/react-native-0.82#other-changes)",
+      "- [High Resolution Time](https://www.w3.org/TR/hr-time-3/): defines `performance.now()`.",
+      "## [Versions - React Native](https://reactnative.dev/versions)",
+      "## [\u200eReact Native Release Notes | Sprinklr](https://www.sprinklr.com/help/rn)",
+      "## [React Native 0.82 - A New Era](https://reactnative.dev/blog/2025/10/08/react-native-0.82)",
+    ].join("\n");
+    expect(webSources([{ type: "text", text }])).toEqual([
+      {
+        title: "React Native 0.82 - A New Era",
+        url: "https://reactnative.dev/blog/2025/10/08/react-native-0.82",
+      },
+      { title: "Versions - React Native", url: "https://reactnative.dev/versions" },
+      { title: "React Native Release Notes | Sprinklr", url: "https://www.sprinklr.com/help/rn" },
+    ]);
   });
 });

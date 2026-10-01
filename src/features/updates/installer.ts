@@ -8,6 +8,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { Platform } from "react-native";
 import { AppInstaller } from "@/modules/app-installer";
 import type { AppRelease } from "./releases";
+import { t } from "@/src/i18n";
 
 export const updatesSupported = Platform.OS === "android" && AppInstaller !== null;
 
@@ -65,6 +66,6 @@ export function openInstallSettings(): void {
 }
 
 export function installApk(fileUri: string, sha256: string | null): Promise<void> {
-  if (!AppInstaller) return Promise.reject(new Error("Updates are not supported on this device."));
+  if (!AppInstaller) return Promise.reject(new Error(t("updates.errors.unsupported")));
   return AppInstaller.install(fileUri, sha256);
 }

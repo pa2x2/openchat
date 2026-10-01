@@ -1,8 +1,11 @@
 import Constants from "expo-constants";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConnectionCard } from "@/src/features/connection/ConnectionCard";
 import { updatesSupported } from "@/src/features/updates/installer";
+import { LANGUAGE_NAMES, type Language, type LanguageSetting } from "@/src/i18n";
 import { formatTimestamp } from "@/src/lib/time";
 import {
   useSettingsStore,
@@ -20,33 +23,24 @@ import { Spinner } from "@/src/ui/Spinner";
 import { Switch } from "@/src/ui/Switch";
 import { dynamicColorsSupported } from "@/src/ui/systemPalettes";
 
-const APPEARANCES: { value: Appearance; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-];
+const APPEARANCES: Appearance[] = ["system", "light", "dark"];
+const COLOR_SOURCES: ColorSource[] = ["default", "dynamic"];
+const CHAT_MODES: ChatMode[] = ["normal", "temporary"];
+const CHAT_CONTROLS: ChatControls[] = ["bottom", "top"];
+const CHANNELS: UpdateChannel[] = ["stable", "prerelease"];
 
-const COLOR_SOURCES: { value: ColorSource; label: string }[] = [
-  { value: "default", label: "Default" },
-  { value: "dynamic", label: "Material You" },
-];
-
-const CHAT_MODES: { value: ChatMode; label: string }[] = [
-  { value: "normal", label: "Normal" },
-  { value: "temporary", label: "Temporary" },
-];
-
-const CHAT_CONTROLS: { value: ChatControls; label: string }[] = [
-  { value: "bottom", label: "Bottom" },
-  { value: "top", label: "Top" },
-];
-
-const CHANNELS: { value: UpdateChannel; label: string }[] = [
-  { value: "stable", label: "Stable" },
-  { value: "prerelease", label: "Pre-release" },
-];
+function languageOptions(t: TFunction): { value: LanguageSetting; label: string }[] {
+  return [
+    { value: "system", label: t("settings.language.system") },
+    ...Object.entries(LANGUAGE_NAMES).map(([value, label]) => ({
+      value: value as Language,
+      label,
+    })),
+  ];
+}
 
 function updateStatusLine(
+  t: TFunction,
   status: UpdateStatus,
   version: string | undefined,
   progress: number | null,
@@ -55,24 +49,29 @@ function updateStatusLine(
 ): string | undefined {
   switch (status) {
     case "checking":
-      return "Checking…";
+      return t("settings.updates.checking");
     case "upToDate":
-      return "You're on the latest version";
+      return t("settings.updates.upToDate");
     case "downloading":
-      return progress === null ? "Downloading…" : `Downloading… ${Math.round(progress * 100)}%`;
+      return progress === null
+        ? t("settings.updates.downloading")
+        : t("settings.updates.downloadingPercent", { percent: Math.round(progress * 100) });
     case "needsPermission":
-      return "Waiting for permission to install";
+      return t("settings.updates.needsPermission");
     case "installing":
-      return "Installing…";
+      return t("settings.updates.installing");
     case "error":
-      return error ?? "The update failed";
+      return error ?? t("settings.updates.failed");
     default:
-      if (version) return `Version ${version} is available`;
-      return lastCheckedAt !== null ? `Last checked ${formatTimestamp(lastCheckedAt)}` : undefined;
+      if (version) return t("settings.updates.available", { version });
+      return lastCheckedAt !== null
+        ? t("settings.updates.lastChecked", { time: formatTimestamp(lastCheckedAt) })
+        : undefined;
   }
 }
 
 function UpdatesSection() {
+  const { t } = useTranslation();
   const channel = useSettingsStore((state) => state.updateChannel);
   const setChannel = useSettingsStore((state) => state.setUpdateChannel);
   const checkOnStartup = useSettingsStore((state) => state.checkUpdatesOnStartup);
@@ -85,7 +84,7 @@ function UpdatesSection() {
   const check = useUpdatesStore((state) => state.check);
   const openSheet = useUpdatesStore((state) => state.openSheet);
 
-  const subtitle = updateStatusLine(status, release?.version, progress, error, lastCheckedAt);
+  const subtitle = updateStatusLine(t, status, release?.version, progress, error, lastCheckedAt);
 
   function handleChannel(next: UpdateChannel) {
     if (next === channel) return;
@@ -95,9 +94,12 @@ function UpdatesSection() {
 
   return (
     <>
-      <GroupLabel>Updates</GroupLabel>
+      <GroupLabel>{t("settings.updates.label")}</GroupLabel>
       <Segmented
-        options={CHANNELS}
+        options={CHANNELS.map((value) => ({
+          value,
+          label: t(`settings.updates.channel.${value}`),
+        }))}
         value={channel}
         onChange={handleChannel}
         testIDPrefix="update-channel"
@@ -105,7 +107,11 @@ function UpdatesSection() {
       <Group className="mt-2">
         <Row
           icon="update"
-          title={release && status !== "upToDate" ? "Update available" : "Check for updates"}
+          title={
+            release && status !== "upToDate"
+              ? t("settings.updates.updateAvailable")
+              : t("settings.updates.check")
+          }
           subtitle={subtitle}
           trailing={status === "checking" ? <Spinner size="small" /> : undefined}
           chevron={release !== null}
@@ -114,13 +120,13 @@ function UpdatesSection() {
         />
         <Row
           icon="autorenew"
-          title="Check for updates on startup"
+          title={t("settings.updates.checkOnStartup")}
           onPress={() => setCheckOnStartup(!checkOnStartup)}
           trailing={
             <Switch
               value={checkOnStartup}
               onValueChange={setCheckOnStartup}
-              accessibilityLabel="Check for updates on startup"
+              accessibilityLabel={t("settings.updates.checkOnStartup")}
               testID="check-updates-on-startup-switch"
             />
           }
@@ -132,6 +138,7 @@ function UpdatesSection() {
 }
 
 function HapticsRow() {
+  const { t } = useTranslation();
   const haptics = useSettingsStore((state) => state.haptics);
   const setHaptics = useSettingsStore((state) => state.setHaptics);
 
@@ -144,13 +151,13 @@ function HapticsRow() {
   return (
     <Row
       icon="vibrate"
-      title="Haptic feedback"
+      title={t("settings.haptics")}
       onPress={() => handleChange(!haptics)}
       trailing={
         <Switch
           value={haptics}
           onValueChange={handleChange}
-          accessibilityLabel="Haptic feedback"
+          accessibilityLabel={t("settings.haptics")}
           testID="haptics-switch"
         />
       }
@@ -161,6 +168,9 @@ function HapticsRow() {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const language = useSettingsStore((state) => state.language);
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
   const appearance = useSettingsStore((state) => state.appearance);
   const setAppearance = useSettingsStore((state) => state.setAppearance);
   const colorSource = useSettingsStore((state) => state.colorSource);
@@ -177,12 +187,23 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        <GroupLabel>Server</GroupLabel>
+        <GroupLabel>{t("settings.server")}</GroupLabel>
         <ConnectionCard />
 
-        <GroupLabel>Appearance</GroupLabel>
+        <GroupLabel>{t("settings.language.label")}</GroupLabel>
         <Segmented
-          options={APPEARANCES}
+          options={languageOptions(t)}
+          value={language}
+          onChange={setLanguage}
+          testIDPrefix="language"
+        />
+
+        <GroupLabel>{t("settings.appearance.label")}</GroupLabel>
+        <Segmented
+          options={APPEARANCES.map((value) => ({
+            value,
+            label: t(`settings.appearance.${value}`),
+          }))}
           value={appearance}
           onChange={setAppearance}
           testIDPrefix="appearance"
@@ -191,9 +212,12 @@ export default function SettingsScreen() {
         {/* Material You needs Android 12+; elsewhere there is only one choice. */}
         {dynamicColorsSupported ? (
           <>
-            <GroupLabel>Colors</GroupLabel>
+            <GroupLabel>{t("settings.colors.label")}</GroupLabel>
             <Segmented
-              options={COLOR_SOURCES}
+              options={COLOR_SOURCES.map((value) => ({
+                value,
+                label: t(`settings.colors.${value}`),
+              }))}
               value={colorSource}
               onChange={setColorSource}
               testIDPrefix="colors"
@@ -201,34 +225,37 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        <GroupLabel>Default chat mode</GroupLabel>
+        <GroupLabel>{t("settings.chatMode.label")}</GroupLabel>
         <Segmented
-          options={CHAT_MODES}
+          options={CHAT_MODES.map((value) => ({ value, label: t(`settings.chatMode.${value}`) }))}
           value={defaultChatMode}
           onChange={setDefaultChatMode}
           testIDPrefix="default-chat-mode"
         />
 
-        <GroupLabel>Chat controls</GroupLabel>
+        <GroupLabel>{t("settings.chatControls.label")}</GroupLabel>
         <Segmented
-          options={CHAT_CONTROLS}
+          options={CHAT_CONTROLS.map((value) => ({
+            value,
+            label: t(`settings.chatControls.${value}`),
+          }))}
           value={chatControls}
           onChange={setChatControls}
           testIDPrefix="chat-controls"
         />
 
-        <GroupLabel>Interaction</GroupLabel>
+        <GroupLabel>{t("settings.interaction")}</GroupLabel>
         <Group>
           <HapticsRow />
         </Group>
 
         {updatesSupported ? <UpdatesSection /> : null}
 
-        <GroupLabel>About</GroupLabel>
+        <GroupLabel>{t("settings.about")}</GroupLabel>
         <Group>
           <Row
             icon="information-outline"
-            title="Version"
+            title={t("settings.version")}
             value={Constants.expoConfig?.version ?? "—"}
           />
         </Group>

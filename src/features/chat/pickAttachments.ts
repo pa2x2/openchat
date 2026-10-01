@@ -24,6 +24,7 @@ import {
   MAX_ATTACHMENTS_TOTAL_BYTES,
   formatBytes,
 } from "@/src/lib/attachments";
+import { t } from "@/src/i18n";
 
 /** Compression applied to picked photos; full-size camera photos are megabytes. */
 const IMAGE_QUALITY = 0.7;
@@ -42,7 +43,7 @@ function base64ByteLength(base64: string): number {
 
 function checkCount(added: number, existing: Attachment[]): void {
   if (existing.length + added > MAX_ATTACHMENT_COUNT) {
-    throw new AttachmentError(`Up to ${MAX_ATTACHMENT_COUNT} files per message.`);
+    throw new AttachmentError(t("attach.errors.tooMany", { count: MAX_ATTACHMENT_COUNT }));
   }
 }
 
@@ -50,7 +51,7 @@ function checkTotal(candidates: Attachment[], existing: Attachment[]): void {
   const total = [...existing, ...candidates].reduce((sum, file) => sum + (file.size ?? 0), 0);
   if (total > MAX_ATTACHMENTS_TOTAL_BYTES) {
     throw new AttachmentError(
-      `Attachments are limited to ${formatBytes(MAX_ATTACHMENTS_TOTAL_BYTES)} per message.`,
+      t("attach.errors.tooLarge", { size: formatBytes(MAX_ATTACHMENTS_TOTAL_BYTES) }),
     );
   }
 }
@@ -61,14 +62,14 @@ function friendlyError(error: unknown, source: AttachmentSource): AttachmentErro
   if (/permission|denied/i.test(message)) {
     return new AttachmentError(
       source === "camera"
-        ? "OpenChat could not open the camera."
+        ? t("attach.errors.cameraDenied")
         : source === "image"
-          ? "OpenChat could not open your photos."
-          : "OpenChat could not open your files.",
+          ? t("attach.errors.photosDenied")
+          : t("attach.errors.filesDenied"),
     );
   }
   return new AttachmentError(
-    source === "file" ? "Could not attach that file." : "Could not attach that image.",
+    source === "file" ? t("attach.errors.fileFailed") : t("attach.errors.imageFailed"),
   );
 }
 
@@ -122,7 +123,7 @@ export async function takePhoto(existing: Attachment[] = []): Promise<Attachment
     throw friendlyError(error, "camera");
   }
   if (!granted) {
-    throw new AttachmentError("Allow camera access in system settings to take a photo.");
+    throw new AttachmentError(t("attach.errors.cameraPermission"));
   }
   try {
     const result = await ImagePicker.launchCameraAsync({

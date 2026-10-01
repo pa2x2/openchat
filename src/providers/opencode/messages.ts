@@ -26,11 +26,21 @@ import {
   isDismissal,
   toolCategory,
   toolSubject,
+  webSources,
 } from "./normalize";
 
+// The server rejects anything above 200, and without a limit it pages at 50.
+const PAGE_SIZE = 200;
+
 export async function fetchMessages(client: OpenCodeClient, chatId: ChatId): Promise<Message[]> {
-  const response = await client.message.list({ sessionID: chatId });
-  return toMessages(response.data);
+  const wire: SessionMessageInfo[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await client.message.list({ sessionID: chatId, limit: PAGE_SIZE, cursor });
+    wire.push(...page.data);
+    cursor = page.data.length > 0 ? (page.cursor.next ?? undefined) : undefined;
+  } while (cursor);
+  return toMessages(wire);
 }
 
 /** Decoded length of a base64 payload, without decoding it. */
@@ -39,7 +49,7 @@ function base64ByteLength(base64: string): number {
   return Math.floor((base64.length * 3) / 4) - padding;
 }
 
-function toAttachment(file: PromptFileAttachment): Attachment {
+export function toAttachment(file: PromptFileAttachment): Attachment {
   // The server hands the payload back itself, whether the file was sent
   // inline or fetched from a uri, so a transcript read back from the server
   // can render an attachment without a second request.
@@ -75,6 +85,9 @@ export function toMessages(wire: readonly SessionMessageInfo[]): Message[] {
     } else if (entry.type === "user") {
       closeRun();
       messages.push(toUserMessage(entry));
+    } else if (entry.type === "compaction" && entry.status === "completed") {
+      // The summary replaced the context these replies measured.
+      for (const message of messages) delete message.contextTokens;
     }
     // Other entries (model switches, compaction, …) are not chat messages.
   }
@@ -127,16 +140,20 @@ function toParts(step: SessionMessageAssistant): ReplyPart[] {
         continue;
       }
       const { state } = part;
+      const category = toolCategory(part.name);
+      const sources =
+        category === "web-search" && state.status === "completed" ? webSources(state.content) : [];
       parts.push({
         type: "tool",
         tool: {
           id: part.id,
           name: part.name,
-          category: toolCategory(part.name),
+          category,
           // Still a raw string while the model is writing it.
           subject: typeof state.input === "string" ? "" : toolSubject(state.input),
           status:
             state.status === "completed" ? "done" : state.status === "error" ? "failed" : "running",
+          ...(sources.length > 0 ? { sources } : {}),
         },
       });
     } else if (part.text.trim().length > 0) {

@@ -4,7 +4,7 @@
 
 import type { ModelRef as OpenCodeModelRef, SessionInfo } from "@opencode/client";
 import { UNTITLED_CHAT, type ChatId, type ChatSummary, type ModelRef } from "@/src/domain";
-import type { OpenCodeClient } from "./client";
+import { toConnectionError, type OpenCodeClient } from "./client";
 import { toCost, toTokenUsage } from "./usage";
 
 /**
@@ -31,8 +31,14 @@ export function fromWireModel(model: OpenCodeModelRef): ModelRef {
 }
 
 export async function listChats(client: OpenCodeClient): Promise<ChatSummary[]> {
-  const response = await client.session.list({ limit: 100, order: "desc" });
-  return response.data.filter((session) => !session.time?.archived).map(toChatSummary);
+  const sessions: SessionInfo[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await client.session.list({ limit: 100, order: "desc", cursor });
+    sessions.push(...page.data);
+    cursor = page.data.length > 0 ? (page.cursor.next ?? undefined) : undefined;
+  } while (cursor);
+  return sessions.filter((session) => !session.time?.archived).map(toChatSummary);
 }
 
 export async function createChat(
@@ -54,6 +60,19 @@ export async function renameChat(client: OpenCodeClient, id: ChatId, title: stri
   await client.session.update({ sessionID: id, title });
 }
 
+export async function branchChat(
+  client: OpenCodeClient,
+  id: ChatId,
+  before?: string,
+): Promise<ChatSummary> {
+  try {
+    const session = await client.session.fork({ sessionID: id, ...(before ? { before } : {}) });
+    return toChatSummary(session);
+  } catch (error) {
+    throw toConnectionError(error);
+  }
+}
+
 export async function isRunning(client: OpenCodeClient, id: ChatId): Promise<boolean> {
   // Lists only the sessions that are running right now.
   const active = await client.session.active();
@@ -69,10 +88,19 @@ export async function switchModel(
   await client.session.switchModel({ sessionID: id, model: toWireModel(model) });
 }
 
+/**
+ * OpenCode names a branch after its source with " (fork #N)" appended. The
+ * app marks branches itself, in the user's language, so the suffix goes.
+ */
+const FORK_SUFFIX = / \(fork #\d+\)$/;
+
 export function toChatSummary(session: SessionInfo): ChatSummary {
+  const branchedFrom = session.fork?.sessionID;
+  const title = branchedFrom ? session.title?.replace(FORK_SUFFIX, "") : session.title;
   return {
     id: session.id,
-    title: session.title && session.title.length > 0 ? session.title : UNTITLED_CHAT,
+    title: title && title.length > 0 ? title : UNTITLED_CHAT,
+    ...(branchedFrom ? { branchedFrom } : {}),
     updatedAt: session.time?.updated ?? 0,
     model: session.model ? fromWireModel(session.model) : undefined,
     usage: toTokenUsage(session.tokens),

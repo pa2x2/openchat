@@ -1,5 +1,6 @@
 import type { SessionMessageInfo } from "@opencode/client";
-import { toMessages } from "../messages";
+import type { OpenCodeClient } from "../client";
+import { fetchMessages, toMessages } from "../messages";
 
 const wire = (message: Record<string, unknown>) => message as unknown as SessionMessageInfo;
 
@@ -206,5 +207,30 @@ describe("toMessages", () => {
       { uri: "", mimeType: "image/png", name: "photo.png", bytes: "QUJD", size: 3 },
       expect.objectContaining({ mimeType: "application/octet-stream", name: "attachment" }),
     ]);
+  });
+});
+
+describe("fetchMessages", () => {
+  it("reads every page, not just the server's first", async () => {
+    // The server lists newest first, 50 per page by default, and hands back a
+    // `next` cursor even when the following page turns out empty.
+    const prompt = (n: number) => ({
+      type: "user",
+      id: `msg_${n}`,
+      time: { created: n },
+      text: `p${n}`,
+    });
+    const pages: Record<string, { data: unknown[]; cursor: { next: string | null } }> = {
+      first: { data: [prompt(3), prompt(2)], cursor: { next: "b" } },
+      b: { data: [prompt(1)], cursor: { next: "c" } },
+      c: { data: [], cursor: { next: "d" } },
+    };
+    const list = jest.fn(async ({ cursor }: { cursor?: string }) => pages[cursor ?? "first"]);
+    const client = { message: { list } } as unknown as OpenCodeClient;
+
+    const messages = await fetchMessages(client, "ses_1");
+
+    expect(messages.map((m) => m.id)).toEqual(["msg_1", "msg_2", "msg_3"]);
+    expect(list).toHaveBeenCalledTimes(3);
   });
 });

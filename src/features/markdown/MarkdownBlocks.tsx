@@ -5,9 +5,12 @@
  * their native views and state.
  */
 
-import { memo, type ReactNode } from "react";
-import { Linking, View, type TextStyle } from "react-native";
+import { memo, useCallback, useState, type ReactNode } from "react";
+import { Linking, View, type LayoutChangeEvent, type TextStyle } from "react-native";
 import { Text } from "@/src/ui/Text";
+// RNGH's ScrollView claims a sideways swipe before the drawer's pan can, so a
+// wide table scrolls instead of the sidebar opening.
+import { ScrollView } from "react-native-gesture-handler";
 import {
   blockGap,
   keyedBlocks,
@@ -152,40 +155,91 @@ function List({ node, theme, live, depth }: BlockProps) {
   );
 }
 
+const CELL_PADDING = 8;
+// Past this a cell's text wraps rather than widening its column further.
+const MAX_CELL_TEXT_WIDTH = 240;
+
+const CELL_ALIGN = { left: "flex-start", center: "center", right: "flex-end" } as const;
+
 function Table({ node, theme }: { node: MarkdownNode; theme: MarkdownTheme }) {
   const rows = tableRows(node);
+  // Each column is as wide as its widest cell's text. Flex can't line up a
+  // column across separate rows by content, so every cell's text reports its
+  // natural width and the column takes the largest. Text only grows while a
+  // reply streams, so a column never needs to shrink.
+  const [widths, setWidths] = useState<number[]>([]);
+  const measure = useCallback((column: number, event: LayoutChangeEvent) => {
+    const width = Math.ceil(event.nativeEvent.layout.width);
+    setWidths((previous) => {
+      if ((previous[column] ?? 0) >= width) return previous;
+      const next = [...previous];
+      next[column] = width;
+      return next;
+    });
+  }, []);
+
   return (
     <View
       style={{ borderColor: theme.border, borderWidth: 1, borderRadius: 12, overflow: "hidden" }}
     >
-      {rows.map((row, rowIndex) => {
-        const cells = row.children ?? [];
-        const header = cells.some((cell) => cell.isHeader);
-        return (
-          <View
-            key={rowIndex}
-            style={{
-              flexDirection: "row",
-              backgroundColor: header ? theme.panel : undefined,
-              borderTopColor: theme.border,
-              borderTopWidth: rowIndex > 0 ? 1 : 0,
-            }}
-          >
-            {cells.map((cell, cellIndex) => (
-              <View key={cellIndex} style={{ flex: 1, padding: 8 }}>
-                <Paragraph
-                  node={cell}
-                  theme={theme}
-                  style={{
-                    fontWeight: cell.isHeader ? "700" : undefined,
-                    textAlign: cell.align,
-                  }}
-                />
+      {/* A table narrower than the screen still fills it: every column grows
+          by the same amount in every row. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <View style={{ flexGrow: 1 }}>
+          {rows.map((row, rowIndex) => {
+            const cells = row.children ?? [];
+            const header = cells.some((cell) => cell.isHeader);
+            return (
+              <View
+                key={rowIndex}
+                style={{
+                  flexDirection: "row",
+                  backgroundColor: header ? theme.panel : undefined,
+                  borderTopColor: theme.border,
+                  borderTopWidth: rowIndex > 0 ? 1 : 0,
+                }}
+              >
+                {cells.map((cell, cellIndex) => (
+                  <View
+                    key={cellIndex}
+                    style={{
+                      minWidth:
+                        widths[cellIndex] === undefined
+                          ? undefined
+                          : widths[cellIndex] + CELL_PADDING * 2,
+                      flexGrow: 1,
+                      padding: CELL_PADDING,
+                    }}
+                  >
+                    {/* Hugs the text, so it measures the text and not the
+                        column it has been stretched to. */}
+                    <View
+                      onLayout={(event) => measure(cellIndex, event)}
+                      style={{
+                        alignSelf: CELL_ALIGN[cell.align ?? "left"],
+                        maxWidth: MAX_CELL_TEXT_WIDTH,
+                      }}
+                    >
+                      <Paragraph
+                        node={cell}
+                        theme={theme}
+                        style={{
+                          fontWeight: cell.isHeader ? "700" : undefined,
+                          textAlign: cell.align,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        );
-      })}
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 }

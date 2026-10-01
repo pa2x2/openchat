@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Button } from "@/src/ui/Button";
@@ -29,6 +30,7 @@ import { useModelsStore } from "@/src/stores/models";
 import { useUsageStore } from "@/src/stores/usage";
 
 export function ConnectionCard() {
+  const { t } = useTranslation();
   // Only one backend ships, so an unconnected app offers the first one
   // rather than a picker.
   const descriptor = useProviderDescriptor() ?? listProviderDescriptors()[0];
@@ -63,15 +65,18 @@ export function ConnectionCard() {
 
   const status: { label: string; tone: "ok" | "busy" | "bad" | "none" } =
     connectionState === "connecting"
-      ? { label: "Connecting…", tone: "busy" }
+      ? { label: t("connection.status.connecting"), tone: "busy" }
       : !profile
-        ? { label: "Not connected", tone: "none" }
+        ? { label: t("connection.status.notConnected"), tone: "none" }
         : chatsError
-          ? { label: "Can’t reach the server", tone: "bad" }
+          ? { label: t("connection.status.unreachable"), tone: "bad" }
           : {
               label: profile.serverVersion
-                ? `Connected — ${descriptor.label} v${profile.serverVersion}`
-                : "Connected",
+                ? t("connection.status.connectedTo", {
+                    server: descriptor.label,
+                    version: profile.serverVersion,
+                  })
+                : t("connection.status.connected"),
               tone: "ok",
             };
 
@@ -101,9 +106,7 @@ export function ConnectionCard() {
       void useChatsStore.getState().refresh();
     } catch (error) {
       const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Could not connect to the server.";
+        error instanceof Error && error.message ? error.message : t("connection.connectFailed");
       setLocalError(message);
       markDisconnected(message);
     } finally {
@@ -120,12 +123,12 @@ export function ConnectionCard() {
     if (!profile) return;
     const { providerId, baseUrl } = profile;
     showDialog({
-      title: "Forget this server?",
-      message: "The app forgets its address and password. Your chats stay on the server.",
+      title: t("connection.forget.title"),
+      message: t("connection.forget.message"),
       actions: [
-        { label: "Cancel", style: "cancel" },
+        { label: t("common.cancel"), style: "cancel" },
         {
-          label: "Forget",
+          label: t("connection.forget.confirm"),
           style: "destructive",
           onPress: () => {
             void clearPassword(providerId).catch(() => undefined);
@@ -194,7 +197,7 @@ export function ConnectionCard() {
               showSaved ? (
                 <View className="flex-row items-center gap-1">
                   <Icon name="lock-outline" size={15} tone="textMuted" />
-                  <Text className="text-[13px] text-text-muted">Saved</Text>
+                  <Text className="text-[13px] text-text-muted">{t("connection.saved")}</Text>
                 </View>
               ) : undefined
             }
@@ -205,7 +208,7 @@ export function ConnectionCard() {
 
       {!profile ? (
         <Button
-          label="Connect"
+          label={t("connection.connect")}
           onPress={handleConnect}
           loading={busy}
           testID="connection-connect"
@@ -213,14 +216,14 @@ export function ConnectionCard() {
       ) : edited ? (
         <View className="flex-row gap-2">
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="ghost"
             onPress={handleCancel}
             disabled={busy}
             testID="connection-cancel"
           />
           <Button
-            label="Save & reconnect"
+            label={t("connection.saveAndReconnect")}
             onPress={handleConnect}
             loading={busy}
             className="flex-1"
@@ -229,7 +232,7 @@ export function ConnectionCard() {
         </View>
       ) : (
         <Button
-          label="Forget server"
+          label={t("connection.forgetServer")}
           variant="dangerGhost"
           onPress={handleForget}
           disabled={busy}

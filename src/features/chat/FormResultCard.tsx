@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import type { FormResult } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
@@ -11,6 +12,7 @@ import { Text } from "@/src/ui/Text";
  * skipped too.
  */
 export function FormResultCard({ form }: { form: FormResult }) {
+  const { t } = useTranslation();
   const answered = form.status === "answered";
   return (
     <View
@@ -24,11 +26,7 @@ export function FormResultCard({ form }: { form: FormResult }) {
           tone="textMuted"
         />
         <Text className="text-[13px] font-medium text-text-muted">
-          {answered
-            ? "You answered"
-            : form.questions.length > 1
-              ? "You skipped these questions"
-              : "You skipped this question"}
+          {answered ? t("forms.answered") : t("forms.skipped", { count: form.questions.length })}
         </Text>
       </View>
       {form.questions.map((question, index) => {
@@ -43,7 +41,7 @@ export function FormResultCard({ form }: { form: FormResult }) {
                 answer ? "text-text" : "text-text-faint",
               )}
             >
-              {answer || "No answer"}
+              {answer || t("forms.noAnswer")}
             </Text>
           </View>
         ) : (

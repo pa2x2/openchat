@@ -75,7 +75,13 @@ async function flush() {
 }
 
 beforeEach(() => {
-  useMessagesStore.setState({ byChat: {}, activeTurns: {}, turnErrors: {}, formRecords: {} });
+  useMessagesStore.setState({
+    byChat: {},
+    activeTurns: {},
+    turnErrors: {},
+    formRecords: {},
+    queued: {},
+  });
   useChatsStore.setState({ chats: [], loading: false, error: null, pendingRegenerate: {} });
   getProviderMock.mockReset();
 });
@@ -196,6 +202,71 @@ describe("sendMessage", () => {
 
     expect(state().turnErrors.c4).toContain("without returning a reply");
     expect(state().activeTurns.c4).toBe(false);
+  });
+});
+
+describe("queued messages", () => {
+  it("splits the reply where a queued message is delivered, but not at the turn's own prompt", async () => {
+    useMessagesStore.setState({
+      queued: {
+        c1: [{ id: "msg_q1", text: "and then?", delivery: "queue", createdAt: 1 }],
+      },
+    });
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            // The backend delivers the turn's own prompt the same way.
+            { type: "queued-delivered", id: "msg_own" },
+            textDelta("Once"),
+            { type: "queued-delivered", id: "msg_q1" },
+            textDelta("Then"),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "tell me");
+
+    expect(state().byChat.c1).toMatchObject([
+      { role: "user", text: "tell me" },
+      { role: "assistant", text: "Once", status: "complete" },
+      { id: "msg_q1", role: "user", text: "and then?" },
+      { role: "assistant", text: "Then", status: "complete" },
+    ]);
+    expect(state().queued.c1).toEqual([]);
+  });
+
+  it("stays for the run the backend starts for what was still queued when its run ended", async () => {
+    useMessagesStore.setState({
+      queued: {
+        c1: [{ id: "msg_q1", text: "and then?", delivery: "queue", createdAt: 1 }],
+      },
+    });
+    useProvider({
+      events: scriptedEvents([
+        {
+          events: [
+            textDelta("Once"),
+            chatIdle(),
+            { type: "queued-delivered", id: "msg_q1" },
+            textDelta("Then"),
+            chatIdle(),
+          ],
+        },
+      ]),
+    });
+
+    await sendMessage("c1", "tell me");
+
+    expect(state().byChat.c1).toMatchObject([
+      { role: "user", text: "tell me" },
+      { role: "assistant", text: "Once", status: "complete" },
+      { id: "msg_q1", role: "user" },
+      { role: "assistant", text: "Then", status: "complete" },
+    ]);
+    expect(state().activeTurns.c1).toBe(false);
   });
 });
 

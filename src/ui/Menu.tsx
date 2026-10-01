@@ -5,6 +5,7 @@ import { Icon, type IconName } from "./Icon";
 import { Modal } from "./Modal";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
+import { useTranslation } from "react-i18next";
 
 export interface MenuItem {
   label: string;
@@ -67,6 +68,7 @@ export function Menu({
   anchor: MenuAnchor;
   testID?: string;
 }) {
+  const { t } = useTranslation();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const menuHeight = items.length * ITEM_HEIGHT + MENU_PADDING;
@@ -75,7 +77,7 @@ export function Menu({
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close menu">
+      <Pressable className="flex-1" onPress={onClose} accessibilityLabel={t("common.closeMenu")}>
         <View
           className="absolute min-w-[220px] rounded-[20px] bg-elevated p-1.5"
           style={{

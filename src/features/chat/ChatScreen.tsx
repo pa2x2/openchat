@@ -1,20 +1,35 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppState, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Composer, type ComposerHandle } from "./Composer";
-import { AUTO_LABEL, ModelSheet } from "./ModelSheet";
+import { Composer, type ComposerHandle, type EditTarget } from "./Composer";
+import { ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
-import { ChatHeader, ChatTitleBar, HEADER_HEIGHT, TITLE_BAR_HEIGHT } from "./ChatHeader";
+import {
+  ChatHeader,
+  ChatTitleBar,
+  HEADER_HEIGHT,
+  TITLE_BAR_HEIGHT,
+  type BranchSource,
+} from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
 import { RecentChats } from "./RecentChats";
 import { Transcript, TranscriptSkeleton } from "./Transcript";
 import { UsageSheet } from "./UsageSheet";
 import { discardTemporaryChat } from "./temporaryChats";
+import {
+  BranchUndoBar,
+  heldForUndo,
+  offerBranchUndo,
+  settleBranchUndo,
+  undoBranch,
+  useBranchUndo,
+} from "./branchUndo";
 import { conversationMarkdown } from "./conversationText";
 import { AttachmentSource, pickFiles, pickImages, takePhoto } from "./pickAttachments";
 import { confirmDeleteChat, promptRenameChat } from "@/src/features/drawer/chatActions";
@@ -22,15 +37,22 @@ import { useDrawer } from "@/src/features/drawer/DrawerContext";
 import { dismissTurnNotification } from "@/src/features/notifications/turnNotifications";
 import {
   answerForm,
+  branchChat,
+  branchForEdit,
+  cancelQueuedMessage,
+  compactChat,
   discardPendingRegenerate,
   dismissForm,
-  editLastMessage,
+  editMessage,
   followRunningTurn,
   interruptTurn,
   isTurnLive,
+  queueMessage,
   regenerateReply,
   sendMessage,
+  sendQueuedNow,
   settleOrphanedStreams,
+  syncQueue,
 } from "@/src/stream/streamMachine";
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
@@ -38,6 +60,7 @@ import { useMessagesStore } from "@/src/stores/messages";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
+import { chatTitle } from "@/src/lib/chatTitle";
 import { cn } from "@/src/lib/cn";
 import {
   UNTITLED_CHAT,
@@ -45,6 +68,7 @@ import {
   type Message,
   type ModelInfo,
   type ModelRef,
+  type QueuedMessage,
 } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
@@ -88,6 +112,7 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
  */
 export function ChatScreen({ chatId }: { chatId: string }) {
   const isDraft = chatId === NEW_CHAT;
+  const { t } = useTranslation();
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
@@ -99,6 +124,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [focusOnMount] = useState(() => Keyboard.isVisible());
 
   const chat = useChatsStore((state) => state.chats.find((candidate) => candidate.id === chatId));
+  const sourceId = chat?.branchedFrom;
+  const source = useChatsStore((state) =>
+    sourceId ? state.chats.find((candidate) => candidate.id === sourceId) : undefined,
+  );
   // Only whether there is a transcript: the transcript itself changes on
   // every streamed frame, and only `Transcript` should re-render for that.
   const empty = useMessagesStore((state) => (state.byChat[chatId]?.length ?? 0) === 0);
@@ -123,21 +152,32 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
   const [switchingModel, setSwitchingModel] = useState(false);
+  const [branching, setBranching] = useState(false);
   // A sent message being edited in the composer, with what the composer held
   // before, which comes back if the edit is cancelled.
   const [editing, setEditing] = useState<{
     message: Message;
     draft: string;
     attachments: Attachment[];
+    target: EditTarget;
   } | null>(null);
+  const editRemoves = useMessagesStore((state) => {
+    if (!editing) return 0;
+    const transcript = state.byChat[chatId] ?? [];
+    const index = transcript.findIndex((message) => message.id === editing.message.id);
+    return index < 0 ? 0 : transcript.length - 1 - index;
+  });
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
   const canAttach = capabilities?.attachments === true;
+  const canQueue = capabilities?.queue === true;
   const modelSelection = capabilities?.modelSelection === true;
+  const canDelete = capabilities?.deleteChat === true;
+  const canEditInNewChat = !isDraft && capabilities?.branch === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
-  const canTemporary = capabilities?.deleteChat === true;
+  const canTemporary = canDelete;
   const controls = useSettingsStore((state) => state.chatControls);
   const topInset = insets.top + (controls === "top" ? HEADER_HEIGHT : TITLE_BAR_HEIGHT);
   const defaultTemporary = useSettingsStore((state) => state.defaultChatMode === "temporary");
@@ -180,7 +220,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const variantLabel = currentModel?.variant
     ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
       currentModel.variant)
-    : AUTO_LABEL;
+    : t("models.auto");
 
   // Cold open: reconcile the transcript from the server (cache first), bury
   // streams this app instance is not going to continue, and pick up a run
@@ -194,6 +234,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void messagesStore.fetchMessages(chatId).then(() => {
       if (cancelled) return;
       settleOrphanedStreams(chatId);
+      void syncQueue(chatId);
       void followRunningTurn(chatId);
     });
     const subscription = AppState.addEventListener("change", (state) => {
@@ -201,7 +242,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         void useMessagesStore
           .getState()
           .fetchMessages(chatId)
-          .then(() => followRunningTurn(chatId));
+          .then(() => {
+            void syncQueue(chatId);
+            return followRunningTurn(chatId);
+          });
       }
     });
     return () => {
@@ -243,14 +287,25 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (!isDraft && !turnActive && !named) void useChatsStore.getState().refresh();
   }, [isDraft, turnActive, named]);
 
-  // Leaving a temporary chat deletes it. Read at unmount rather than render,
-  // so a chat deleted some other way meanwhile is not deleted twice.
+  // Leaving a temporary chat deletes it, unless a branch made from it can
+  // still be undone back to it. Read at unmount rather than render, so a chat
+  // deleted some other way meanwhile is not deleted twice.
   useEffect(() => {
     if (isDraft) return;
     return () => {
-      if (useChatsStore.getState().temporary[chatId]) void discardTemporaryChat(chatId);
+      settleBranchUndo(chatId);
+      if (useChatsStore.getState().temporary[chatId] && !heldForUndo(chatId)) {
+        void discardTemporaryChat(chatId);
+      }
     };
   }, [chatId, isDraft]);
+
+  // Undo would delete whatever the branch has gained since.
+  const undoOffered = useBranchUndo((state) => state.offer?.branchId === chatId);
+  useEffect(() => {
+    if (turnActive) settleBranchUndo(chatId);
+  }, [chatId, turnActive]);
+  const expireUndo = useCallback(() => settleBranchUndo(chatId), [chatId]);
 
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
@@ -269,7 +324,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       const provider = await getProvider();
       if (!provider) {
         setAttachments(files);
-        setBanner("Not connected. Open Settings to connect to a server.");
+        setBanner(t("errors.notConnected"));
         return false;
       }
       if (isDraft) {
@@ -292,12 +347,52 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       return true;
     } catch (error) {
       setAttachments(files);
-      setBanner(error instanceof Error && error.message ? error.message : "Could not send.");
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
       return false;
     } finally {
       busy.current = false;
     }
   }
+
+  async function handleQueue(text: string, files: Attachment[]): Promise<boolean> {
+    // The reply can end between the last render and the tap.
+    if (!isTurnLive(chatId)) return handleSend(text, files);
+    setBanner(null);
+    setAttachments([]);
+    try {
+      await queueMessage(chatId, text, files);
+      return true;
+    } catch (error) {
+      setAttachments(files);
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
+      return false;
+    }
+  }
+
+  const handleSendQueuedNow = useCallback(
+    (message: QueuedMessage) => {
+      setBanner(null);
+      sendQueuedNow(chatId, message.id).catch(() => setBanner(t("queue.sendNowFailed")));
+    },
+    [chatId, t],
+  );
+
+  /** Takes the message back into the composer, after whatever is typed there. */
+  const handleCancelQueued = useCallback(
+    (message: QueuedMessage) => {
+      setBanner(null);
+      cancelQueuedMessage(chatId, message.id).then(
+        (taken) => {
+          const draft = composer.current?.read().trim() ?? "";
+          composer.current?.insert(draft ? `${draft}\n\n${taken.text}` : taken.text);
+          const files = taken.attachments;
+          if (files) setAttachments((current) => [...current, ...files]);
+        },
+        () => setBanner(t("queue.cancelFailed")),
+      );
+    },
+    [chatId, t],
+  );
 
   async function sendEdit(text: string): Promise<boolean> {
     const target = editing;
@@ -310,7 +405,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
     try {
-      const outcome = await editLastMessage(chatId, target.message.text, text);
+      const outcome =
+        target.target === "new"
+          ? await sendEditToBranch(target.message, text)
+          : await editMessage(chatId, target.message, text);
       if (outcome.ok) return true;
       if (outcome.error) setBanner(outcome.error);
       // Back to editing with the edited text, so nothing typed is lost.
@@ -323,10 +421,22 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
+  async function sendEditToBranch(
+    message: Message,
+    text: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const outcome = await branchForEdit(chatId, message);
+    if (!outcome.ok) return outcome;
+    const streaming = sendMessage(outcome.chat.id, text, outcome.attachments);
+    router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
+    await streaming;
+    return { ok: true };
+  }
+
   function startEdit(message: Message) {
     // Files staged for a new message would not go with the edit; they wait
     // for it to finish, as the typed draft does.
-    setEditing({ message, draft: composer.current?.read() ?? "", attachments });
+    setEditing({ message, draft: composer.current?.read() ?? "", attachments, target: "here" });
     setAttachments([]);
     composer.current?.insert(message.text);
   }
@@ -342,6 +452,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     void interruptTurn(chatId);
   }
 
+  function handleCompact() {
+    setUsageSheetOpen(false);
+    setBanner(null);
+    compactChat(chatId).catch(() => setBanner(t("context.compactFailed")));
+  }
+
   async function handleAddAttachment(source: AttachmentSource) {
     setAttachSheetOpen(false);
     setBanner(null);
@@ -351,7 +467,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (picked.length === 0) return;
       setAttachments((current) => [...current, ...picked]);
     } catch (error) {
-      setBanner(error instanceof Error && error.message ? error.message : "Could not attach.");
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.attachFailed"));
     }
   }
 
@@ -361,6 +477,33 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (!outcome.ok && outcome.error) setBanner(outcome.error);
     });
   }, [chatId]);
+
+  // The icon stays tappable while the fork is made; a second tap would make a second chat.
+  const branchingNow = useRef(false);
+  const handleBranch = useCallback(
+    (reply: Message) => {
+      if (branchingNow.current) return;
+      branchingNow.current = true;
+      setBanner(null);
+      setBranching(true);
+      void branchChat(chatId, reply).then((outcome) => {
+        branchingNow.current = false;
+        setBranching(false);
+        if (!outcome.ok) {
+          setBanner(outcome.error);
+          return;
+        }
+        if (canDelete) offerBranchUndo({ branchId: outcome.chat.id, sourceId: chatId });
+        router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
+      });
+    },
+    [chatId, router, canDelete],
+  );
+
+  function handleUndoBranch() {
+    const sourceId = undoBranch(chatId);
+    if (sourceId) router.replace({ pathname: "/chat/[id]", params: { id: sourceId } });
+  }
 
   function handleSelectModel(model: ModelInfo) {
     // The reasoning level carries over when the new model offers it too.
@@ -379,7 +522,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     try {
       const provider = await getProvider();
       if (!provider) {
-        setBanner("Not connected. Open Settings to connect to a server.");
+        setBanner(t("errors.notConnected"));
         return;
       }
       await provider.setChatModel(chatId, model);
@@ -387,7 +530,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (current) useChatsStore.getState().upsert({ ...current, model });
     } catch (error) {
       setBanner(
-        error instanceof Error && error.message ? error.message : "Could not switch model.",
+        error instanceof Error && error.message ? error.message : t("chat.switchModelFailed"),
       );
     } finally {
       setSwitchingModel(false);
@@ -397,7 +540,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const menuItems: MenuItem[] = [];
   if (!isDraft && temporary) {
     menuItems.push({
-      label: "Keep this chat",
+      label: t("chat.menu.keep"),
       icon: "content-save-outline",
       onPress: () => useChatsStore.getState().keepTemporary(chatId),
       testID: "menu-keep",
@@ -409,7 +552,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       : undefined;
   if (rename) {
     menuItems.push({
-      label: "Rename",
+      label: t("chat.menu.rename"),
       icon: "pencil-outline",
       onPress: rename,
       testID: "menu-rename",
@@ -417,7 +560,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
   if (!empty) {
     menuItems.push({
-      label: "Copy conversation",
+      label: t("chat.menu.copyConversation"),
       icon: "text-box-multiple-outline",
       onPress: () => {
         const messages = useMessagesStore.getState().byChat[chatId] ?? [];
@@ -428,9 +571,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       testID: "menu-copy-conversation",
     });
   }
-  if (!isDraft && !temporary && capabilities?.deleteChat) {
+  if (!isDraft && !temporary && canDelete) {
     menuItems.push({
-      label: "Delete",
+      label: t("chat.menu.delete"),
       icon: "trash-can-outline",
       destructive: true,
       onPress: () =>
@@ -442,6 +585,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
 
   const title = !isDraft && named && chat ? chat.title : null;
+  // A source missing from the list has been deleted.
+  const branchedFrom: BranchSource | undefined = !sourceId
+    ? undefined
+    : source
+      ? {
+          title: chatTitle(source.title),
+          onOpen: () => router.replace({ pathname: "/chat/[id]", params: { id: source.id } }),
+        }
+      : { title: null };
   const header = (
     <ChatHeader
       placement={controls}
@@ -453,6 +605,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       title={title}
       menuItems={menuItems}
       temporaryLabel={temporary}
+      branchedFrom={branchedFrom}
       temporary={
         isDraft && canTemporary
           ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
@@ -500,24 +653,33 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               showReasoning={showReasoning}
               onRegenerate={handleRegenerate}
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
+              onBranch={!isDraft && capabilities?.branch ? handleBranch : undefined}
               editingId={editing?.message.id ?? null}
+              editReplaces={editing?.target !== "new"}
+              onSendQueuedNow={handleSendQueuedNow}
+              onCancelQueued={handleCancelQueued}
             />
           )}
 
           {controls === "top" ? (
             header
           ) : (
-            <ChatTitleBar title={title} temporaryLabel={temporary} onRename={rename} />
+            <ChatTitleBar
+              title={title}
+              temporaryLabel={temporary}
+              branchedFrom={branchedFrom}
+              onRename={rename}
+            />
           )}
 
           {/* The skeleton already says an uncached transcript is loading. */}
-          {(transcriptLoading && !empty) || deleting ? (
+          {(transcriptLoading && !empty) || deleting || branching ? (
             <View
               pointerEvents="none"
               className="absolute left-0 right-0"
               style={{ top: insets.top }}
             >
-              <LinearProgress immediate={deleting} testID="chat-progress" />
+              <LinearProgress immediate={deleting || branching} testID="chat-progress" />
             </View>
           ) : null}
         </View>
@@ -533,6 +695,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               onOpen={(id) => router.replace({ pathname: "/chat/[id]", params: { id } })}
             />
           ) : null}
+          {undoOffered ? <BranchUndoBar onUndo={handleUndoBranch} onExpire={expireUndo} /> : null}
           {form ? (
             <FormCard
               key={form.id}
@@ -550,7 +713,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               <Icon name="alert-circle-outline" size={18} tone="danger" />
               <Text className="flex-1 py-1 text-sm leading-[19px] text-danger">{shownError}</Text>
               <Pressable
-                accessibilityLabel="Dismiss"
+                accessibilityLabel={t("common.dismiss")}
                 accessibilityRole="button"
                 className="h-8 w-8 items-center justify-center rounded-full active:bg-danger/10"
                 onPress={dismissError}
@@ -562,27 +725,49 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           ) : null}
           <Composer
             ref={composer}
+            draftKey={editing ? undefined : chatId}
             autoFocus={focusOnMount}
             lockedReason={
               !connected
-                ? "Connect a server to start chatting"
+                ? t("composer.locked.notConnected")
                 : form
-                  ? "Answer the question above"
+                  ? t("composer.locked.form")
                   : undefined
             }
             onSend={handleSend}
             onStop={turnActive && capabilities?.interrupt ? handleInterrupt : undefined}
+            onQueue={turnActive && canQueue ? handleQueue : undefined}
             onAttach={canAttach && !editing ? () => setAttachSheetOpen(true) : undefined}
             attachments={attachments}
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
-            editing={editing ? { onCancel: cancelEdit } : undefined}
+            editing={
+              editing
+                ? {
+                    label:
+                      editing.target === "new"
+                        ? t("composer.keepsChat")
+                        : editRemoves === 0
+                          ? t("composer.editing")
+                          : canEditInNewChat
+                            ? t("composer.removesLater", { count: editRemoves })
+                            : t("composer.editingRemoves", { count: editRemoves }),
+                    onCancel: cancelEdit,
+                    target: canEditInNewChat
+                      ? {
+                          value: editing.target,
+                          onChange: (target) => setEditing({ ...editing, target }),
+                        }
+                      : undefined,
+                  }
+                : undefined
+            }
             context={context ? { ...context, onPress: () => setUsageSheetOpen(true) } : undefined}
             model={
               modelSelection
                 ? {
-                    label: currentLabel ?? "Choose model",
+                    label: currentLabel ?? t("models.choose"),
                     level: variants.length > 0 ? variantLabel : undefined,
                     status: switchingModel
                       ? "busy"
@@ -610,6 +795,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           context={context}
           usage={chat?.usage}
           cost={chat?.cost}
+          onCompact={capabilities?.compact && connected && !turnActive ? handleCompact : undefined}
         />
         {modelSelection ? (
           <ModelSheet

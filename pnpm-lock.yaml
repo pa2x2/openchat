@@ -10,6 +10,9 @@ importers:
 
   .:
     dependencies:
+      '@formatjs/intl-pluralrules':
+        specifier: ^6.3.15
+        version: 6.3.15
       '@opencode/client':
         specifier: 2.0.19
         version: 2.0.19(effect@4.0.0-rc.112)
@@ -52,6 +55,9 @@ importers:
       expo-linking:
         specifier: ~57.0.11
         version: 57.0.11(expo@57.0.25)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)
+      expo-localization:
+        specifier: ~57.0.2
+        version: 57.0.2(expo@57.0.25)(react@19.2.3)
       expo-navigation-bar:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.25)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)
@@ -70,6 +76,9 @@ importers:
       expo-system-ui:
         specifier: ~57.0.4
         version: 57.0.4(expo@57.0.25)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(supports-color@8.1.1)
+      i18next:
+        specifier: ^26.4.2
+        version: 26.4.2(typescript@6.0.3)
       jest:
         specifier: ~29.7.0
         version: 29.7.0(@types/node@24.13.6)(supports-color@8.1.1)
@@ -91,6 +100,9 @@ importers:
       react-dom:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
+      react-i18next:
+        specifier: ^17.0.15
+        version: 17.0.15(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(typescript@6.0.3)
       react-native:
         specifier: 0.86.3
         version: 0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1)
@@ -132,7 +144,7 @@ importers:
         version: 3.7.0
       zustand:
         specifier: 5.0.15
-        version: 5.0.15(@types/react@19.2.18)(react@19.2.3)
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.3)(use-sync-external-store@1.7.0(react@19.2.3))
     devDependencies:
       '@babel/plugin-transform-react-jsx':
         specifier: ^7.29.7
@@ -871,6 +883,18 @@ packages:
   '@expo/xcpretty@4.4.5':
     resolution: {integrity: sha512-J3eL4n4h5QTwfD0SIz8OIk6/+sOL/hFZAMacgCM07UNlxBQfJipEpIC2AQxvGkbYeStByJ0TVhQAJo+DeNgaSQ==}
     hasBin: true
+
+  '@formatjs/bigdecimal@0.2.7':
+    resolution: {integrity: sha512-B4+XY/e4u5v261r3a37Kq2ax91gPZSKGyVpx8X5dygAggLlUz+6MeBpmAhaBFGB8WQ4JB1qD+QtKHk9aJkEb9Q==}
+
+  '@formatjs/fast-memoize@3.1.7':
+    resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
+
+  '@formatjs/intl-localematcher@0.9.0':
+    resolution: {integrity: sha512-Z7TD3ssNry1Av1dVDoq/mzpxGyxqWwU0ClWEo+BB3k0JQTeQvUGmeK9WZGYvlqStS0UqkaKXk3dfjsb6NaHAxw==}
+
+  '@formatjs/intl-pluralrules@6.3.15':
+    resolution: {integrity: sha512-/K6Up6SrvLcTP5mWVHp58A9Uk7I4jYbDYqtYdgKDeSY1HG0bhBMS4eVtqK2nFx8mWWdcHbt9ZqHBcCto573PNg==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2646,6 +2670,12 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-localization@57.0.2:
+    resolution: {integrity: sha512-sIKYH3Ivddoge568WY6j+Kp2MAAZzWWqEnY2bokLkJFwX366tGL1mEnoY2WUi/qHatFFPop2yqDdurzbhnnimQ==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+
   expo-manifests@57.0.2:
     resolution: {integrity: sha512-pPIIcKR73OShwlWMg8H90WRzKUd2krDdKlKAwuQV1FtUwE7H3hQEFw0ePFQY9yFoGMF/77ryYwNKfI5umMcCog==}
     peerDependencies:
@@ -3051,6 +3081,9 @@ packages:
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
+  html-parse-stringify@4.0.1:
+    resolution: {integrity: sha512-0zHsZJrK7S3K2aucXWL6ycoYJ/iNtIcFHC/nYQgFklPtrv5LpJctIiSCroWZWeuoXvuyFdzp6KzjJQ+OT5MfFw==}
+
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
@@ -3078,6 +3111,14 @@ packages:
 
   hyphenate-style-name@1.1.0:
     resolution: {integrity: sha512-WDC/ui2VVRrz3jOVi+XtjqkDjiVjTtFaAGiW37k6b+ohyQ5wYDOGkvCZa8+H0nx3gyvv0+BST9xuOgIyGQ00gw==}
+
+  i18next@26.4.2:
+    resolution: {integrity: sha512-RX+R0VLg13IbvRuJSxnqykUFS9vQZTl8wYpWPCIUDWVrSGjsQywB5Y+pjzrkboxGAuYfJZVH1InFTdgBdxq6ug==}
+    peerDependencies:
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -4451,6 +4492,22 @@ packages:
     peerDependencies:
       react: '>=17.0.0'
 
+  react-i18next@17.0.15:
+    resolution: {integrity: sha512-7uYpx/oBkesLto7cOzOmfITlUBaXHCAcFahmgETMfWr8nbbWRRnVGvz8wsH/xpbNcyoH+NpCcnOQEqWPMO6/hw==}
+    peerDependencies:
+      i18next: '>= 26.2.0'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -4692,6 +4749,9 @@ packages:
   reusify@1.1.0:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
+
+  rtl-detect@1.1.2:
+    resolution: {integrity: sha512-PGMBq03+TTG/p/cRB7HCLKJ1MgDIi07+QU1faSjiYRfmY5UsAttV9Hs08jDAHVwcOwmVLcSJkpwyfXszVjWfIQ==}
 
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
@@ -5192,6 +5252,11 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  use-sync-external-store@1.7.0:
+    resolution: {integrity: sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -6404,6 +6469,19 @@ snapshots:
       '@babel/code-frame': 7.29.7
       chalk: 4.1.2
       js-yaml: 4.3.2
+
+  '@formatjs/bigdecimal@0.2.7': {}
+
+  '@formatjs/fast-memoize@3.1.7': {}
+
+  '@formatjs/intl-localematcher@0.9.0':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
+  '@formatjs/intl-pluralrules@6.3.15':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.9.0
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -8523,6 +8601,12 @@ snapshots:
       - expo
       - supports-color
 
+  expo-localization@57.0.2(expo@57.0.25)(react@19.2.3):
+    dependencies:
+      expo: 57.0.25(c360b3ea26b644765550ab0b708881a0)
+      react: 19.2.3
+      rtl-detect: 1.1.2
+
   expo-manifests@57.0.2(expo@57.0.25):
     dependencies:
       expo: 57.0.25(c360b3ea26b644765550ab0b708881a0)
@@ -8974,6 +9058,8 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
+  html-parse-stringify@4.0.1: {}
+
   http-errors@2.0.1:
     dependencies:
       depd: 2.0.0
@@ -9009,6 +9095,10 @@ snapshots:
   husky@9.1.7: {}
 
   hyphenate-style-name@1.1.0: {}
+
+  i18next@26.4.2(typescript@6.0.3):
+    optionalDependencies:
+      typescript: 6.0.3
 
   iconv-lite@0.6.3:
     dependencies:
@@ -10846,6 +10936,18 @@ snapshots:
     dependencies:
       react: 19.2.3
 
+  react-i18next@17.0.15(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(typescript@6.0.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 4.0.1
+      i18next: 26.4.2(typescript@6.0.3)
+      react: 19.2.3
+      use-sync-external-store: 1.7.0(react@19.2.3)
+    optionalDependencies:
+      react-dom: 19.2.3(react@19.2.3)
+      react-native: 0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1)
+      typescript: 6.0.3
+
   react-is@16.13.1: {}
 
   react-is@18.3.1: {}
@@ -11135,6 +11237,8 @@ snapshots:
       signal-exit: 3.0.7
 
   reusify@1.1.0: {}
+
+  rtl-detect@1.1.2: {}
 
   run-parallel@1.2.0:
     dependencies:
@@ -11710,6 +11814,10 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
 
+  use-sync-external-store@1.7.0(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+
   util-deprecate@1.0.2: {}
 
   utils-merge@1.0.1: {}
@@ -11885,7 +11993,8 @@ snapshots:
 
   zod@3.25.76: {}
 
-  zustand@5.0.15(@types/react@19.2.18)(react@19.2.3):
+  zustand@5.0.15(@types/react@19.2.18)(react@19.2.3)(use-sync-external-store@1.7.0(react@19.2.3)):
     optionalDependencies:
       '@types/react': 19.2.18
       react: 19.2.3
+      use-sync-external-store: 1.7.0(react@19.2.3)

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="turn_notifier_channel_work">Ответы в процессе</string>
+  <string name="turn_notifier_channel_replies">Готовые ответы</string>
+  <string name="turn_notifier_channel_replies_description">Ответ готов, завершился ошибкой или ждёт вашего решения</string>
+</resources>

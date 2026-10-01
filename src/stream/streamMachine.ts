@@ -30,9 +30,11 @@ import {
   type Attachment,
   type ChatForm,
   type ChatId,
+  type ChatSummary,
   type FormAnswer,
   type FormResult,
   type Message,
+  type QueuedMessage,
   type ReplyPart,
   type StreamEvent,
   type ToolCall,
@@ -41,16 +43,23 @@ import {
 } from "@/src/domain";
 import { getProvider } from "@/src/lib/providerFactory";
 import { canResendAttachments } from "@/src/lib/attachments";
-import type { ChatProvider } from "@/src/providers/types";
+import { ConnectionError, type ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
 import { withFormRecords } from "@/src/stores/formRecords";
 import { useMessagesStore } from "@/src/stores/messages";
+import { t } from "@/src/i18n";
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 15_000;
 /** Stream silence longer than this triggers a reconcile. */
 const STALL_MS = 45_000;
 const WATCHDOG_TICK_MS = 5_000;
+/**
+ * How long a turn whose run ended with messages still queued waits for the
+ * run the backend starts for them. It starts at once; this only covers the
+ * events' way here.
+ */
+const LINGER_MS = 5_000;
 
 /**
  * Optimistic messages carry a local id until the server-assigned one arrives.
@@ -104,6 +113,13 @@ interface LiveTurn {
   lastDelta: "text" | "reasoning" | null;
   /** Picked up by `followRunningTurn`, not started by a send here. */
   followed: boolean;
+  /**
+   * A message this app did not queue joined the transcript mid-run. Only its
+   * id is known, so the transcript is read again once the turn ends.
+   */
+  stale: boolean;
+  /** Set while the turn waits for the run that delivers what is still queued; see `linger`. */
+  lingering: ReturnType<typeof setTimeout> | null;
 }
 
 const liveTurns = new Map<ChatId, LiveTurn>();
@@ -116,6 +132,7 @@ function isCurrentTurn(turn: LiveTurn): boolean {
 
 function settleTurn(turn: LiveTurn): void {
   if (turn.finished) return;
+  stopLingering(turn);
   flushDraft(turn);
   turn.finished = true;
   // A form belongs to its run: once the run is over there is nothing left to
@@ -233,7 +250,7 @@ async function runTurn(
   const consuming = consumeEvents(turn);
   try {
     const delivery = getProvider().then((provider) => {
-      if (!provider) throw new Error("Not connected. Open Settings to connect.");
+      if (!provider) throw new Error(t("errors.notConnected"));
       return options.deliver(provider, userMessage);
     });
     // Some provider event iterators do not promptly close when their signal is
@@ -257,7 +274,7 @@ async function runTurn(
 }
 
 function describe(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "The reply failed.";
+  return error instanceof Error && error.message ? error.message : t("errors.replyFailed");
 }
 
 /**
@@ -275,29 +292,29 @@ export async function regenerateReply(chatId: ChatId): Promise<RegenerateOutcome
 }
 
 /**
- * Replaces the chat's last user message with `text` and runs the turn again:
- * a rerun of the last turn that sends the edited text. `original` is the
- * text the user chose to edit; if the server's last message no longer reads
- * that (another client wrote since), nothing is sent. Needs the backend's
- * native rerun: re-sending instead would leave the old turn standing above.
+ * Replaces one of the chat's user messages with `text` and runs it again;
+ * everything after it is dropped, as a rerun drops the old reply. If the
+ * server's copy of `message` no longer reads the same (another client wrote
+ * since), nothing is sent. Needs the backend's native rerun: re-sending
+ * instead would leave the old turns standing above.
  */
-export async function editLastMessage(
+export async function editMessage(
   chatId: ChatId,
-  original: string,
+  message: Message,
   text: string,
 ): Promise<RegenerateOutcome> {
-  return startRerun(chatId, { original, text });
+  return startRerun(chatId, { message, text });
 }
 
 interface Edit {
-  original: string;
+  message: Message;
   text: string;
 }
 
 async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   // A repeated tap on the same rerun; the first one is already under way.
   if (startingTurns.has(chatId)) return { ok: false };
-  if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
+  if (isTurnLive(chatId)) return { ok: false, error: t("errors.turnLive") };
   // The rerun only goes live once the transcript is fetched and the rollback
   // staged. Until then it holds the chat, so a second tap or a send cannot
   // start a turn beside it and leave this one's reply "Thinking" forever.
@@ -315,30 +332,32 @@ async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcom
 
 async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   const provider = await getProvider();
-  if (!provider) return { ok: false, error: "Not connected. Open Settings to connect." };
+  if (!provider) return { ok: false, error: t("errors.notConnected") };
 
   // The transcript has to come from the server first: a native rerun
   // addresses the turn by its backend message id, and the ids of a message
   // sent in this session are still local ones.
-  const store = useMessagesStore.getState();
-  await store.fetchMessages(chatId);
+  // The edited message is found again by its place in the transcript.
+  const index = edit ? indexOf(chatId, edit.message) : -1;
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const messages = useMessagesStore.getState().byChat[chatId] ?? [];
 
-  const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
-  if (!target) return { ok: false, error: "There is nothing to regenerate yet." };
-  if (edit && target.user.text !== edit.original) {
-    return { ok: false, error: "The chat changed since you started editing. Try again." };
+  const target = edit ? turnAt(messages, index) : lastTurn(messages);
+  if (edit && target?.user.text !== edit.message.text) {
+    return { ok: false, error: t("errors.chatChanged") };
   }
+  if (!target) return { ok: false, error: t("errors.nothingToRegenerate") };
   if (!canResendAttachments(target.user.attachments)) {
     return {
       ok: false,
-      error: "The attached file is no longer available. Re-attach it and try again.",
+      error: t("errors.attachmentGone"),
     };
   }
 
   const native = provider.capabilities.regenerate && typeof provider.regenerate === "function";
-  if (edit && !native) return { ok: false, error: "This server can't edit messages." };
+  if (edit && !native) return { ok: false, error: t("errors.editUnsupported") };
   if (native && target.user.id.startsWith(LOCAL_ID_PREFIX)) {
-    return { ok: false, error: "The server transcript is not available yet. Try again." };
+    return { ok: false, error: t("errors.transcriptUnavailable") };
   }
 
   const carried: Pick<UserMessage, "text" | "attachments"> = {
@@ -380,6 +399,18 @@ interface TurnTarget {
   replaceIds: string[];
 }
 
+function turnAt(messages: Message[], index: number): TurnTarget | null {
+  const user = messages[index];
+  if (user?.role !== "user") return null;
+  return { user, replaceIds: messages.slice(index).map((candidate) => candidate.id) };
+}
+
+function indexOf(chatId: ChatId, message: Message): number {
+  return (useMessagesStore.getState().byChat[chatId] ?? []).findIndex(
+    (candidate) => candidate.id === message.id,
+  );
+}
+
 function lastTurn(messages: Message[]): TurnTarget | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -401,6 +432,98 @@ export async function discardPendingRegenerate(chatId: ChatId): Promise<void> {
   const provider = await getProvider().catch(() => null);
   await provider?.discardRegenerate?.(chatId).catch(() => undefined);
   useChatsStore.getState().clearPendingRegenerate(chatId);
+}
+
+export type BranchOutcome = { ok: true; chat: ChatSummary } | { ok: false; error: string };
+
+/**
+ * Copies the chat into a new one that ends with `reply`. A branch is cut at a
+ * backend message id, which a message sent in this session may not have yet,
+ * so the transcript is read again and the reply found by its place in it.
+ */
+export async function branchChat(chatId: ChatId, reply: Message): Promise<BranchOutcome> {
+  const ready = await branchingProvider(chatId);
+  if (!("provider" in ready)) return ready;
+  const index = indexOf(chatId, reply);
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const transcript = useMessagesStore.getState().byChat[chatId] ?? [];
+  if (transcript[index]?.role !== "assistant") {
+    return { ok: false, error: t("errors.chatChanged") };
+  }
+  return branchBefore(ready.provider, chatId, transcript, index + 1);
+}
+
+export type EditBranchOutcome =
+  { ok: true; chat: ChatSummary; attachments?: Attachment[] } | { ok: false; error: string };
+
+/**
+ * Copies the chat into a new one that ends just before `message`, for an edit
+ * of it to be sent there instead of replacing what follows it here. Resolves
+ * with the attachments the edit carries over, as the server has them.
+ */
+export async function branchForEdit(chatId: ChatId, message: Message): Promise<EditBranchOutcome> {
+  const ready = await branchingProvider(chatId);
+  if (!("provider" in ready)) return ready;
+  const index = indexOf(chatId, message);
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const transcript = useMessagesStore.getState().byChat[chatId] ?? [];
+  const user = transcript[index];
+  if (user?.role !== "user" || user.text !== message.text) {
+    return { ok: false, error: t("errors.chatChanged") };
+  }
+  if (!canResendAttachments(user.attachments)) {
+    return { ok: false, error: t("errors.attachmentGone") };
+  }
+  const outcome = await branchBefore(ready.provider, chatId, transcript, index);
+  return outcome.ok && user.attachments ? { ...outcome, attachments: user.attachments } : outcome;
+}
+
+async function branchingProvider(
+  chatId: ChatId,
+): Promise<{ provider: ChatProvider } | { ok: false; error: string }> {
+  if (startingTurns.has(chatId) || isTurnLive(chatId)) {
+    return { ok: false, error: t("errors.turnLive") };
+  }
+  const provider = await getProvider();
+  if (!provider) return { ok: false, error: t("errors.notConnected") };
+  if (!provider.branchChat) return { ok: false, error: t("errors.branchFailed") };
+  return { provider };
+}
+
+/** A new chat holding the messages of `transcript` before index `cut`. */
+async function branchBefore(
+  provider: ChatProvider,
+  chatId: ChatId,
+  transcript: Message[],
+  cut: number,
+): Promise<BranchOutcome> {
+  const before = transcript[cut]?.id;
+  if (before?.startsWith(LOCAL_ID_PREFIX)) {
+    return { ok: false, error: t("errors.transcriptUnavailable") };
+  }
+  const chats = useChatsStore.getState();
+  let chat: ChatSummary;
+  try {
+    // Nothing comes before the first message, and a backend has no empty
+    // branch to make: a new chat on the same model is what that branch holds.
+    const model = chats.chats.find((candidate) => candidate.id === chatId)?.model;
+    chat =
+      cut === 0
+        ? await provider.createChat(model ? { model } : undefined)
+        : await provider.branchChat!(chatId, before);
+  } catch (error) {
+    // Only a connection problem is worth naming: the server's own reasons
+    // ("Cannot fork empty session: ses_…") are not worded for the user.
+    const known = error instanceof ConnectionError && error.code !== "unknown";
+    return { ok: false, error: known ? error.message : t("errors.branchFailed") };
+  }
+  // Before it is listed: a temporary chat's branch must never reach the sidebar.
+  if (chats.temporary[chatId]) chats.markTemporary(chat.id);
+  chats.upsert(chat);
+  // The new chat opens on what it was copied from instead of a skeleton; its
+  // own transcript replaces this once it is read.
+  useMessagesStore.getState().setMessages(chat.id, transcript.slice(0, cut));
+  return { ok: true, chat };
 }
 
 function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[] = []): void {
@@ -451,6 +574,8 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
     activity: null,
     lastDelta: null,
     followed: false,
+    stale: false,
+    lingering: null,
   };
   startingTurns.delete(chatId);
   liveTurns.set(chatId, turn);
@@ -559,11 +684,12 @@ function closeEventIterator(iterator?: AsyncIterator<StreamEvent>): void {
 async function consumeEvents(turn: LiveTurn): Promise<void> {
   const { controller, chatId } = turn;
   let backoffMs = INITIAL_BACKOFF_MS;
+  let resubscribed = false;
   try {
     while (!controller.signal.aborted && !turn.finished) {
       const provider = await getProvider();
       if (!provider) {
-        failTurn(turn, new Error("Not connected. Open Settings to connect."));
+        failTurn(turn, new Error(t("errors.notConnected")));
         return;
       }
       let lastActivity = Date.now();
@@ -580,6 +706,10 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
       try {
         iterator = provider.events(chatId, subscription.signal)[Symbol.asyncIterator]();
         void syncForms(provider, chatId);
+        // Not on a send's first subscription: the backend can list the turn's
+        // own prompt there, just before delivering it.
+        if (resubscribed || turn.followed) void syncQueue(chatId, provider);
+        resubscribed = true;
         while (!turn.finished) {
           const next = await nextEvent(iterator, subscription.signal);
           if (next.done) break;
@@ -597,6 +727,16 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
           // one sentence, and anything applied there ends the part being written.
           if (event.type === "chat-usage") {
             useChatsStore.getState().setUsage(chatId, event);
+            continue;
+          }
+          if (event.type === "queued-cancelled") {
+            changeQueue(chatId, (messages) => messages.removeQueued(chatId, event.id));
+            continue;
+          }
+          if (event.type === "queued-delivery") {
+            changeQueue(chatId, (messages) =>
+              messages.patchQueued(chatId, event.id, { delivery: event.delivery }),
+            );
             continue;
           }
           if (event.type === "connected") {
@@ -657,7 +797,30 @@ function isRetryableError(event: StreamEvent): boolean {
 }
 
 function turnEnded(turn: LiveTurn): boolean {
-  return turn.draft.status !== "pending" && turn.draft.status !== "streaming";
+  return (
+    turn.lingering === null && turn.draft.status !== "pending" && turn.draft.status !== "streaming"
+  );
+}
+
+/**
+ * Keeps a turn live after its run ended with messages still queued. The
+ * backend delivers them in a run of its own, and on this subscription that
+ * run reads as more of this turn; ending here would close the subscription
+ * just before it starts. Without a delivery in time, the turn ends after all.
+ */
+function linger(turn: LiveTurn): void {
+  turn.lingering = setTimeout(() => {
+    turn.lingering = null;
+    if (!isCurrentTurn(turn)) return;
+    turn.controller.abort();
+    endTurn(turn);
+  }, LINGER_MS);
+}
+
+function stopLingering(turn: LiveTurn): void {
+  if (turn.lingering === null) return;
+  clearTimeout(turn.lingering);
+  turn.lingering = null;
 }
 
 /** Natural completion (the stream itself ended the turn). */
@@ -668,6 +831,8 @@ function endTurn(turn: LiveTurn): void {
     useMessagesStore.getState().setTurnActive(turn.chatId, false);
   }
   settleTurn(turn);
+  const queued = useMessagesStore.getState().queued[turn.chatId] ?? [];
+  if (turn.stale || queued.length > 0) void resumeQueue(turn.chatId);
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -712,7 +877,7 @@ async function settleForm(
   settle: (provider: ChatProvider) => Promise<void> | undefined,
 ): Promise<void> {
   const provider = await getProvider();
-  if (!provider) throw new Error("Not connected. Open Settings to connect.");
+  if (!provider) throw new Error(t("errors.notConnected"));
   try {
     await settle(provider);
   } catch (error) {
@@ -817,11 +982,14 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       messages.patchMessage(turn.chatId, draft.id, counted);
       break;
     }
+    case "queued-delivered":
+      deliverQueued(turn, event.id);
+      break;
     case "chat-idle": {
       // The whole prompt run finished. An assistant message that never
       // produced visible text failed silently — surface it as an error with a
       // reason instead of leaving the user on a blank, unexplained bubble.
-      const produced = turn.draft.text.length > 0 || (turn.draft.parts ?? []).length > 0;
+      const produced = hasContent(turn.draft);
       turn.draft = {
         ...turn.draft,
         status: produced ? "complete" : "error",
@@ -832,10 +1000,9 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
         completedAt: turn.draft.completedAt,
       });
       if (!produced) {
-        messages.setTurnError(
-          turn.chatId,
-          "The server finished the run without returning a reply. It may have rejected the model or provider request.",
-        );
+        messages.setTurnError(turn.chatId, t("errors.server.noReply"));
+      } else if ((messages.queued[turn.chatId] ?? []).length > 0) {
+        linger(turn);
       }
       break;
     }
@@ -851,6 +1018,63 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
 }
 
 const THINKING: TurnActivity = { kind: "thinking" };
+
+function hasContent(reply: Message): boolean {
+  return reply.text.length > 0 || (reply.parts ?? []).length > 0;
+}
+
+/**
+ * A queued message joined the transcript in the middle of the run: the reply
+ * so far is over, and what the run writes next answers the message.
+ */
+function deliverQueued(turn: LiveTurn, id: string): void {
+  const { chatId } = turn;
+  stopLingering(turn);
+  const messages = useMessagesStore.getState();
+  const queued = messages.queued[chatId]?.find((message) => message.id === id);
+  if (queued) changeQueue(chatId, (store) => store.removeQueued(chatId, id));
+  // Already in place when a reconcile read the transcript after the delivery.
+  if ((messages.byChat[chatId] ?? []).some((message) => message.id === id)) return;
+  if (!queued) {
+    // The turn's own prompt is delivered this way too, before its reply starts.
+    if (hasContent(turn.draft)) turn.stale = true;
+    return;
+  }
+  const now = Date.now();
+  const { draft } = turn;
+  if (hasContent(draft)) {
+    // Already complete when its run ended and the backend started another
+    // to deliver this message.
+    if (draft.status !== "complete") {
+      turn.draft = { ...draft, status: "complete", completedAt: now };
+      messages.patchMessage(chatId, draft.id, { status: "complete", completedAt: now });
+    }
+  } else {
+    // Messages steered in together are delivered one after the other, before
+    // the reply to the first of them has begun.
+    messages.removeMessage(chatId, draft.id);
+  }
+  messages.appendMessage(chatId, {
+    id,
+    role: "user",
+    text: queued.text,
+    ...(queued.attachments ? { attachments: queued.attachments } : {}),
+    status: "complete",
+    createdAt: now,
+  });
+  const reply: Message = {
+    id: localId("assistant"),
+    role: "assistant",
+    text: "",
+    parts: [],
+    status: "pending",
+    createdAt: now + 1,
+  };
+  messages.appendMessage(chatId, reply);
+  turn.draft = reply;
+  turn.lastSnapshotText = null;
+  setActivity(turn, THINKING);
+}
 
 function appendDelta(
   draft: Message,
@@ -971,7 +1195,7 @@ async function reconcile(turn: LiveTurn, { over = false } = {}): Promise<void> {
       turn.draft = lastAssistant;
       messages.setMessages(turn.chatId, fetched);
       if (!messages.turnErrors[turn.chatId]) {
-        messages.setTurnError(turn.chatId, "The server reported an error.");
+        messages.setTurnError(turn.chatId, t("errors.server.error"));
       }
       endTurn(turn);
       return;
@@ -1018,6 +1242,16 @@ function stillRunning(provider: ChatProvider, chatId: ChatId): Promise<boolean> 
   return provider.isRunning(chatId).catch(() => true);
 }
 
+export async function compactChat(chatId: ChatId): Promise<void> {
+  const provider = await getProvider();
+  if (!provider?.compact) throw new Error(t("errors.notConnected"));
+  await provider.compact(chatId);
+  await followRunningTurn(chatId);
+  // A quick compaction can be over before it is followed, which leaves the
+  // transcript still counting the context it replaced.
+  if (!isTurnLive(chatId)) await useMessagesStore.getState().fetchMessages(chatId);
+}
+
 /**
  * User-initiated interrupt: stop consuming, mark the optimistic message,
  * and tell the server. The server's own interrupted confirmation is not
@@ -1059,7 +1293,7 @@ function failTurn(turn: LiveTurn, error: unknown): void {
   const isCurrent = liveTurns.get(turn.chatId) === turn;
   if (isCurrent) liveTurns.delete(turn.chatId);
   const messages = useMessagesStore.getState();
-  const message = error instanceof Error && error.message ? error.message : "The reply failed.";
+  const message = error instanceof Error && error.message ? error.message : t("errors.replyFailed");
   if (isCurrent) {
     messages.patchMessage(turn.chatId, turn.draft.id, { status: "error" });
     messages.setTurnError(turn.chatId, message);
@@ -1067,6 +1301,152 @@ function failTurn(turn: LiveTurn, error: unknown): void {
     useChatsStore.getState().touch(turn.chatId);
   }
   settleTurn(turn);
+}
+
+/**
+ * Bumped on every change to a chat's queue, so that a list read from the
+ * backend before the change does not overwrite it.
+ */
+const queueVersions = new Map<ChatId, number>();
+/** Queued here, with the request that queues them still on its way. */
+const queueing = new Set<string>();
+
+function changeQueue(
+  chatId: ChatId,
+  change: (messages: ReturnType<typeof useMessagesStore.getState>) => void,
+): void {
+  queueVersions.set(chatId, (queueVersions.get(chatId) ?? 0) + 1);
+  change(useMessagesStore.getState());
+}
+
+/**
+ * Replaces the chat's queue with the backend's. Events are live-only, so this
+ * is how messages queued, delivered or cancelled during a gap catch up.
+ */
+export async function syncQueue(chatId: ChatId, provider?: ChatProvider | null): Promise<void> {
+  provider ??= await getProvider().catch(() => null);
+  if (!provider?.queuedMessages) return;
+  const version = queueVersions.get(chatId) ?? 0;
+  try {
+    const listed = await provider.queuedMessages(chatId);
+    if ((queueVersions.get(chatId) ?? 0) !== version) return;
+    const messages = useMessagesStore.getState();
+    // The backend may answer before it has seen a message still on its way.
+    const arriving = (messages.queued[chatId] ?? []).filter(
+      (message) => queueing.has(message.id) && !listed.some((item) => item.id === message.id),
+    );
+    messages.setQueued(chatId, [...listed, ...arriving]);
+    dropDelivered(chatId);
+  } catch {
+    // The queue on screen stays; the next subscription syncs again.
+  }
+}
+
+/**
+ * Sends a message while a reply runs. It waits on the backend and joins the
+ * transcript once the reply is done, or as soon as its step ends if steered.
+ */
+export async function queueMessage(
+  chatId: ChatId,
+  text: string,
+  attachments?: Attachment[],
+): Promise<void> {
+  const provider = await getProvider();
+  if (!provider) throw new Error(t("errors.notConnected"));
+  if (!provider.queueMessage || !provider.newMessageId) throw new Error(t("errors.turnLive"));
+  const message: QueuedMessage = {
+    id: provider.newMessageId(),
+    text,
+    ...(attachments?.length ? { attachments } : {}),
+    delivery: "queue",
+    createdAt: Date.now(),
+  };
+  changeQueue(chatId, (messages) => messages.addQueued(chatId, message));
+  queueing.add(message.id);
+  try {
+    await provider.queueMessage(chatId, message, "queue");
+  } catch (error) {
+    changeQueue(chatId, (messages) => messages.removeQueued(chatId, message.id));
+    throw error;
+  } finally {
+    queueing.delete(message.id);
+  }
+  // The reply ended while the message was on its way; the backend starts a
+  // run for it that nothing here is following yet.
+  if (!isTurnLive(chatId)) void resumeQueue(chatId);
+}
+
+/**
+ * Delivers a queued message as soon as the reply's current step ends. With no
+ * reply running (it was stopped), the message starts one, as a send does.
+ */
+export async function sendQueuedNow(chatId: ChatId, id: string): Promise<void> {
+  const queued = useMessagesStore.getState().queued[chatId]?.find((message) => message.id === id);
+  if (!queued) return;
+  const provider = await getProvider();
+  if (!provider?.steerQueued) throw new Error(t("errors.notConnected"));
+  if (isTurnLive(chatId)) {
+    if (queued.delivery === "steer") return;
+    changeQueue(chatId, (messages) => messages.patchQueued(chatId, id, { delivery: "steer" }));
+    try {
+      await provider.steerQueued(chatId, id);
+    } catch (error) {
+      changeQueue(chatId, (messages) => messages.patchQueued(chatId, id, { delivery: "queue" }));
+      throw error;
+    }
+    return;
+  }
+  changeQueue(chatId, (messages) => messages.removeQueued(chatId, id));
+  await runTurn(
+    chatId,
+    { id, text: queued.text, ...(queued.attachments ? { attachments: queued.attachments } : {}) },
+    { deliver: (active) => active.steerQueued!(chatId, id) },
+  );
+}
+
+/**
+ * Takes a queued message back. It stays queued until the backend agrees: one
+ * delivered in the meantime has to land in the transcript, not vanish.
+ */
+export async function cancelQueuedMessage(chatId: ChatId, id: string): Promise<QueuedMessage> {
+  const queued = useMessagesStore.getState().queued[chatId]?.find((message) => message.id === id);
+  const provider = await getProvider();
+  if (!queued || !provider?.cancelQueued) throw new Error(t("errors.notConnected"));
+  try {
+    await provider.cancelQueued(chatId, id);
+  } catch (error) {
+    void syncQueue(chatId, provider);
+    throw error;
+  }
+  changeQueue(chatId, (messages) => messages.removeQueued(chatId, id));
+  return queued;
+}
+
+/**
+ * Catches up after a turn that left messages queued, or that saw a message it
+ * did not queue: the backend delivers what is still queued in a run of its
+ * own, and that run is followed like one another client started.
+ */
+async function resumeQueue(chatId: ChatId): Promise<void> {
+  if (isTurnLive(chatId)) return;
+  await useMessagesStore.getState().fetchMessages(chatId);
+  dropDelivered(chatId);
+  await syncQueue(chatId);
+  // Even with the queue empty: its last message may have been delivered
+  // already, into a run that is still writing the reply to it.
+  await followRunningTurn(chatId);
+}
+
+/**
+ * Drops queued messages the transcript already holds: delivered while no
+ * subscription was there to hear it.
+ */
+function dropDelivered(chatId: ChatId): void {
+  const messages = useMessagesStore.getState();
+  const queued = messages.queued[chatId] ?? [];
+  const transcript = new Set((messages.byChat[chatId] ?? []).map((message) => message.id));
+  const left = queued.filter((message) => !transcript.has(message.id));
+  if (left.length < queued.length) changeQueue(chatId, (store) => store.setQueued(chatId, left));
 }
 
 export function isTurnLive(chatId: ChatId): boolean {

@@ -5,14 +5,12 @@
  */
 
 import type { Money, TokenUsage } from "@/src/domain";
+import { t } from "@/src/i18n";
+import { formatNumber } from "@/src/i18n/format";
 import { formatDuration } from "./replyLayout";
 
-function grouped(digits: string): string {
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
 export function formatTokens(count: number): string {
-  return grouped(String(Math.round(count)));
+  return formatNumber(count);
 }
 
 /**
@@ -23,10 +21,10 @@ export function formatTokens(count: number): string {
 export function formatTokensShort(count: number): string {
   if (count < 1_000) return String(Math.round(count));
   const tenths = Math.round(count / 100);
-  if (tenths < 1_000) return `${(tenths / 10).toFixed(1)}k`;
+  if (tenths < 1_000) return `${formatNumber(tenths / 10, 1)}k`;
   const thousands = Math.round(count / 1_000);
   if (thousands < 1_000) return `${thousands}k`;
-  return `${(count / 1_000_000).toFixed(2)}M`;
+  return `${formatNumber(count / 1_000_000, 2)}M`;
 }
 
 /**
@@ -40,14 +38,17 @@ export function formatCost(cost: Money | undefined): string | null {
   const decimals = amount >= 1 ? 2 : Math.max(2, Math.ceil(-Math.log10(amount)) + 1);
   // Rounding can leave a zero past the second decimal: 0.0996 is "0.100" at three.
   const fixed = amount.toFixed(decimals).replace(/(\.\d\d\d*?)0+$/, "$1");
-  const [whole, fraction] = fixed.split(".");
-  const text = `${grouped(whole)}.${fraction}`;
-  return currency === "USD" ? `$${text}` : `${text} ${currency}`;
+  const text = formatNumber(Number(fixed), fixed.split(".")[1].length);
+  return currency === "USD"
+    ? t("format.usd", { amount: text })
+    : t("format.currency", { amount: text, currency });
 }
 
 /** One decimal under a minute, where "Worked for" rounds to whole seconds. */
 export function formatModelTime(ms: number): string {
-  return ms < 59_950 ? `${(ms / 1_000).toFixed(1)}s` : formatDuration(ms);
+  return ms < 59_950
+    ? t("format.seconds", { value: formatNumber(ms / 1_000, 1) })
+    : formatDuration(ms);
 }
 
 export interface Figure {
@@ -62,10 +63,10 @@ export interface Figure {
 export function tokenFigures(usage: TokenUsage | undefined): Figure[] {
   if (!usage) return [];
   const counts: [string, number][] = [
-    ["Input", (usage.input ?? 0) + (usage.cacheWrite ?? 0)],
-    ["Cached input", usage.cacheRead ?? 0],
-    ["Output", usage.output ?? 0],
-    ["Reasoning", usage.reasoning ?? 0],
+    [t("usage.figures.input"), (usage.input ?? 0) + (usage.cacheWrite ?? 0)],
+    [t("usage.figures.cachedInput"), usage.cacheRead ?? 0],
+    [t("usage.figures.output"), usage.output ?? 0],
+    [t("usage.figures.reasoning"), usage.reasoning ?? 0],
   ];
   return counts
     .filter(([, count]) => count > 0)
