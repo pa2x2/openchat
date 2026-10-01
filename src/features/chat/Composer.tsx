@@ -55,8 +55,16 @@ export interface ComposerProps {
   };
   /** Present once a reply has said how full the model's context is; stays while a reply streams. */
   context?: ContextUse & { onPress: () => void };
-  /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
-  editing?: { label: string; onCancel: () => void };
+  /**
+   * Present while the field holds a sent message being edited; shows a bar
+   * to cancel it, with a switch between sending the edit here and to a new
+   * chat when `target` is set.
+   */
+  editing?: {
+    label: string;
+    onCancel: () => void;
+    target?: { value: EditTarget; onChange: (target: EditTarget) => void };
+  };
   /**
    * The chat the typed text is saved as a draft for, restored when the
    * composer mounts again. Unset while the field holds something that is not
@@ -74,6 +82,11 @@ export interface ComposerProps {
 }
 
 const NO_ATTACHMENTS: Attachment[] = [];
+
+/** Where an edit goes: in place of the message, or to a branch cut just before it. */
+export type EditTarget = "here" | "new";
+
+const EDIT_TARGETS: EditTarget[] = ["here", "new"];
 
 export interface ComposerHandle {
   /** Replaces the draft with `text`, and focuses the field unless told not to. */
@@ -171,7 +184,44 @@ export function Composer({
           testID="composer-editing"
         >
           <Icon name="pencil-outline" size={17} tone="textMuted" />
-          <Text className="flex-1 text-sm text-text-muted">{editing.label}</Text>
+          <Text className="flex-1 text-sm text-text-muted" numberOfLines={2}>
+            {editing.label}
+          </Text>
+          {editing.target ? (
+            <View
+              accessibilityRole="radiogroup"
+              className="flex-row rounded-full bg-raised-hover p-0.5"
+            >
+              {EDIT_TARGETS.map((target) => {
+                const chosen = editing.target?.value === target;
+                const label =
+                  target === "here" ? t("composer.editHere") : t("composer.editNewChat");
+                return (
+                  <Pressable
+                    key={target}
+                    accessibilityRole="radio"
+                    accessibilityLabel={label}
+                    accessibilityState={{ checked: chosen }}
+                    className={cn(
+                      "h-7 justify-center rounded-full px-2.5",
+                      chosen && "bg-elevated",
+                    )}
+                    onPress={() => editing.target?.onChange(target)}
+                    testID={`composer-edit-${target}`}
+                  >
+                    <Text
+                      className={cn(
+                        "text-[13px]",
+                        chosen ? "font-medium text-text" : "text-text-muted",
+                      )}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <Pressable
             accessibilityLabel={t("composer.cancelEditing")}
             accessibilityRole="button"

@@ -89,6 +89,8 @@ export interface TranscriptProps {
   onEditMessage?: (message: Message) => void;
   onBranch?: (message: Message) => void;
   editingId?: string | null;
+  /** The edit replaces what follows the message, rather than going to a new chat. */
+  editReplaces?: boolean;
   onSendQueuedNow: (message: QueuedMessage) => void;
   onCancelQueued: (message: QueuedMessage) => void;
 }
@@ -104,6 +106,7 @@ export function Transcript({
   onEditMessage,
   onBranch,
   editingId = null,
+  editReplaces = true,
   onSendQueuedNow,
   onCancelQueued,
 }: TranscriptProps) {
@@ -237,7 +240,7 @@ export function Transcript({
               onEdit={!turnActive && item.role === "user" ? onEditMessage : undefined}
               onBranch={!turnActive && item.role === "assistant" ? onBranch : undefined}
               editing={index === editingIndex}
-              dimmed={index < editingIndex}
+              dimmed={editReplaces && index < editingIndex}
               // The store keeps the reason for the latest turn only.
               error={item.id === lastMessage?.id ? turnError : null}
             />
@@ -255,6 +258,7 @@ export function Transcript({
       onBranch,
       turnActive,
       editingIndex,
+      editReplaces,
       lastMessage?.id,
       turnError,
       pinned,

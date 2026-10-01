@@ -6,7 +6,7 @@ import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Composer, type ComposerHandle } from "./Composer";
+import { Composer, type ComposerHandle, type EditTarget } from "./Composer";
 import { ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
 import {
@@ -38,6 +38,7 @@ import { dismissTurnNotification } from "@/src/features/notifications/turnNotifi
 import {
   answerForm,
   branchChat,
+  branchForEdit,
   cancelQueuedMessage,
   compactChat,
   discardPendingRegenerate,
@@ -158,6 +159,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     message: Message;
     draft: string;
     attachments: Attachment[];
+    target: EditTarget;
   } | null>(null);
   // Sending the edit removes everything after the message.
   const editRemoves = useMessagesStore((state) => {
@@ -174,6 +176,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const canQueue = capabilities?.queue === true;
   const modelSelection = capabilities?.modelSelection === true;
   const canDelete = capabilities?.deleteChat === true;
+  const canEditInNewChat = !isDraft && capabilities?.branch === true;
   // A temporary chat is only temporary if the app can delete it afterwards.
   const canTemporary = canDelete;
   const controls = useSettingsStore((state) => state.chatControls);
@@ -403,7 +406,10 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
     try {
-      const outcome = await editMessage(chatId, target.message, text);
+      const outcome =
+        target.target === "new"
+          ? await sendEditToBranch(target.message, text)
+          : await editMessage(chatId, target.message, text);
       if (outcome.ok) return true;
       if (outcome.error) setBanner(outcome.error);
       // Back to editing with the edited text, so nothing typed is lost.
@@ -416,10 +422,22 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     }
   }
 
+  async function sendEditToBranch(
+    message: Message,
+    text: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const outcome = await branchForEdit(chatId, message);
+    if (!outcome.ok) return outcome;
+    const streaming = sendMessage(outcome.chat.id, text, outcome.attachments);
+    router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
+    await streaming;
+    return { ok: true };
+  }
+
   function startEdit(message: Message) {
     // Files staged for a new message would not go with the edit; they wait
     // for it to finish, as the typed draft does.
-    setEditing({ message, draft: composer.current?.read() ?? "", attachments });
+    setEditing({ message, draft: composer.current?.read() ?? "", attachments, target: "here" });
     setAttachments([]);
     composer.current?.insert(message.text);
   }
@@ -638,6 +656,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               onEditMessage={capabilities?.regenerate ? startEdit : undefined}
               onBranch={!isDraft && capabilities?.branch ? handleBranch : undefined}
               editingId={editing?.message.id ?? null}
+              editReplaces={editing?.target !== "new"}
               onSendQueuedNow={handleSendQueuedNow}
               onCancelQueued={handleCancelQueued}
             />
@@ -728,10 +747,20 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               editing
                 ? {
                     label:
-                      editRemoves > 0
-                        ? t("composer.editingRemoves", { count: editRemoves })
-                        : t("composer.editing"),
+                      editing.target === "new"
+                        ? t("composer.keepsChat")
+                        : editRemoves === 0
+                          ? t("composer.editing")
+                          : canEditInNewChat
+                            ? t("composer.removesLater", { count: editRemoves })
+                            : t("composer.editingRemoves", { count: editRemoves }),
                     onCancel: cancelEdit,
+                    target: canEditInNewChat
+                      ? {
+                          value: editing.target,
+                          onChange: (target) => setEditing({ ...editing, target }),
+                        }
+                      : undefined,
                   }
                 : undefined
             }

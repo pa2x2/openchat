@@ -442,33 +442,81 @@ export type BranchOutcome = { ok: true; chat: ChatSummary } | { ok: false; error
  * so the transcript is read again and the reply found by its place in it.
  */
 export async function branchChat(chatId: ChatId, reply: Message): Promise<BranchOutcome> {
-  if (startingTurns.has(chatId) || isTurnLive(chatId)) {
-    return { ok: false, error: t("errors.turnLive") };
-  }
-  const provider = await getProvider();
-  if (!provider) return { ok: false, error: t("errors.notConnected") };
-  if (!provider.branchChat) return { ok: false, error: t("errors.branchFailed") };
+  const ready = await branchingProvider(chatId);
+  if (!("provider" in ready)) return ready;
   const index = indexOf(chatId, reply);
   await useMessagesStore.getState().fetchMessages(chatId);
   const transcript = useMessagesStore.getState().byChat[chatId] ?? [];
   if (transcript[index]?.role !== "assistant") {
     return { ok: false, error: t("errors.chatChanged") };
   }
-  const cut = index + 1;
+  return branchBefore(ready.provider, chatId, transcript, index + 1);
+}
+
+export type EditBranchOutcome =
+  { ok: true; chat: ChatSummary; attachments?: Attachment[] } | { ok: false; error: string };
+
+/**
+ * Copies the chat into a new one that ends just before `message`, for an edit
+ * of it to be sent there instead of replacing what follows it here. Resolves
+ * with the attachments the edit carries over, as the server has them.
+ */
+export async function branchForEdit(chatId: ChatId, message: Message): Promise<EditBranchOutcome> {
+  const ready = await branchingProvider(chatId);
+  if (!("provider" in ready)) return ready;
+  const index = indexOf(chatId, message);
+  await useMessagesStore.getState().fetchMessages(chatId);
+  const transcript = useMessagesStore.getState().byChat[chatId] ?? [];
+  const user = transcript[index];
+  if (user?.role !== "user" || user.text !== message.text) {
+    return { ok: false, error: t("errors.chatChanged") };
+  }
+  if (!canResendAttachments(user.attachments)) {
+    return { ok: false, error: t("errors.attachmentGone") };
+  }
+  const outcome = await branchBefore(ready.provider, chatId, transcript, index);
+  return outcome.ok && user.attachments ? { ...outcome, attachments: user.attachments } : outcome;
+}
+
+async function branchingProvider(
+  chatId: ChatId,
+): Promise<{ provider: ChatProvider } | { ok: false; error: string }> {
+  if (startingTurns.has(chatId) || isTurnLive(chatId)) {
+    return { ok: false, error: t("errors.turnLive") };
+  }
+  const provider = await getProvider();
+  if (!provider) return { ok: false, error: t("errors.notConnected") };
+  if (!provider.branchChat) return { ok: false, error: t("errors.branchFailed") };
+  return { provider };
+}
+
+/** A new chat holding the messages of `transcript` before index `cut`. */
+async function branchBefore(
+  provider: ChatProvider,
+  chatId: ChatId,
+  transcript: Message[],
+  cut: number,
+): Promise<BranchOutcome> {
   const before = transcript[cut]?.id;
   if (before?.startsWith(LOCAL_ID_PREFIX)) {
     return { ok: false, error: t("errors.transcriptUnavailable") };
   }
+  const chats = useChatsStore.getState();
   let chat: ChatSummary;
   try {
-    chat = await provider.branchChat(chatId, before);
+    // Nothing comes before the first message, and a backend has no empty
+    // branch to make: a new chat on the same model is what that branch holds.
+    const model = chats.chats.find((candidate) => candidate.id === chatId)?.model;
+    chat =
+      cut === 0
+        ? await provider.createChat(model ? { model } : undefined)
+        : await provider.branchChat!(chatId, before);
   } catch (error) {
     // Only a connection problem is worth naming: the server's own reasons
     // ("Cannot fork empty session: ses_…") are not worded for the user.
     const known = error instanceof ConnectionError && error.code !== "unknown";
     return { ok: false, error: known ? error.message : t("errors.branchFailed") };
   }
-  const chats = useChatsStore.getState();
   // Before it is listed: a temporary chat's branch must never reach the sidebar.
   if (chats.temporary[chatId]) chats.markTemporary(chat.id);
   chats.upsert(chat);
