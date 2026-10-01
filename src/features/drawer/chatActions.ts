@@ -6,6 +6,8 @@
 
 import { UNTITLED_CHAT, type ChatId, type ChatSummary } from "@/src/domain";
 import { deleteChatKeepingUsage } from "@/src/features/usage/deleteChat";
+import { t } from "@/src/i18n";
+import { chatTitle } from "@/src/lib/chatTitle";
 import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
@@ -14,12 +16,12 @@ import { showDialog } from "@/src/ui/Dialog";
 /** Removes a chat on the server and locally, after asking. */
 export function confirmDeleteChat(chat: Pick<ChatSummary, "id" | "title">, onDeleted?: () => void) {
   showDialog({
-    title: "Delete chat?",
-    message: `This will delete “${chat.title || "this chat"}”.`,
+    title: t("drawer.delete.title"),
+    message: t("drawer.delete.message", { title: chatTitle(chat.title) }),
     actions: [
-      { label: "Cancel", style: "cancel" },
+      { label: t("common.cancel"), style: "cancel" },
       {
-        label: "Delete",
+        label: t("common.delete"),
         style: "destructive",
         onPress: () => void deleteChats([chat.id], () => onDeleted?.()),
       },
@@ -39,8 +41,8 @@ export async function deleteChats(
   const provider = await getProvider().catch(() => null);
   if (!provider) {
     showDialog({
-      title: ids.length === 1 ? "Could not delete chat" : "Could not delete chats",
-      message: "Not connected. Open Settings to connect to a server.",
+      title: ids.length === 1 ? t("drawer.delete.failed") : t("drawer.delete.failedMany"),
+      message: t("errors.notConnected"),
     });
     return;
   }
@@ -62,21 +64,24 @@ export async function deleteChats(
     showDialog({
       title:
         ids.length === 1
-          ? "Could not delete chat"
-          : `Could not delete ${failed} of ${ids.length} chats`,
-      message: reason instanceof Error && reason.message ? reason.message : "Try again later.",
+          ? t("drawer.delete.failed")
+          : t("drawer.delete.failedSome", { failed, count: ids.length }),
+      message: reason instanceof Error && reason.message ? reason.message : t("errors.tryLater"),
     });
   }
 }
 
 export function confirmDeleteSelected(ids: ChatId[], onDeleted: (deleted: ChatId[]) => void) {
   showDialog({
-    title: ids.length === 1 ? "Delete chat?" : `Delete ${ids.length} chats?`,
-    message: "This can't be undone.",
+    title:
+      ids.length === 1
+        ? t("drawer.delete.title")
+        : t("drawer.delete.titleMany", { count: ids.length }),
+    message: t("drawer.delete.irreversible"),
     actions: [
-      { label: "Cancel", style: "cancel" },
+      { label: t("common.cancel"), style: "cancel" },
       {
-        label: "Delete",
+        label: t("common.delete"),
         style: "destructive",
         onPress: () => void deleteChats(ids, onDeleted),
       },
@@ -86,15 +91,15 @@ export function confirmDeleteSelected(ids: ChatId[], onDeleted: (deleted: ChatId
 
 export function promptRenameChat(chat: Pick<ChatSummary, "id" | "title">) {
   showDialog({
-    title: "Rename chat",
+    title: t("drawer.rename.title"),
     input: {
       value: chat.title === UNTITLED_CHAT ? "" : chat.title,
-      placeholder: "Chat name",
-      label: "Chat name",
+      placeholder: t("drawer.rename.name"),
+      label: t("drawer.rename.name"),
     },
     actions: [
-      { label: "Cancel", style: "cancel" },
-      { label: "Save", onPress: (title) => void renameChat(chat.id, title) },
+      { label: t("common.cancel"), style: "cancel" },
+      { label: t("common.save"), onPress: (title) => void renameChat(chat.id, title) },
     ],
   });
 }
@@ -106,8 +111,8 @@ async function renameChat(id: ChatId, title: string): Promise<void> {
   const provider = await getProvider().catch(() => null);
   if (!provider?.renameChat) {
     showDialog({
-      title: "Could not rename chat",
-      message: "Not connected. Open Settings to connect to a server.",
+      title: t("drawer.rename.failed"),
+      message: t("errors.notConnected"),
     });
     return;
   }
@@ -120,8 +125,8 @@ async function renameChat(id: ChatId, title: string): Promise<void> {
     if (latest?.title === trimmed)
       useChatsStore.getState().upsert({ ...latest, title: before.title });
     showDialog({
-      title: "Could not rename chat",
-      message: error instanceof Error && error.message ? error.message : "Try again later.",
+      title: t("drawer.rename.failed"),
+      message: error instanceof Error && error.message ? error.message : t("errors.tryLater"),
     });
   }
 }

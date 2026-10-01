@@ -13,6 +13,7 @@
  */
 
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Menu, type MenuItem } from "@/src/ui/Menu";
@@ -56,6 +57,7 @@ export function ChatHeader({
   const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
   const top = placement === "top";
+  const { t } = useTranslation();
   const row = useRef<View>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   // Screen y the menu hangs from. The bottom row is measured when the menu
@@ -89,7 +91,7 @@ export function ChatHeader({
     <>
       {temporary ? (
         <Pressable
-          accessibilityLabel="Temporary chat"
+          accessibilityLabel={t("chat.temporary")}
           accessibilityRole="switch"
           accessibilityState={{ checked: temporary.on }}
           className={action}
@@ -101,7 +103,7 @@ export function ChatHeader({
         </Pressable>
       ) : (
         <Pressable
-          accessibilityLabel="New chat"
+          accessibilityLabel={t("chat.newChat")}
           accessibilityRole="button"
           className={action}
           onPress={onNewChat}
@@ -112,7 +114,7 @@ export function ChatHeader({
       )}
       {menuItems.length > 0 ? (
         <Pressable
-          accessibilityLabel="More options"
+          accessibilityLabel={t("chat.moreOptions")}
           accessibilityRole="button"
           className={action}
           onPress={openMenu}
@@ -145,7 +147,7 @@ export function ChatHeader({
       }
     >
       <Pressable
-        accessibilityLabel="Open sidebar"
+        accessibilityLabel={t("chat.openSidebar")}
         accessibilityRole="button"
         className={cn(
           "h-11 w-11 items-center justify-center rounded-full",
@@ -243,11 +245,12 @@ function ChatTitle({
   onPress?: () => void;
   onLines?: (lines: number) => void;
 }) {
-  const shown = title ?? "New chat";
+  const { t } = useTranslation();
+  const shown = title ?? t("chat.newChat");
   return (
     <Pressable
-      accessibilityHint={onPress ? "Renames the chat" : undefined}
-      accessibilityLabel={temporaryLabel ? `${shown}. Temporary chat` : shown}
+      accessibilityHint={onPress ? t("chat.renameHint") : undefined}
+      accessibilityLabel={temporaryLabel ? t("chat.titleTemporary", { title: shown }) : shown}
       accessibilityRole={onPress ? "button" : "header"}
       className="items-center active:opacity-60"
       hitSlop={10}
@@ -271,7 +274,7 @@ function ChatTitle({
       {temporaryLabel ? (
         <View className="flex-row items-center gap-1" testID="temporary-label">
           <TemporaryChatGlyph on size={12} tone="textMuted" background="background" />
-          <Text className="text-xs text-text-muted">Temporary chat</Text>
+          <Text className="text-xs text-text-muted">{t("chat.temporary")}</Text>
         </View>
       ) : null}
     </Pressable>

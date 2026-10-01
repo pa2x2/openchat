@@ -17,6 +17,7 @@ import type {
   ToolCategory,
 } from "@/src/domain";
 import { toCost, toTokenUsage, type WireTokens } from "./usage";
+import { t } from "@/src/i18n";
 
 /** Structural subset of the client's form field union. */
 interface WireField {
@@ -319,7 +320,7 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       // reconnect loop for provider/auth failures.
       return {
         type: "error",
-        message: errorMessage(event.data.error, "The server failed to complete the reply."),
+        message: errorMessage(event.data.error, t("errors.server.replyFailed")),
         retryable: false,
       };
     // The server reports a failed step immediately before the matching
@@ -332,13 +333,13 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       if (event.data.error?.type === "aborted") return null;
       return {
         type: "error",
-        message: errorMessage(event.data.error, "The reply step failed."),
+        message: errorMessage(event.data.error, t("errors.server.stepFailed")),
         retryable: false,
       };
     case "session.error": {
       return {
         type: "error",
-        message: errorMessage(event.data.error, "The server reported an error."),
+        message: errorMessage(event.data.error, t("errors.server.error")),
         // Errors reported by the server are application/provider failures, not
         // evidence that the live subscription should be retried indefinitely.
         retryable: false,

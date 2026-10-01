@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Keyboard, Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -42,6 +43,7 @@ export interface FormCardProps {
 }
 
 export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<FormDraft>(() => initialDraft(form));
   // Errors show once a field has been edited, not while it is still empty.
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
@@ -81,7 +83,9 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
     try {
       await action();
     } catch (failure) {
-      setError(failure instanceof Error && failure.message ? failure.message : "Could not send.");
+      setError(
+        failure instanceof Error && failure.message ? failure.message : t("chat.sendFailed"),
+      );
       setPending(null);
     }
   }
@@ -94,7 +98,9 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           <Text className="flex-1 text-base font-semibold text-text">{form.title}</Text>
           {paged ? (
             <Text className="text-sm text-text-muted" testID="form-page">
-              {reviewing ? "Review" : `${index + 1} of ${shown.length}`}
+              {reviewing
+                ? t("forms.review")
+                : t("forms.page", { page: index + 1, total: shown.length })}
             </Text>
           ) : null}
         </View>
@@ -155,7 +161,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
       ) : null}
       <View className="flex-row items-center gap-2 px-3 pb-3 pt-2">
         <Button
-          label="Dismiss"
+          label={t("common.dismiss")}
           variant="ghost"
           size="sm"
           disabled={busy}
@@ -166,7 +172,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
         <View className="flex-1" />
         {paged && index > 0 && !revising ? (
           <Button
-            label="Back"
+            label={t("common.back")}
             variant="secondary"
             size="sm"
             disabled={busy}
@@ -176,7 +182,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
         ) : null}
         {reviewing || !paged ? (
           <Button
-            label="Submit"
+            label={t("forms.submit")}
             size="sm"
             disabled={busy || !canSubmit(form, draft)}
             loading={pending === "submit"}
@@ -189,7 +195,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           />
         ) : (
           <Button
-            label={revising ? "Done" : "Next"}
+            label={revising ? t("common.done") : t("common.next")}
             size="sm"
             disabled={busy || invalid !== null}
             onPress={() => turnPage(revising ? shown.length : index + 1)}
@@ -209,12 +215,13 @@ interface ReviewRowProps {
 }
 
 function ReviewRow({ field, value, disabled, onPress }: ReviewRowProps) {
+  const { t } = useTranslation();
   const invalid = fieldError(field, value);
   const answer = answerText(field, value).join(", ");
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityHint="Opens the question to change its answer"
+      accessibilityHint={t("forms.reviewHint")}
       className={cn(
         "min-h-[48px] flex-row items-center gap-3 rounded-2xl border border-border bg-background px-3.5 py-2.5 active:bg-surface-hover",
         disabled && "opacity-50",
@@ -231,7 +238,7 @@ function ReviewRow({ field, value, disabled, onPress }: ReviewRowProps) {
             invalid ? "text-danger" : answer ? "text-text" : "text-text-faint",
           )}
         >
-          {invalid ?? (answer || "No answer")}
+          {invalid ?? (answer || t("forms.noAnswer"))}
         </Text>
       </View>
       <Icon name="pencil-outline" size={18} tone="textMuted" />
@@ -247,6 +254,7 @@ interface FieldControlProps {
 }
 
 function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
+  const { t } = useTranslation();
   switch (field.type) {
     case "text": {
       const text = typeof value === "string" ? value : "";
@@ -279,7 +287,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
             <Input
               value={isOption ? "" : text}
               onChangeText={onChange}
-              placeholder={field.placeholder ?? "Something else"}
+              placeholder={field.placeholder ?? t("forms.other")}
               testID={`form-field-${field.key}-custom`}
             />
           ) : null}
@@ -301,7 +309,10 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
           {([true, false] as const).map((answer) => (
             <OptionRow
               key={String(answer)}
-              option={{ value: answer ? "yes" : "no", label: answer ? "Yes" : "No" }}
+              option={{
+                value: answer ? "yes" : "no",
+                label: answer ? t("forms.yes") : t("forms.no"),
+              }}
               role="radio"
               icon={value === answer ? "radiobox-marked" : "radiobox-blank"}
               selected={value === answer}
@@ -344,7 +355,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
               onChangeText={(next) =>
                 onChange([...picked.filter((item) => listed.has(item)), ...(next ? [next] : [])])
               }
-              placeholder="Something else"
+              placeholder={t("forms.other")}
               testID={`form-field-${field.key}-custom`}
             />
           ) : null}
@@ -354,7 +365,7 @@ function FieldControl({ field, value, disabled, onChange }: FieldControlProps) {
     case "link":
       return (
         <OptionRow
-          option={{ value: field.url, label: "Open", description: field.url }}
+          option={{ value: field.url, label: t("forms.open"), description: field.url }}
           role="link"
           icon="open-in-new"
           selected={false}

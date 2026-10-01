@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { View, type GestureResponderEvent } from "react-native";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
@@ -29,6 +30,7 @@ export function Bubble({
   className,
   testID,
 }: BubbleProps) {
+  const { t } = useTranslation();
   const isUser = role === "user";
   const content =
     children ??
@@ -44,7 +46,7 @@ export function Bubble({
     <View className={cn("px-4", className)} testID={testID}>
       {isUser && onLongPress ? (
         <Pressable
-          accessibilityHint="Opens the message menu"
+          accessibilityHint={t("message.menuHint")}
           className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5 active:opacity-80"
           onLongPress={onLongPress}
         >

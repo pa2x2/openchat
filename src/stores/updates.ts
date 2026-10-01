@@ -29,6 +29,7 @@ import {
 } from "@/src/features/updates/releases";
 import { useSettingsStore, type UpdateChannel } from "./settings";
 import { mmkvStorage } from "./storage";
+import { t } from "@/src/i18n";
 
 export type UpdateStatus =
   | "idle"
@@ -113,18 +114,18 @@ function installErrorMessage(error: unknown): string {
     case "E_FILE_MISSING":
     case "E_CHECKSUM":
     case "E_INVALID_APK":
-      return "The download was damaged. Try again to download it afresh.";
+      return t("updates.errors.damaged");
     case "E_SIGNATURE_MISMATCH":
-      return "This update is signed with a different key than the installed app, so Android won't install it over this build. Install it from the releases page instead.";
+      return t("updates.errors.signature");
     case "E_NOT_NEWER":
     case "E_WRONG_PACKAGE":
-      return "The downloaded file isn't a newer version of this app.";
+      return t("updates.errors.notNewer");
     case "E_INSTALL_STORAGE":
-      return "There isn't enough free storage to install the update.";
+      return t("updates.errors.storage");
     case "E_INSTALL_INCOMPATIBLE":
-      return "This update isn't compatible with your device.";
+      return t("updates.errors.incompatible");
     default:
-      return `The update couldn't be installed. ${errorMessage(error, "")}`.trim();
+      return `${t("updates.errors.installFailed")} ${errorMessage(error, "")}`.trim();
   }
 }
 
@@ -208,7 +209,10 @@ export function createUpdatesStore(storage = mmkvStorage, overrides: Partial<Upd
               set(
                 auto
                   ? { status: get().release ? "available" : "idle" }
-                  : { status: "error", error: errorMessage(error, "The update check failed.") },
+                  : {
+                      status: "error",
+                      error: errorMessage(error, t("updates.errors.checkFailed")),
+                    },
               );
             } finally {
               if (checkController === controller) checkController = null;
@@ -236,7 +240,8 @@ export function createUpdatesStore(storage = mmkvStorage, overrides: Partial<Upd
                   : {
                       status: "error",
                       progress: null,
-                      error: `The download failed. ${errorMessage(error, "")}`.trim(),
+                      error:
+                        `${t("updates.errors.downloadFailed")} ${errorMessage(error, "")}`.trim(),
                     },
               );
               return;

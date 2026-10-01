@@ -1,25 +1,29 @@
 import type { ModelInfo, ModelVariant } from "@/src/domain";
+import { t } from "@/src/i18n";
 import type { OpenCodeClient } from "./client";
 
 /**
- * Labels for the variant ids OpenCode generates for reasoning models. Each
- * one maps to the upstream provider's effort or thinking setting.
+ * The variant ids OpenCode generates for reasoning models. Each one maps to
+ * the upstream provider's effort or thinking setting.
  */
-const VARIANT_LABELS: Record<string, string> = {
-  none: "Off",
-  thinking: "On",
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "Extra high",
-  max: "Max",
-};
+const KNOWN_VARIANTS = [
+  "none",
+  "thinking",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
+function isKnownVariant(id: string): id is (typeof KNOWN_VARIANTS)[number] {
+  return (KNOWN_VARIANTS as readonly string[]).includes(id);
+}
 
 /** A variant id as a label; ids from custom server config are shown as written. */
 export function variantLabel(id: string): string {
-  const known = VARIANT_LABELS[id];
-  if (known) return known;
+  if (isKnownVariant(id)) return t(`models.variant.${id}`);
   const words = id.replace(/[-_]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Modal } from "./Modal";
@@ -50,6 +51,7 @@ const variantFor: Record<NonNullable<DialogAction["style"]>, ButtonVariant> = {
 
 /** Mounted once, at the root, inside the view that seeds the theme variables. */
 export function DialogHost() {
+  const { t } = useTranslation();
   const { colors } = useAppTheme();
   const shown = useDialogStore((state) => state.request);
   const open = useDialogStore((state) => state.open);
@@ -68,7 +70,7 @@ export function DialogHost() {
     action?.onPress?.(value);
   }
 
-  const actions = shown?.actions ?? [{ label: "OK" }];
+  const actions = shown?.actions ?? [{ label: t("common.ok") }];
   const dismiss = () => close(actions.find((action) => action.style === "cancel"));
 
   return (
@@ -89,7 +91,7 @@ export function DialogHost() {
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: 0.4 }]}
           onPress={dismiss}
-          accessibilityLabel="Close dialog"
+          accessibilityLabel={t("common.closeDialog")}
         />
         {shown ? (
           <View

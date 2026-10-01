@@ -3,7 +3,7 @@
  *
  * Holds the last model picked per provider, used when a chat has no explicit
  * model (new chats and chats the server reports without one), the
- * appearance and colour preferences, haptics, the mode new chats start
+ * language, the appearance and colour preferences, haptics, the mode new chats start
  * in, where the chat controls sit, the update channel and automatic checks,
  * whether the notification permission was already asked for, and how the
  * usage screen was last left.
@@ -11,6 +11,7 @@
 
 import Constants from "expo-constants";
 import type { ModelRef, ProviderId } from "@/src/domain";
+import type { LanguageSetting } from "@/src/i18n";
 import { isPrerelease } from "@/src/features/updates/version";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -48,6 +49,8 @@ export type UsageMeasure = "tokens" | "cost" | "requests";
 interface SettingsStoreState {
   lastModels: Record<ProviderId, ModelRef>;
   setLastModel: (providerId: ProviderId, model: ModelRef) => void;
+  language: LanguageSetting;
+  setLanguage: (language: LanguageSetting) => void;
   appearance: Appearance;
   setAppearance: (appearance: Appearance) => void;
   colorSource: ColorSource;
@@ -78,6 +81,8 @@ export function createSettingsStore(
     persist(
       (set) => ({
         lastModels: {},
+        language: "system",
+        setLanguage: (language) => set({ language }),
         appearance: "system",
         setAppearance: (appearance) => set({ appearance }),
         colorSource: "default",

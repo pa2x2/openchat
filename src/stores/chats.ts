@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
 import { mmkvStorage } from "./storage";
+import { t } from "@/src/i18n";
 
 interface ChatsStoreState {
   chats: ChatSummary[];
@@ -119,7 +120,7 @@ export function createChatsStore(storage = mmkvStorage) {
           try {
             const provider = await getProvider();
             if (!provider) {
-              set({ loading: false, error: "Not connected." });
+              set({ loading: false, error: t("errors.notConnectedShort") });
               return;
             }
             const chats = await provider.listChats();
@@ -128,7 +129,7 @@ export function createChatsStore(storage = mmkvStorage) {
             set({
               loading: false,
               error:
-                error instanceof Error && error.message ? error.message : "Could not load chats.",
+                error instanceof Error && error.message ? error.message : t("drawer.loadFailed"),
             });
           }
         },

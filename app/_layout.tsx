@@ -1,11 +1,14 @@
 import "../global.css";
+import { applyLanguage } from "@/src/i18n";
 
 import { useEffect } from "react";
 import { Platform, View } from "react-native";
 import { requireNativeModule } from "expo";
 import { Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useLocales } from "expo-localization";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useTranslation } from "react-i18next";
 import { colorScheme } from "nativewind";
 import { watchTurns } from "@/src/features/notifications/turnNotifications";
 import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
@@ -29,10 +32,15 @@ const ExpoNavigationBar =
 // alone, a launch with a forced scheme would draw its first frame in the
 // system one.
 colorScheme.set(useSettingsStore.getState().appearance);
+applyLanguage(useSettingsStore.getState().language);
 
 export default function RootLayout() {
   const { scheme, vars, navigationTheme } = useAppTheme();
   const appearance = useSettingsStore((state) => state.appearance);
+  const language = useSettingsStore((state) => state.language);
+  // Changes when the device's languages do, which matters on "system".
+  const locales = useLocales();
+  const { t } = useTranslation();
   useUpdateChecks();
   useSystemPalettesSync();
 
@@ -41,6 +49,10 @@ export default function RootLayout() {
   useEffect(() => {
     colorScheme.set(appearance);
   }, [appearance]);
+
+  useEffect(() => {
+    applyLanguage(language);
+  }, [language, locales]);
 
   useEffect(() => {
     // Rejects if the activity is already gone; the next one reapplies this.
@@ -64,8 +76,8 @@ export default function RootLayout() {
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />
           <Stack screenOptions={{ headerShadowVisible: false }}>
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
-            <Stack.Screen name="settings" options={{ title: "Settings" }} />
-            <Stack.Screen name="usage" options={{ title: "Usage" }} />
+            <Stack.Screen name="settings" options={{ title: t("settings.title") }} />
+            <Stack.Screen name="usage" options={{ title: t("usage.title") }} />
           </Stack>
           {/* Here rather than in a screen, so a launch check can offer an
               update over whichever screen is open. */}

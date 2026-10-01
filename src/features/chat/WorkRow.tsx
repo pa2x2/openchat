@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -19,12 +20,13 @@ function ReasoningText({ text }: { text: string }) {
 }
 
 function ThoughtItem({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
     <View>
       <Pressable
-        accessibilityHint={expanded ? "Hides the model reasoning" : "Shows the model reasoning"}
-        accessibilityLabel="Thought"
+        accessibilityHint={expanded ? t("reply.hideReasoning") : t("reply.showReasoning")}
+        accessibilityLabel={t("reply.thought")}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-2 self-start py-1"
@@ -32,7 +34,7 @@ function ThoughtItem({ text }: { text: string }) {
         onPress={() => setExpanded((current) => !current)}
       >
         <Icon name="brain" size={15} tone="textMuted" />
-        <Text className="text-[14.5px] text-text-muted">Thought</Text>
+        <Text className="text-[14.5px] text-text-muted">{t("reply.thought")}</Text>
         <Icon name={expanded ? "chevron-down" : "chevron-right"} size={16} tone="textMuted" />
       </Pressable>
       {expanded ? <ReasoningText text={text} /> : null}
@@ -41,6 +43,7 @@ function ThoughtItem({ text }: { text: string }) {
 }
 
 function WorkItems({ items }: { items: WorkItem[] }) {
+  const { t } = useTranslation();
   // A row of thinking alone opens straight onto the thought.
   if (items.length === 1 && items[0].type === "reasoning") {
     return (
@@ -66,7 +69,7 @@ function WorkItems({ items }: { items: WorkItem[] }) {
             <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
               {toolLabel(item.tool)}
               {item.tool.status === "failed" ? (
-                <Text className="text-danger"> · Failed</Text>
+                <Text className="text-danger"> · {t("reply.toolFailed")}</Text>
               ) : null}
             </Text>
           </View>
@@ -82,6 +85,8 @@ function WorkItems({ items }: { items: WorkItem[] }) {
  * what the reply is doing now.
  */
 export function WorkRow({ block }: { block: WorkBlock }) {
+  // Re-renders the labels `workRow` builds when the language changes.
+  useTranslation();
   const [expanded, setExpanded] = useState(false);
   const { icon, label } = workRow(block);
   const expandable = block.items.length > 0;

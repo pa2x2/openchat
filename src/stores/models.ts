@@ -18,6 +18,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getProvider } from "@/src/lib/providerFactory";
 import { mmkvStorage } from "./storage";
+import { t } from "@/src/i18n";
 
 interface ModelsStoreState {
   models: ModelInfo[];
@@ -83,7 +84,7 @@ export function createModelsStore(storage = mmkvStorage) {
           try {
             const provider = await getProvider();
             if (!provider) {
-              set({ loading: false, error: "Not connected." });
+              set({ loading: false, error: t("errors.notConnectedShort") });
               return;
             }
             const models = await provider.listModels();
@@ -92,7 +93,7 @@ export function createModelsStore(storage = mmkvStorage) {
             set({
               loading: false,
               error:
-                error instanceof Error && error.message ? error.message : "Could not load models.",
+                error instanceof Error && error.message ? error.message : t("models.loadFailed"),
             });
           }
           if (stale) {

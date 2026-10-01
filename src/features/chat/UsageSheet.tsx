@@ -4,6 +4,7 @@
  * sent, and a part with nothing is left out.
  */
 
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import type { Money, TokenUsage } from "@/src/domain";
 import { Group, GroupLabel } from "@/src/ui/ListGroup";
@@ -42,29 +43,29 @@ function FigureRow({ label, value }: Figure) {
 }
 
 function ContextCard({ context }: { context: ContextUse }) {
+  const { t } = useTranslation();
   const { colors } = useAppTheme();
   const used = formatTokensShort(context.tokens);
   if (!context.window) {
     return (
       <Group className="bg-raised">
         <View className="min-h-[42px] justify-center px-4">
-          <Text className="text-[15px] text-text">{used} tokens</Text>
+          <Text className="text-[15px] text-text">{t("context.tokenCount", { tokens: used })}</Text>
         </View>
       </Group>
     );
   }
   const share = contextShare(context.tokens, context.window);
+  const usedOf = t("context.tokensOf", { used, window: formatTokensShort(context.window) });
   return (
     <Group className="bg-raised">
       <View
         accessible
-        accessibilityLabel={`${used} of ${formatTokensShort(context.window)} tokens, ${formatShare(share)}`}
+        accessibilityLabel={`${usedOf}, ${formatShare(share)}`}
         className="px-4 pb-3.5 pt-3"
       >
         <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-[15px] text-text">
-            {used} of {formatTokensShort(context.window)} tokens
-          </Text>
+          <Text className="text-[15px] text-text">{usedOf}</Text>
           <Text className="text-[15px] font-medium tabular-nums text-text">
             {formatShare(share)}
           </Text>
@@ -81,30 +82,30 @@ function ContextCard({ context }: { context: ContextUse }) {
 }
 
 export function UsageSheet({ visible, onClose, context, usage, cost }: UsageSheetProps) {
+  const { t } = useTranslation();
   const costText = formatCost(cost);
   const totals: Figure[] = [
     ...tokenFigures(usage),
-    ...(costText ? [{ label: "Cost", value: costText }] : []),
+    ...(costText ? [{ label: t("usage.figures.cost"), value: costText }] : []),
   ];
   return (
-    <Sheet visible={visible} onClose={onClose} title="Chat usage" testID="usage-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t("usage.sheet.title")} testID="usage-sheet">
       {context ? (
         <>
-          <GroupLabel>Context</GroupLabel>
+          <GroupLabel>{t("usage.sheet.context")}</GroupLabel>
           <ContextCard context={context} />
         </>
       ) : null}
       {totals.length > 0 ? (
         <>
-          <GroupLabel>Everything this chat used</GroupLabel>
+          <GroupLabel>{t("usage.sheet.totals")}</GroupLabel>
           <Group className="bg-raised" testID="usage-totals">
             {totals.map((figure) => (
               <FigureRow key={figure.label} {...figure} />
             ))}
           </Group>
           <Text className="px-3 pt-2 text-[12.5px] leading-[17px] text-text-muted">
-            Counts naming the chat and replies you regenerated, so it can be more than the chat’s
-            replies add up to.
+            {t("usage.sheet.totalsNote")}
           </Text>
         </>
       ) : null}

@@ -9,6 +9,7 @@
 import { OpenCode, type OpenCodeClient } from "@opencode/client";
 import { encode as base64 } from "js-base64";
 import { fetch as streamingFetch } from "expo/fetch";
+import { t } from "@/src/i18n";
 import { ConnectionError, type ConnectionConfig } from "@/src/providers/types";
 
 export type { OpenCodeClient };
@@ -20,16 +21,16 @@ const AUTH_USERNAME = "opencode";
 export function normalizeBaseUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
-    throw new ConnectionError("invalid-url", "Enter a server URL.", false);
+    throw new ConnectionError("invalid-url", t("errors.connection.urlMissing"), false);
   }
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
-    throw new ConnectionError("invalid-url", "That does not look like a valid URL.", false);
+    throw new ConnectionError("invalid-url", t("errors.connection.urlInvalid"), false);
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new ConnectionError("invalid-url", "The URL must start with http:// or https://.", false);
+    throw new ConnectionError("invalid-url", t("errors.connection.urlScheme"), false);
   }
   return trimmed.replace(/\/+$/, "");
 }
@@ -68,21 +69,23 @@ export function toConnectionError(error: unknown): ConnectionError {
     const cause = error.cause;
     if (reason === "Transport") {
       if (cause instanceof Error && cause.name === "AbortError") {
-        return new ConnectionError("timeout", "The server did not respond in time.", true);
+        return new ConnectionError("timeout", t("errors.connection.timeout"), true);
       }
-      return new ConnectionError("unreachable", "Could not reach the server.", true);
+      return new ConnectionError("unreachable", t("errors.connection.unreachable"), true);
     }
     if (reason === "UnexpectedStatus") {
       const status = (cause as { status?: number } | undefined)?.status ?? 0;
       if (status === 401 || status === 403) {
-        return new ConnectionError("unauthorized", "The server rejected the request.", false);
+        return new ConnectionError("unauthorized", t("errors.connection.unauthorized"), false);
       }
       if (status >= 500) {
-        return new ConnectionError("server-error", "The server reported an internal error.", true);
+        return new ConnectionError("server-error", t("errors.connection.serverError"), true);
       }
       return new ConnectionError(
         "unknown",
-        `The server responded with status ${status || "error"}.`,
+        status
+          ? t("errors.connection.status", { status })
+          : t("errors.connection.unexpectedStatus"),
         false,
       );
     }
@@ -91,13 +94,13 @@ export function toConnectionError(error: unknown): ConnectionError {
       // /api/info) arrives with an empty, non-JSON body — the stock server's
       // unauthenticated response — losing the status. Treat it as an auth
       // rejection; it does not occur on happy-path responses.
-      return new ConnectionError("unauthorized", "The server rejected the request.", false);
+      return new ConnectionError("unauthorized", t("errors.connection.unauthorized"), false);
     }
-    return new ConnectionError("unknown", "Unexpected error.", true);
+    return new ConnectionError("unknown", t("errors.unexpected"), true);
   }
   if (error instanceof Error) {
     if (error.name === "AbortError") {
-      return new ConnectionError("timeout", "The server did not respond in time.", true);
+      return new ConnectionError("timeout", t("errors.connection.timeout"), true);
     }
     // Last-resort transport heuristics (kept for injected fetch impls).
     const message = error.message ?? "";
@@ -108,9 +111,9 @@ export function toConnectionError(error: unknown): ConnectionError {
       message.includes("ConnectException") ||
       message.includes("UnknownHostException")
     ) {
-      return new ConnectionError("unreachable", "Could not reach the server.", true);
+      return new ConnectionError("unreachable", t("errors.connection.unreachable"), true);
     }
-    return new ConnectionError("unknown", message || "Unexpected error.", true);
+    return new ConnectionError("unknown", message || t("errors.unexpected"), true);
   }
-  return new ConnectionError("unknown", "Unexpected error.", true);
+  return new ConnectionError("unknown", t("errors.unexpected"), true);
 }

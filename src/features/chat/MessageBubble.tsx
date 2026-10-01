@@ -1,10 +1,12 @@
 import * as Clipboard from "expo-clipboard";
 import { memo, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { totalTokens, type Message, type TurnActivity } from "@/src/domain";
+import { t } from "@/src/i18n";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
@@ -38,14 +40,15 @@ export interface MessageBubbleProps {
 
 /** A terminal outcome worth a line under the message; live states show inline, errors in a card. */
 function statusFor(message: Message): string | undefined {
-  return message.status === "interrupted" ? "Stopped" : undefined;
+  return message.status === "interrupted" ? t("reply.stopped") : undefined;
 }
 
 function CopyButton({ text, label, testID }: { text: string; label: string; testID: string }) {
+  const { t } = useTranslation();
   const { copied, copy } = useCopyToClipboard();
   return (
     <Pressable
-      accessibilityLabel={copied ? "Copied" : label}
+      accessibilityLabel={copied ? t("common.copied") : label}
       accessibilityRole="button"
       className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
       onPress={() => copy(text)}
@@ -59,14 +62,17 @@ function CopyButton({ text, label, testID }: { text: string; label: string; test
 /** What a running reply has used so far; it moves when a step ends, not as text arrives. */
 function runningCount(message: Message): string | null {
   if (!message.usage) return null;
-  const cost = formatCost(message.cost);
-  return [`${formatTokensShort(totalTokens(message.usage))} tokens`, cost]
+  const used = [
+    t("context.tokenCount", { tokens: formatTokensShort(totalTokens(message.usage)) }),
+    formatCost(message.cost),
+  ]
     .filter(Boolean)
-    .join(" · ")
-    .concat(" so far");
+    .join(" · ");
+  return t("reply.soFar", { used });
 }
 
 function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -77,20 +83,20 @@ function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => 
         <Icon name="alert-circle-outline" size={20} tone="danger" />
       </View>
       <View className="flex-1">
-        <Text className="text-[15px] font-medium text-text">The reply didn’t finish</Text>
+        <Text className="text-[15px] font-medium text-text">{t("reply.failedTitle")}</Text>
         {error ? (
           <Text className="mt-0.5 text-[13.5px] leading-[18px] text-text-muted">{error}</Text>
         ) : null}
         {onRetry ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityHint="Runs this reply again and replaces it"
+            accessibilityHint={t("reply.regenerateHint")}
             className="mt-2.5 h-9 flex-row items-center gap-1.5 self-start rounded-full bg-raised-hover px-3.5 active:opacity-80"
             onPress={onRetry}
             testID="reply-retry"
           >
             <Icon name="refresh" size={17} />
-            <Text className="text-sm font-medium text-text">Retry</Text>
+            <Text className="text-sm font-medium text-text">{t("reply.retry")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -104,13 +110,14 @@ function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => 
  * starts a selection.
  */
 function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         <View className="h-14 justify-center px-5">
-          <Text className="text-lg font-medium text-text">Select text</Text>
+          <Text className="text-lg font-medium text-text">{t("message.selectText")}</Text>
         </View>
         <ScrollView contentContainerClassName="px-5 pb-6 pt-2">
           <Text
@@ -123,7 +130,12 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
           </Text>
         </ScrollView>
         <View className="px-4 pt-2" style={{ paddingBottom: insets.bottom + 12 }}>
-          <Button label="Done" variant="secondary" onPress={onClose} testID="select-text-close" />
+          <Button
+            label={t("common.done")}
+            variant="secondary"
+            onPress={onClose}
+            testID="select-text-close"
+          />
         </View>
       </View>
     </Modal>
@@ -136,19 +148,20 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
  * on the message that allows it, edit.
  */
 function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Message) => void }) {
+  const { t } = useTranslation();
   const [menuAt, setMenuAt] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
 
   const items: MenuItem[] = [
     {
-      label: "Copy",
+      label: t("message.copy"),
       icon: "content-copy",
       onPress: () => void Clipboard.setStringAsync(message.text).catch(() => undefined),
       testID: "message-menu-copy",
     },
     {
-      label: "Select text",
+      label: t("message.selectText"),
       icon: "cursor-text",
       onPress: () => setSelecting(true),
       testID: "message-menu-select",
@@ -156,7 +169,7 @@ function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Me
   ];
   if (onEdit) {
     items.push({
-      label: "Edit",
+      label: t("message.edit"),
       icon: "pencil-outline",
       onPress: () => onEdit(message),
       testID: "message-menu-edit",
@@ -201,15 +214,19 @@ export const MessageBubble = memo(function MessageBubble({
   dimmed = false,
   error = null,
 }: MessageBubbleProps) {
+  const { t, i18n } = useTranslation();
   const streaming = message.status === "pending" || message.status === "streaming";
   const attachments = message.attachments ?? [];
   const isUser = message.role === "user";
   const hasText = message.text.length > 0;
   const [foldOpen, setFoldOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // The layout's labels are in the language they were made in.
+  const language = i18n.language;
   const layout = useMemo(
     () => (isUser ? null : layoutReply(message, { showReasoning, activity })),
-    [isUser, message, showReasoning, activity],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isUser, message, showReasoning, activity, language],
   );
 
   if (isUser || !layout) {
@@ -255,9 +272,7 @@ export const MessageBubble = memo(function MessageBubble({
       {layout.fold ? (
         <View className="mb-1 self-stretch">
           <Pressable
-            accessibilityHint={
-              foldOpen ? "Hides how the reply was worked out" : "Shows how the reply was worked out"
-            }
+            accessibilityHint={foldOpen ? t("reply.hideFold") : t("reply.showFold")}
             accessibilityLabel={layout.fold.label}
             accessibilityRole="button"
             accessibilityState={{ expanded: foldOpen }}
@@ -296,12 +311,12 @@ export const MessageBubble = memo(function MessageBubble({
       ) : layout.answer || canRegenerate || hasDetails ? (
         <View className="-ml-2 mt-1 flex-row">
           {layout.answer ? (
-            <CopyButton label="Copy reply" testID="copy-reply-button" text={layout.answer} />
+            <CopyButton label={t("reply.copy")} testID="copy-reply-button" text={layout.answer} />
           ) : null}
           {canRegenerate ? (
             <Pressable
-              accessibilityHint="Runs this reply again and replaces it"
-              accessibilityLabel="Regenerate reply"
+              accessibilityHint={t("reply.regenerateHint")}
+              accessibilityLabel={t("reply.regenerate")}
               accessibilityRole="button"
               className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
               onPress={onRegenerate}
@@ -312,10 +327,8 @@ export const MessageBubble = memo(function MessageBubble({
           ) : null}
           {hasDetails ? (
             <Pressable
-              accessibilityHint={
-                detailsOpen ? "Hides what the reply used" : "Shows what the reply used"
-              }
-              accessibilityLabel="Reply details"
+              accessibilityHint={detailsOpen ? t("reply.hideDetails") : t("reply.showDetails")}
+              accessibilityLabel={t("reply.details")}
               accessibilityRole="button"
               accessibilityState={{ expanded: detailsOpen }}
               className={cn(

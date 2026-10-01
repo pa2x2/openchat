@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Image, StyleSheet, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Modal } from "@/src/ui/Modal";
@@ -85,10 +86,11 @@ export function AttachmentChip({
   onRemove?: (attachment: Attachment) => void;
   size?: "small" | "large";
 }) {
+  const { t } = useTranslation();
   const bytes = formatBytes(attachment.size);
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()!.toUpperCase()
-    : "FILE";
+    : t("attach.fileBadge");
   // A transcript read from the cache has the file's name but not its payload
   // yet, so there is nothing to show a thumbnail of until the server's copy
   // arrives; the chip falls back to the file's type.
@@ -103,7 +105,7 @@ export function AttachmentChip({
     <View testID={`attachment-chip-${attachment.name}`}>
       {preview ? (
         <Pressable
-          accessibilityLabel={`View ${attachment.name}`}
+          accessibilityLabel={t("attach.view", { name: attachment.name })}
           accessibilityRole="imagebutton"
           onPress={() => setViewing(true)}
         >
@@ -142,7 +144,7 @@ export function AttachmentChip({
       )}
       {onRemove ? (
         <Pressable
-          accessibilityLabel={`Remove ${attachment.name}`}
+          accessibilityLabel={t("attach.remove", { name: attachment.name })}
           accessibilityRole="button"
           className="absolute -right-1.5 -top-1.5 h-[22px] w-[22px] items-center justify-center rounded-full bg-text"
           hitSlop={8}
@@ -161,11 +163,12 @@ export function AttachmentChip({
 
 /** Full-screen view of an image attachment; a tap anywhere or back closes it. */
 function ImageViewer({ name, uri, onClose }: { name: string; uri: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   return (
     <Modal visible animationType="fade" onRequestClose={onClose}>
       <Pressable
-        accessibilityLabel="Close image"
+        accessibilityLabel={t("attach.closeImage")}
         className="flex-1 bg-black"
         onPress={onClose}
         testID="attachment-viewer"

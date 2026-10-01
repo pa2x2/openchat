@@ -8,6 +8,7 @@
  */
 
 import type { ChatForm, FormAnswer, FormField, FormResult, FormValue } from "@/src/domain";
+import { t } from "@/src/i18n";
 
 export type DraftValue = string | boolean | string[];
 export type FormDraft = Record<string, DraftValue>;
@@ -75,42 +76,42 @@ export function fieldError(field: FormField, value: DraftValue | undefined): str
   const answer = toValue(field, value);
   if (answer === undefined) {
     if (field.type === "number" && typeof value === "string" && value.trim() !== "") {
-      return "Enter a number.";
+      return t("forms.errors.number");
     }
-    return field.required ? "Required." : null;
+    return field.required ? t("forms.errors.required") : null;
   }
   switch (field.type) {
     case "text": {
       const text = answer as string;
       if (field.minLength !== undefined && text.length < field.minLength) {
-        return `Use at least ${field.minLength} characters.`;
+        return t("forms.errors.minLength", { count: field.minLength });
       }
       if (field.maxLength !== undefined && text.length > field.maxLength) {
-        return `Use at most ${field.maxLength} characters.`;
+        return t("forms.errors.maxLength", { count: field.maxLength });
       }
       if (field.pattern !== undefined && !matchesPattern(field.pattern, text)) {
-        return "That doesn't look right.";
+        return t("forms.errors.pattern");
       }
       return null;
     }
     case "number": {
       const number = answer as number;
-      if (field.integer && !Number.isInteger(number)) return "Enter a whole number.";
+      if (field.integer && !Number.isInteger(number)) return t("forms.errors.integer");
       if (field.minimum !== undefined && number < field.minimum) {
-        return `Enter ${field.minimum} or more.`;
+        return t("forms.errors.minimum", { value: field.minimum });
       }
       if (field.maximum !== undefined && number > field.maximum) {
-        return `Enter ${field.maximum} or less.`;
+        return t("forms.errors.maximum", { value: field.maximum });
       }
       return null;
     }
     case "multiselect": {
       const count = (answer as string[]).length;
       if (field.minItems !== undefined && count < field.minItems) {
-        return `Pick at least ${field.minItems}.`;
+        return t("forms.errors.minItems", { count: field.minItems });
       }
       if (field.maxItems !== undefined && count > field.maxItems) {
-        return `Pick at most ${field.maxItems}.`;
+        return t("forms.errors.maxItems", { count: field.maxItems });
       }
       return null;
     }
@@ -156,7 +157,7 @@ export function fieldQuestion(field: FormField): string {
 export function answerText(field: FormField, value: DraftValue | undefined): string[] {
   const answer = toValue(field, value);
   if (answer === undefined) return [];
-  if (typeof answer === "boolean") return [answer ? "Yes" : "No"];
+  if (typeof answer === "boolean") return [answer ? t("forms.yes") : t("forms.no")];
   const options = field.type === "text" || field.type === "multiselect" ? field.options : undefined;
   const label = (item: string) => options?.find((option) => option.value === item)?.label ?? item;
   return Array.isArray(answer) ? answer.map(label) : [label(String(answer))];

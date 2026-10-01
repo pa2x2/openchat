@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useWindowDimensions, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -36,6 +37,7 @@ const Line = memo(function Line({ tokens }: { tokens: CodeLine }) {
 });
 
 export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
+  const { t } = useTranslation();
   const lines = useCodeLines(code, language, theme.scheme, live);
   const { copied, copy } = useCopyToClipboard();
   const { height } = useWindowDimensions();
@@ -44,7 +46,7 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
 
   const copyButton = (
     <Pressable
-      accessibilityLabel={copied ? "Copied" : "Copy code"}
+      accessibilityLabel={copied ? t("common.copied") : t("markdown.copyCode")}
       accessibilityRole="button"
       hitSlop={6}
       onPress={() => copy(code)}

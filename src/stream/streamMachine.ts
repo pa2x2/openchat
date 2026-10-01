@@ -45,6 +45,7 @@ import type { ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
 import { withFormRecords } from "@/src/stores/formRecords";
 import { useMessagesStore } from "@/src/stores/messages";
+import { t } from "@/src/i18n";
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 15_000;
@@ -233,7 +234,7 @@ async function runTurn(
   const consuming = consumeEvents(turn);
   try {
     const delivery = getProvider().then((provider) => {
-      if (!provider) throw new Error("Not connected. Open Settings to connect.");
+      if (!provider) throw new Error(t("errors.notConnected"));
       return options.deliver(provider, userMessage);
     });
     // Some provider event iterators do not promptly close when their signal is
@@ -257,7 +258,7 @@ async function runTurn(
 }
 
 function describe(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "The reply failed.";
+  return error instanceof Error && error.message ? error.message : t("errors.replyFailed");
 }
 
 /**
@@ -297,7 +298,7 @@ interface Edit {
 async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   // A repeated tap on the same rerun; the first one is already under way.
   if (startingTurns.has(chatId)) return { ok: false };
-  if (isTurnLive(chatId)) return { ok: false, error: "Wait for the current reply to finish." };
+  if (isTurnLive(chatId)) return { ok: false, error: t("errors.turnLive") };
   // The rerun only goes live once the transcript is fetched and the rollback
   // staged. Until then it holds the chat, so a second tap or a send cannot
   // start a turn beside it and leave this one's reply "Thinking" forever.
@@ -315,7 +316,7 @@ async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcom
 
 async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   const provider = await getProvider();
-  if (!provider) return { ok: false, error: "Not connected. Open Settings to connect." };
+  if (!provider) return { ok: false, error: t("errors.notConnected") };
 
   // The transcript has to come from the server first: a native rerun
   // addresses the turn by its backend message id, and the ids of a message
@@ -324,21 +325,21 @@ async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
   await store.fetchMessages(chatId);
 
   const target = lastTurn(useMessagesStore.getState().byChat[chatId] ?? []);
-  if (!target) return { ok: false, error: "There is nothing to regenerate yet." };
+  if (!target) return { ok: false, error: t("errors.nothingToRegenerate") };
   if (edit && target.user.text !== edit.original) {
-    return { ok: false, error: "The chat changed since you started editing. Try again." };
+    return { ok: false, error: t("errors.chatChanged") };
   }
   if (!canResendAttachments(target.user.attachments)) {
     return {
       ok: false,
-      error: "The attached file is no longer available. Re-attach it and try again.",
+      error: t("errors.attachmentGone"),
     };
   }
 
   const native = provider.capabilities.regenerate && typeof provider.regenerate === "function";
-  if (edit && !native) return { ok: false, error: "This server can't edit messages." };
+  if (edit && !native) return { ok: false, error: t("errors.editUnsupported") };
   if (native && target.user.id.startsWith(LOCAL_ID_PREFIX)) {
-    return { ok: false, error: "The server transcript is not available yet. Try again." };
+    return { ok: false, error: t("errors.transcriptUnavailable") };
   }
 
   const carried: Pick<UserMessage, "text" | "attachments"> = {
@@ -563,7 +564,7 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
     while (!controller.signal.aborted && !turn.finished) {
       const provider = await getProvider();
       if (!provider) {
-        failTurn(turn, new Error("Not connected. Open Settings to connect."));
+        failTurn(turn, new Error(t("errors.notConnected")));
         return;
       }
       let lastActivity = Date.now();
@@ -712,7 +713,7 @@ async function settleForm(
   settle: (provider: ChatProvider) => Promise<void> | undefined,
 ): Promise<void> {
   const provider = await getProvider();
-  if (!provider) throw new Error("Not connected. Open Settings to connect.");
+  if (!provider) throw new Error(t("errors.notConnected"));
   try {
     await settle(provider);
   } catch (error) {
@@ -832,10 +833,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
         completedAt: turn.draft.completedAt,
       });
       if (!produced) {
-        messages.setTurnError(
-          turn.chatId,
-          "The server finished the run without returning a reply. It may have rejected the model or provider request.",
-        );
+        messages.setTurnError(turn.chatId, t("errors.server.noReply"));
       }
       break;
     }
@@ -971,7 +969,7 @@ async function reconcile(turn: LiveTurn, { over = false } = {}): Promise<void> {
       turn.draft = lastAssistant;
       messages.setMessages(turn.chatId, fetched);
       if (!messages.turnErrors[turn.chatId]) {
-        messages.setTurnError(turn.chatId, "The server reported an error.");
+        messages.setTurnError(turn.chatId, t("errors.server.error"));
       }
       endTurn(turn);
       return;
@@ -1059,7 +1057,7 @@ function failTurn(turn: LiveTurn, error: unknown): void {
   const isCurrent = liveTurns.get(turn.chatId) === turn;
   if (isCurrent) liveTurns.delete(turn.chatId);
   const messages = useMessagesStore.getState();
-  const message = error instanceof Error && error.message ? error.message : "The reply failed.";
+  const message = error instanceof Error && error.message ? error.message : t("errors.replyFailed");
   if (isCurrent) {
     messages.patchMessage(turn.chatId, turn.draft.id, { status: "error" });
     messages.setTurnError(turn.chatId, message);

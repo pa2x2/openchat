@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import { cn } from "@/src/lib/cn";
 import { Pulse } from "./Pulse";
+import { useTranslation } from "react-i18next";
 
 /**
  * Size and shape come from `className`. A block does not animate by itself:
@@ -12,7 +13,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function SkeletonGroup({
   children,
-  label = "Loading",
+  label,
   className,
   testID,
 }: {
@@ -21,8 +22,14 @@ export function SkeletonGroup({
   className?: string;
   testID?: string;
 }) {
+  const { t } = useTranslation();
   return (
-    <View accessible accessibilityLabel={label} accessibilityState={{ busy: true }} testID={testID}>
+    <View
+      accessible
+      accessibilityLabel={label ?? t("common.loading")}
+      accessibilityState={{ busy: true }}
+      testID={testID}
+    >
       <Pulse>
         <View className={className}>{children}</View>
       </Pulse>

@@ -8,6 +8,7 @@
 
 import type { UpdateChannel } from "@/src/stores/settings";
 import { compareVersions, isPrerelease, parseVersion, type Version } from "./version";
+import { t } from "@/src/i18n";
 
 export const RELEASES_REPO = "pa2x2/openchat";
 
@@ -144,18 +145,18 @@ export async function fetchReleases(
     });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new Error("Couldn't reach GitHub. Check your internet connection.");
+    throw new Error(t("updates.errors.githubUnreachable"));
   }
   if (
     (response.status === 403 || response.status === 429) &&
     response.headers.get("x-ratelimit-remaining") === "0"
   ) {
-    throw new Error("GitHub is limiting update checks from this network. Try again later.");
+    throw new Error(t("updates.errors.githubRateLimited"));
   }
   if (!response.ok) {
-    throw new Error(`GitHub answered the update check with HTTP ${response.status}.`);
+    throw new Error(t("updates.errors.githubStatus", { status: response.status }));
   }
   const data: unknown = await response.json();
-  if (!Array.isArray(data)) throw new Error("GitHub sent an unexpected release list.");
+  if (!Array.isArray(data)) throw new Error(t("updates.errors.githubUnexpected"));
   return data as GitHubRelease[];
 }

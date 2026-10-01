@@ -1,12 +1,13 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppState, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Composer, type ComposerHandle } from "./Composer";
-import { AUTO_LABEL, ModelSheet } from "./ModelSheet";
+import { ModelSheet } from "./ModelSheet";
 import { AttachSheet } from "./AttachSheet";
 import { ChatHeader, ChatTitleBar, HEADER_HEIGHT, TITLE_BAR_HEIGHT } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
@@ -88,6 +89,7 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
  */
 export function ChatScreen({ chatId }: { chatId: string }) {
   const isDraft = chatId === NEW_CHAT;
+  const { t } = useTranslation();
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
@@ -180,7 +182,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const variantLabel = currentModel?.variant
     ? (variants.find((variant) => variant.id === currentModel.variant)?.label ??
       currentModel.variant)
-    : AUTO_LABEL;
+    : t("models.auto");
 
   // Cold open: reconcile the transcript from the server (cache first), bury
   // streams this app instance is not going to continue, and pick up a run
@@ -269,7 +271,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       const provider = await getProvider();
       if (!provider) {
         setAttachments(files);
-        setBanner("Not connected. Open Settings to connect to a server.");
+        setBanner(t("errors.notConnected"));
         return false;
       }
       if (isDraft) {
@@ -292,7 +294,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       return true;
     } catch (error) {
       setAttachments(files);
-      setBanner(error instanceof Error && error.message ? error.message : "Could not send.");
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
       return false;
     } finally {
       busy.current = false;
@@ -351,7 +353,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (picked.length === 0) return;
       setAttachments((current) => [...current, ...picked]);
     } catch (error) {
-      setBanner(error instanceof Error && error.message ? error.message : "Could not attach.");
+      setBanner(error instanceof Error && error.message ? error.message : t("chat.attachFailed"));
     }
   }
 
@@ -379,7 +381,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     try {
       const provider = await getProvider();
       if (!provider) {
-        setBanner("Not connected. Open Settings to connect to a server.");
+        setBanner(t("errors.notConnected"));
         return;
       }
       await provider.setChatModel(chatId, model);
@@ -387,7 +389,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       if (current) useChatsStore.getState().upsert({ ...current, model });
     } catch (error) {
       setBanner(
-        error instanceof Error && error.message ? error.message : "Could not switch model.",
+        error instanceof Error && error.message ? error.message : t("chat.switchModelFailed"),
       );
     } finally {
       setSwitchingModel(false);
@@ -397,7 +399,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const menuItems: MenuItem[] = [];
   if (!isDraft && temporary) {
     menuItems.push({
-      label: "Keep this chat",
+      label: t("chat.menu.keep"),
       icon: "content-save-outline",
       onPress: () => useChatsStore.getState().keepTemporary(chatId),
       testID: "menu-keep",
@@ -409,7 +411,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       : undefined;
   if (rename) {
     menuItems.push({
-      label: "Rename",
+      label: t("chat.menu.rename"),
       icon: "pencil-outline",
       onPress: rename,
       testID: "menu-rename",
@@ -417,7 +419,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
   if (!empty) {
     menuItems.push({
-      label: "Copy conversation",
+      label: t("chat.menu.copyConversation"),
       icon: "text-box-multiple-outline",
       onPress: () => {
         const messages = useMessagesStore.getState().byChat[chatId] ?? [];
@@ -430,7 +432,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }
   if (!isDraft && !temporary && capabilities?.deleteChat) {
     menuItems.push({
-      label: "Delete",
+      label: t("chat.menu.delete"),
       icon: "trash-can-outline",
       destructive: true,
       onPress: () =>
@@ -550,7 +552,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               <Icon name="alert-circle-outline" size={18} tone="danger" />
               <Text className="flex-1 py-1 text-sm leading-[19px] text-danger">{shownError}</Text>
               <Pressable
-                accessibilityLabel="Dismiss"
+                accessibilityLabel={t("common.dismiss")}
                 accessibilityRole="button"
                 className="h-8 w-8 items-center justify-center rounded-full active:bg-danger/10"
                 onPress={dismissError}
@@ -565,9 +567,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             autoFocus={focusOnMount}
             lockedReason={
               !connected
-                ? "Connect a server to start chatting"
+                ? t("composer.locked.notConnected")
                 : form
-                  ? "Answer the question above"
+                  ? t("composer.locked.form")
                   : undefined
             }
             onSend={handleSend}
@@ -582,7 +584,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             model={
               modelSelection
                 ? {
-                    label: currentLabel ?? "Choose model",
+                    label: currentLabel ?? t("models.choose"),
                     level: variants.length > 0 ? variantLabel : undefined,
                     status: switchingModel
                       ? "busy"

@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
 import type { ChatId, Message, TurnActivity } from "@/src/domain";
@@ -94,6 +95,7 @@ export function Transcript({
   onEditMessage,
   editingId = null,
 }: TranscriptProps) {
+  const { t } = useTranslation();
   const { colors, floatingShadow } = useAppTheme();
   const listRef = useRef<FlatList<Message>>(null);
   const transcript = useMessagesStore((state) => state.byChat[chatId]);
@@ -296,7 +298,7 @@ export function Transcript({
       />
       {showScrollButton ? (
         <Pressable
-          accessibilityLabel="Scroll to latest"
+          accessibilityLabel={t("chat.scrollToLatest")}
           accessibilityRole="button"
           className="absolute bottom-3 h-9 w-9 items-center justify-center self-center rounded-full bg-elevated"
           style={{ boxShadow: floatingShadow }}
@@ -314,11 +316,16 @@ export function Transcript({
 }
 
 export function TranscriptSkeleton() {
+  const { t } = useTranslation();
   // Bottom-anchored like the inverted list, so the transcript lands where
   // its placeholder was.
   return (
     <View className="flex-1 justify-end pb-3">
-      <SkeletonGroup label="Loading messages" className="px-4" testID="transcript-skeleton">
+      <SkeletonGroup
+        label={t("chat.loadingMessages")}
+        className="px-4"
+        testID="transcript-skeleton"
+      >
         <Skeleton className="h-10 w-[58%] self-end rounded-[22px]" />
         <View className="mt-9 gap-3">
           <Skeleton className="h-3.5 w-[92%]" />

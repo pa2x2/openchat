@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useTranslation } from "react-i18next";
 import { Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
@@ -79,9 +80,10 @@ export function Composer({
   context,
   editing,
   autoFocus,
-  placeholder = "Ask anything",
+  placeholder,
   lockedReason,
 }: ComposerProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const input = useRef<TextInputHandle>(null);
   const streaming = Boolean(onStop);
@@ -127,9 +129,9 @@ export function Composer({
           testID="composer-editing"
         >
           <Icon name="pencil-outline" size={17} tone="textMuted" />
-          <Text className="flex-1 text-sm text-text-muted">Editing message</Text>
+          <Text className="flex-1 text-sm text-text-muted">{t("composer.editing")}</Text>
           <Pressable
-            accessibilityLabel="Cancel editing"
+            accessibilityLabel={t("composer.cancelEditing")}
             accessibilityRole="button"
             className="h-8 w-8 items-center justify-center rounded-full active:bg-raised-hover"
             onPress={editing.onCancel}
@@ -151,18 +153,18 @@ export function Composer({
         autoFocus={autoFocus}
         value={text}
         onChangeText={setText}
-        placeholder={lockedReason ?? placeholder}
+        placeholder={lockedReason ?? placeholder ?? t("composer.placeholder")}
         editable={!locked}
         multiline
-        accessibilityLabel="Message"
+        accessibilityLabel={t("composer.message")}
         className="max-h-36 min-h-11 px-3 py-2.5 text-base leading-[22px] text-text"
         testID="composer-input"
       />
       <View className="mx-2 mb-1 flex-row items-center gap-1">
         {showAttach ? (
           <Pressable
-            accessibilityHint="Attaches a photo or a file to your message"
-            accessibilityLabel="Add attachment"
+            accessibilityHint={t("composer.attachHint")}
+            accessibilityLabel={t("composer.attach")}
             accessibilityRole="button"
             className="h-10 w-10 items-center justify-center rounded-full active:bg-raised"
             onPress={onAttach}
@@ -173,10 +175,10 @@ export function Composer({
         ) : null}
         {showModel && model ? (
           <Pressable
-            accessibilityHint="Chooses the model and how much it thinks before answering"
+            accessibilityHint={t("composer.modelHint")}
             accessibilityLabel={[
-              `Model: ${model.label}`,
-              model.level && `Reasoning: ${model.level}`,
+              t("composer.modelLabel", { model: model.label }),
+              model.level && t("composer.reasoningLabel", { level: model.level }),
             ]
               .filter(Boolean)
               .join(". ")}
@@ -189,7 +191,7 @@ export function Composer({
             testID="model-button"
           >
             {model.status === "placeholder" ? (
-              <SkeletonGroup label="Loading model" testID="model-button-skeleton">
+              <SkeletonGroup label={t("models.loadingOne")} testID="model-button-skeleton">
                 <Skeleton className="h-4 w-28 bg-raised" />
               </SkeletonGroup>
             ) : (
@@ -214,8 +216,8 @@ export function Composer({
         {context ? <ContextMeter context={context} onPress={context.onPress} /> : null}
         {streaming ? (
           <Pressable
-            accessibilityHint="Stops the current response"
-            accessibilityLabel="Stop generating"
+            accessibilityHint={t("composer.stopHint")}
+            accessibilityLabel={t("composer.stop")}
             accessibilityRole="button"
             accessibilityState={{ busy: true }}
             className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
@@ -226,8 +228,8 @@ export function Composer({
           </Pressable>
         ) : (
           <Pressable
-            accessibilityHint="Sends the message"
-            accessibilityLabel="Send message"
+            accessibilityHint={t("composer.sendHint")}
+            accessibilityLabel={t("composer.send")}
             accessibilityRole="button"
             accessibilityState={{ disabled: sendDisabled }}
             className={cn(

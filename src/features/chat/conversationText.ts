@@ -1,11 +1,12 @@
 import { UNTITLED_CHAT, type FormResult, type Message } from "@/src/domain";
+import { t } from "@/src/i18n";
 
 function formMarkdown(form: FormResult): string {
   return form.questions
     .map((question, index) => {
       const answer = form.answers[index]?.join(", ");
-      if (form.status !== "answered") return `- ${question} _Skipped_`;
-      return `- ${question} ${answer ? `**${answer}**` : "_No answer_"}`;
+      if (form.status !== "answered") return `- ${question} _${t("forms.skippedMark")}_`;
+      return `- ${question} ${answer ? `**${answer}**` : `_${t("forms.noAnswer")}_`}`;
     })
     .join("\n");
 }
@@ -38,10 +39,11 @@ export function conversationMarkdown(title: string, messages: Message[]): string
     const files = (message.attachments ?? []).map((file) => file.name);
     const body = [
       replyText(message),
-      files.length > 0 ? `_Attached: ${files.join(", ")}_` : "",
+      files.length > 0 ? `_${t("conversation.attached", { files: files.join(", ") })}_` : "",
     ].filter(Boolean);
     if (body.length === 0) continue;
-    sections.push(`**${message.role === "user" ? "You" : "Assistant"}**`, ...body);
+    const author = message.role === "user" ? t("conversation.you") : t("conversation.assistant");
+    sections.push(`**${author}**`, ...body);
   }
   return sections.join("\n\n") + "\n";
 }
