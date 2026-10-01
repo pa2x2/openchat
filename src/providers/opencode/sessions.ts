@@ -88,10 +88,19 @@ export async function switchModel(
   await client.session.switchModel({ sessionID: id, model: toWireModel(model) });
 }
 
+/**
+ * OpenCode names a branch after its source with " (fork #N)" appended. The
+ * app marks branches itself, in the user's language, so the suffix goes.
+ */
+const FORK_SUFFIX = / \(fork #\d+\)$/;
+
 export function toChatSummary(session: SessionInfo): ChatSummary {
+  const branchedFrom = session.fork?.sessionID;
+  const title = branchedFrom ? session.title?.replace(FORK_SUFFIX, "") : session.title;
   return {
     id: session.id,
-    title: session.title && session.title.length > 0 ? session.title : UNTITLED_CHAT,
+    title: title && title.length > 0 ? title : UNTITLED_CHAT,
+    ...(branchedFrom ? { branchedFrom } : {}),
     updatedAt: session.time?.updated ?? 0,
     model: session.model ? fromWireModel(session.model) : undefined,
     usage: toTokenUsage(session.tokens),

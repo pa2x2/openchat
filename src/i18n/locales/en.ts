@@ -188,6 +188,7 @@ export default {
     untitled: "Untitled chat",
     temporary: "Temporary chat",
     titleTemporary: "{{title}}. Temporary chat",
+    titleBranch: "{{title}}. Branch",
     renameHint: "Renames the chat",
     moreOptions: "More options",
     openSidebar: "Open sidebar",

@@ -490,7 +490,13 @@ const ChatRow = memo(function ChatRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={live ? t("drawer.replying", { title }) : title}
+      accessibilityLabel={
+        live
+          ? t("drawer.replying", { title })
+          : chat.branchedFrom
+            ? t("chat.titleBranch", { title })
+            : title
+      }
       accessibilityState={{
         ...(selection === undefined ? { selected: active } : { checked: selection }),
         busy: deleting,
@@ -516,6 +522,7 @@ const ChatRow = memo(function ChatRow({
         />
       ) : null}
       {live ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
+      {chat.branchedFrom ? <Icon name="source-branch" size={17} tone="textMuted" /> : null}
       <Text
         className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
         numberOfLines={1}

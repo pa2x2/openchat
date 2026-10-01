@@ -194,6 +194,7 @@ export default {
     newChat: "Новый чат",
     untitled: "Чат без названия",
     temporary: "Временный чат",
+    titleBranch: "{{title}}. Ветка",
     titleTemporary: "{{title}}. Временный чат",
     renameHint: "Переименовывает чат",
     moreOptions: "Другие действия",

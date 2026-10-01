@@ -359,6 +359,8 @@ export interface ChatSummary {
   title: string;
   updatedAt: number;
   model?: ModelRef;
+  /** The chat this one was branched from, which may since have been deleted. */
+  branchedFrom?: ChatId;
   /**
    * Everything the chat has used, as the backend counts it. That can be more
    * than its replies add up to: a backend may also count work that left no
