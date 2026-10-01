@@ -161,7 +161,6 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     attachments: Attachment[];
     target: EditTarget;
   } | null>(null);
-  // Sending the edit removes everything after the message.
   const editRemoves = useMessagesStore((state) => {
     if (!editing) return 0;
     const transcript = state.byChat[chatId] ?? [];
