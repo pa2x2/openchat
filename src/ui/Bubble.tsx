@@ -4,6 +4,7 @@ import { View, type GestureResponderEvent } from "react-native";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 import { cn } from "@/src/lib/cn";
+import { useAppTheme } from "./theme";
 
 export interface BubbleProps {
   /** Plain-text fallback used by the design-system demo and simple callers. */
@@ -13,6 +14,8 @@ export interface BubbleProps {
   status?: string;
   /** The user's side only: a long press on the bubble itself. */
   onLongPress?: (event: GestureResponderEvent) => void;
+  /** The user's side only: rings the bubble, as the message being edited. */
+  highlighted?: boolean;
   className?: string;
   testID?: string;
 }
@@ -27,11 +30,15 @@ export function Bubble({
   role,
   status,
   onLongPress,
+  highlighted = false,
   className,
   testID,
 }: BubbleProps) {
   const { t } = useTranslation();
+  const { colors } = useAppTheme();
   const isUser = role === "user";
+  // An outline rather than a border, so the ring doesn't move the text.
+  const ring = highlighted ? { outlineWidth: 2, outlineColor: colors.primary } : undefined;
   const content =
     children ??
     (text !== undefined ? (
@@ -48,12 +55,16 @@ export function Bubble({
         <Pressable
           accessibilityHint={t("message.menuHint")}
           className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5 active:opacity-80"
+          style={ring}
           onLongPress={onLongPress}
         >
           {content}
         </Pressable>
       ) : isUser ? (
-        <View className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5">
+        <View
+          className="max-w-[82%] self-end rounded-[22px] bg-user-bubble px-4 py-2.5"
+          style={ring}
+        >
           {content}
         </View>
       ) : (

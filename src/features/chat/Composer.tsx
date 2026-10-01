@@ -56,7 +56,7 @@ export interface ComposerProps {
   /** Present once a reply has said how full the model's context is; stays while a reply streams. */
   context?: ContextUse & { onPress: () => void };
   /** Present while the field holds a sent message being edited; shows a bar to cancel it. */
-  editing?: { onCancel: () => void };
+  editing?: { label: string; onCancel: () => void };
   /**
    * The chat the typed text is saved as a draft for, restored when the
    * composer mounts again. Unset while the field holds something that is not
@@ -171,7 +171,7 @@ export function Composer({
           testID="composer-editing"
         >
           <Icon name="pencil-outline" size={17} tone="textMuted" />
-          <Text className="flex-1 text-sm text-text-muted">{t("composer.editing")}</Text>
+          <Text className="flex-1 text-sm text-text-muted">{editing.label}</Text>
           <Pressable
             accessibilityLabel={t("composer.cancelEditing")}
             accessibilityRole="button"

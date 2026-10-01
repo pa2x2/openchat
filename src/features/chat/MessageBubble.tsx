@@ -34,7 +34,9 @@ export interface MessageBubbleProps {
   onEdit?: (message: Message) => void;
   /** Set only on replies while no turn is live. */
   onBranch?: (message: Message) => void;
-  /** The message is being edited in the composer, or comes after one that is and goes with the edit. */
+  /** The user message being edited in the composer. */
+  editing?: boolean;
+  /** The message comes after the one being edited, and goes with the edit. */
   dimmed?: boolean;
   /** Why a failed reply failed, when it is known. */
   error?: string | null;
@@ -149,7 +151,15 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
  * view of its own, since the bubble's text is not selectable in place) and,
  * on the message that allows it, edit.
  */
-function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Message) => void }) {
+function UserText({
+  message,
+  onEdit,
+  editing,
+}: {
+  message: Message;
+  onEdit?: (message: Message) => void;
+  editing: boolean;
+}) {
   const { t } = useTranslation();
   const [menuAt, setMenuAt] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,6 +193,7 @@ function UserText({ message, onEdit }: { message: Message; onEdit?: (message: Me
       <Bubble
         role="user"
         status={statusFor(message)}
+        highlighted={editing}
         onLongPress={(event) => {
           setMenuAt(event.nativeEvent.pageY + 12);
           setMenuOpen(true);
@@ -214,6 +225,7 @@ export const MessageBubble = memo(function MessageBubble({
   onRegenerate,
   onEdit,
   onBranch,
+  editing = false,
   dimmed = false,
   error = null,
 }: MessageBubbleProps) {
@@ -243,7 +255,7 @@ export const MessageBubble = memo(function MessageBubble({
             />
           </View>
         ) : null}
-        {hasText ? <UserText message={message} onEdit={onEdit} /> : null}
+        {hasText ? <UserText message={message} onEdit={onEdit} editing={editing} /> : null}
       </View>
     );
   }

@@ -159,6 +159,13 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     draft: string;
     attachments: Attachment[];
   } | null>(null);
+  // Sending the edit removes everything after the message.
+  const editRemoves = useMessagesStore((state) => {
+    if (!editing) return 0;
+    const transcript = state.byChat[chatId] ?? [];
+    const index = transcript.findIndex((message) => message.id === editing.message.id);
+    return index < 0 ? 0 : transcript.length - 1 - index;
+  });
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
@@ -717,7 +724,17 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
-            editing={editing ? { onCancel: cancelEdit } : undefined}
+            editing={
+              editing
+                ? {
+                    label:
+                      editRemoves > 0
+                        ? t("composer.editingRemoves", { count: editRemoves })
+                        : t("composer.editing"),
+                    onCancel: cancelEdit,
+                  }
+                : undefined
+            }
             context={context ? { ...context, onPress: () => setUsageSheetOpen(true) } : undefined}
             model={
               modelSelection

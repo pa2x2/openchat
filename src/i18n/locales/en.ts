@@ -220,6 +220,8 @@ export default {
     placeholder: "Ask anything",
     message: "Message",
     editing: "Editing message",
+    editingRemoves_one: "Editing · removes {{count}} later message",
+    editingRemoves_other: "Editing · removes {{count}} later messages",
     cancelEditing: "Cancel editing",
     attach: "Add attachment",
     attachHint: "Attaches a photo or a file to your message",

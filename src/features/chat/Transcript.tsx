@@ -35,6 +35,9 @@ const LIVE_SCROLL_BUTTON_OFFSET = 48;
 /** Within this many px of the newest message, the list follows a streaming reply. */
 const FOLLOW_OFFSET = 8;
 
+/** How much of what follows a message being edited stays in view under it. */
+const EDIT_PEEK = 120;
+
 /** Space the list keeps above the oldest message and below the newest. */
 const TOP_GAP = 4;
 const BOTTOM_GAP = 12;
@@ -129,7 +132,7 @@ export function Transcript({
   const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const questionIndex = reversed.findIndex((message) => message.role === "user");
   const questionId = reversed[questionIndex]?.id ?? null;
-  // The list is newest first: everything up to the edited message is replaced by the edit.
+  // The list is newest first: everything before the edited message is replaced by the edit.
   const editingIndex = editingId ? reversed.findIndex((message) => message.id === editingId) : -1;
   const replyPending =
     lastMessage?.role === "assistant" &&
@@ -168,6 +171,18 @@ export function Transcript({
   useEffect(() => {
     if (turnStarts > 0) listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [turnStarts]);
+
+  // The edit is typed in the composer, so the message goes just above it,
+  // with the start of what the edit replaces under it. Placed from the
+  // bottom, it stays in view as the keyboard opens and the list shrinks.
+  useEffect(() => {
+    if (editingIndex >= 0) scrollToEdited(editingIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per edit, not as the list changes under it
+  }, [editingId]);
+
+  function scrollToEdited(index: number) {
+    listRef.current?.scrollToIndex({ index, viewPosition: 0, viewOffset: EDIT_PEEK });
+  }
 
   const dragged = useRef(false);
   const wandered = useRef(false);
@@ -221,7 +236,8 @@ export function Transcript({
               // done while a run is still going.
               onEdit={!turnActive && item.role === "user" ? onEditMessage : undefined}
               onBranch={!turnActive && item.role === "assistant" ? onBranch : undefined}
-              dimmed={index <= editingIndex}
+              editing={index === editingIndex}
+              dimmed={index < editingIndex}
               // The store keeps the reason for the latest turn only.
               error={item.id === lastMessage?.id ? turnError : null}
             />
@@ -310,6 +326,11 @@ export function Transcript({
         }
         ListFooterComponent={<View style={{ height: topInset + TOP_GAP }} />}
         renderItem={renderMessage}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          // A message far up has not been laid out yet: get near it, then aim again.
+          listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+          setTimeout(() => scrollToEdited(index), 100);
+        }}
       />
 
       {/* Fade the transcript out into the composer. */}
