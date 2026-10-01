@@ -28,9 +28,18 @@ import {
   toolSubject,
 } from "./normalize";
 
+// The server rejects anything above 200, and without a limit it pages at 50.
+const PAGE_SIZE = 200;
+
 export async function fetchMessages(client: OpenCodeClient, chatId: ChatId): Promise<Message[]> {
-  const response = await client.message.list({ sessionID: chatId });
-  return toMessages(response.data);
+  const wire: SessionMessageInfo[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await client.message.list({ sessionID: chatId, limit: PAGE_SIZE, cursor });
+    wire.push(...page.data);
+    cursor = page.data.length > 0 ? (page.cursor.next ?? undefined) : undefined;
+  } while (cursor);
+  return toMessages(wire);
 }
 
 /** Decoded length of a base64 payload, without decoding it. */
