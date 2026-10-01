@@ -237,6 +237,13 @@ export interface ToolCall {
   /** What the call works on (a query, URL, command or path); empty until its input arrives. */
   subject: string;
   status: ToolStatus;
+  /** The pages a web search found; set once it succeeds. */
+  sources?: WebSource[];
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
 }
 
 /**

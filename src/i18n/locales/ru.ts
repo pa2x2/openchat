@@ -275,6 +275,7 @@ export default {
     showReasoning: "Показывает рассуждения модели",
     hideReasoning: "Скрывает рассуждения модели",
     toolFailed: "Ошибка",
+    openSource: "Открывает страницу в браузере",
     activity: {
       thinking: "Размышляет",
       asking: "Ждёт вашего ответа",

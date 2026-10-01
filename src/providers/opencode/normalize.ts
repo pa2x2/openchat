@@ -15,6 +15,7 @@ import type {
   FormValue,
   StreamEvent,
   ToolCategory,
+  WebSource,
 } from "@/src/domain";
 import { toCost, toTokenUsage, type WireTokens } from "./usage";
 import { t } from "@/src/i18n";
@@ -189,6 +190,28 @@ export function toolSubject(input: unknown): string {
   return "";
 }
 
+// The search tool writes each hit as a markdown heading that links the page:
+// `## [Title](https://…)`, then a snippet. Links inside a snippet are not hits.
+const SEARCH_HIT = /^#{1,6}[ \t]+\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/gm;
+
+/** The pages listed in a web search's result content, first mention of each. */
+export function webSources(content: unknown): WebSource[] {
+  if (!Array.isArray(content)) return [];
+  const sources: WebSource[] = [];
+  const seen = new Set<string>();
+  for (const block of content as { type?: unknown; text?: unknown }[]) {
+    if (block?.type !== "text" || typeof block.text !== "string") continue;
+    for (const [, rawTitle, url] of block.text.matchAll(SEARCH_HIT)) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      // Some sites lead their titles with a bidi mark.
+      const title = rawTitle.replace(/[‎‏]/g, "").trim();
+      sources.push({ title: title || url, url });
+    }
+  }
+  return sources;
+}
+
 const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" } };
 
 /** Structural subset of the client's V2Event union the normalizer consumes. */
@@ -277,7 +300,14 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       if (event.type === "session.tool.success") {
         const answers = givenAnswers(event.data.metadata);
         if (answers) return { type: "form-result", id, update: { status: "answered", answers } };
-        return { type: "tool", id, update: { status: "done" } };
+        // The event doesn't name its tool, so this reads every call's result;
+        // only a web search's sources are shown.
+        const sources = webSources(event.data.content);
+        return {
+          type: "tool",
+          id,
+          update: { status: "done", ...(sources.length > 0 ? { sources } : {}) },
+        };
       }
       if (isDismissal(event.data.error)) {
         return { type: "form-result", id, update: { status: "dismissed" } };

@@ -18,6 +18,7 @@ import type {
   ToolCall,
   ToolCategory,
   TurnActivity,
+  WebSource,
 } from "@/src/domain";
 import { t } from "@/src/i18n";
 import { formatNumber } from "@/src/i18n/format";
@@ -158,11 +159,23 @@ function bareToolLabel(category: ToolCategory, running: boolean): string {
   return running ? t(`reply.tools.${category}.bareRunning`) : t(`reply.tools.${category}.bare`);
 }
 
+function bareUrl(url: string): string {
+  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+}
+
+export function sourceSite(url: string): string {
+  return bareUrl(url).split(/[/?#]/)[0];
+}
+
+// A live result is parsed for sources before the app knows which tool made
+// it, so another call can carry some too; only a search's are real.
+export function searchSources(tool: ToolCall): WebSource[] {
+  return tool.category === "web-search" ? (tool.sources ?? []) : [];
+}
+
 function formatSubject(tool: ToolCall): string {
   if (tool.category === "web-search") return t("format.quoted", { text: tool.subject });
-  if (tool.category === "web-fetch") {
-    return tool.subject.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-  }
+  if (tool.category === "web-fetch") return bareUrl(tool.subject);
   return tool.subject;
 }
 

@@ -26,6 +26,7 @@ import {
   isDismissal,
   toolCategory,
   toolSubject,
+  webSources,
 } from "./normalize";
 
 // The server rejects anything above 200, and without a limit it pages at 50.
@@ -139,16 +140,20 @@ function toParts(step: SessionMessageAssistant): ReplyPart[] {
         continue;
       }
       const { state } = part;
+      const category = toolCategory(part.name);
+      const sources =
+        category === "web-search" && state.status === "completed" ? webSources(state.content) : [];
       parts.push({
         type: "tool",
         tool: {
           id: part.id,
           name: part.name,
-          category: toolCategory(part.name),
+          category,
           // Still a raw string while the model is writing it.
           subject: typeof state.input === "string" ? "" : toolSubject(state.input),
           status:
             state.status === "completed" ? "done" : state.status === "error" ? "failed" : "running",
+          ...(sources.length > 0 ? { sources } : {}),
         },
       });
     } else if (part.text.trim().length > 0) {

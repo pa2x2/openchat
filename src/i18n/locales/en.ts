@@ -267,6 +267,7 @@ export default {
     showReasoning: "Shows the model reasoning",
     hideReasoning: "Hides the model reasoning",
     toolFailed: "Failed",
+    openSource: "Opens the page in your browser",
     activity: {
       thinking: "Thinking",
       asking: "Waiting for your answer",

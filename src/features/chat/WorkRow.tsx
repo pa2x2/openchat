@@ -1,11 +1,20 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Linking, View } from "react-native";
+import type { WebSource } from "@/src/domain";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";
-import { toolLabel, workItemIcon, workRow, type WorkBlock, type WorkItem } from "./replyLayout";
+import {
+  searchSources,
+  sourceSite,
+  toolLabel,
+  workItemIcon,
+  workRow,
+  type WorkBlock,
+  type WorkItem,
+} from "./replyLayout";
 
 function ReasoningText({ text }: { text: string }) {
   return (
@@ -42,6 +51,32 @@ function ThoughtItem({ text }: { text: string }) {
   );
 }
 
+function SourceList({ sources }: { sources: WebSource[] }) {
+  const { t } = useTranslation();
+  if (sources.length === 0) return null;
+  return (
+    <View className="mb-1 ml-[23px]" testID="search-sources">
+      {sources.map((source) => (
+        <Pressable
+          key={source.url}
+          accessibilityHint={t("reply.openSource")}
+          accessibilityLabel={`${source.title}, ${sourceSite(source.url)}`}
+          accessibilityRole="link"
+          className="py-1.5"
+          onPress={() => void Linking.openURL(source.url).catch(() => undefined)}
+        >
+          <Text numberOfLines={1} className="text-[14.5px] text-text">
+            {source.title}
+          </Text>
+          <Text numberOfLines={1} className="text-[12.5px] text-text-muted">
+            {sourceSite(source.url)}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function WorkItems({ items }: { items: WorkItem[] }) {
   const { t } = useTranslation();
   // A row of thinking alone opens straight onto the thought.
@@ -58,20 +93,23 @@ function WorkItems({ items }: { items: WorkItem[] }) {
         item.type === "reasoning" ? (
           <ThoughtItem key={index} text={item.text} />
         ) : (
-          <View key={item.tool.id} className="flex-row items-start gap-2 py-1">
-            <View className="pt-0.5">
-              <Icon
-                name={workItemIcon(item)}
-                size={15}
-                tone={item.tool.status === "failed" ? "danger" : "textMuted"}
-              />
+          <View key={item.tool.id}>
+            <View className="flex-row items-start gap-2 py-1">
+              <View className="pt-0.5">
+                <Icon
+                  name={workItemIcon(item)}
+                  size={15}
+                  tone={item.tool.status === "failed" ? "danger" : "textMuted"}
+                />
+              </View>
+              <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
+                {toolLabel(item.tool)}
+                {item.tool.status === "failed" ? (
+                  <Text className="text-danger"> · {t("reply.toolFailed")}</Text>
+                ) : null}
+              </Text>
             </View>
-            <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
-              {toolLabel(item.tool)}
-              {item.tool.status === "failed" ? (
-                <Text className="text-danger"> · {t("reply.toolFailed")}</Text>
-              ) : null}
-            </Text>
+            <SourceList sources={searchSources(item.tool)} />
           </View>
         ),
       )}

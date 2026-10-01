@@ -31,6 +31,7 @@ export type {
   UsageReport,
   UsageTotals,
   UserMessage,
+  WebSource,
 } from "./types";
 export { UNTITLED_CHAT } from "./types";
 export {
