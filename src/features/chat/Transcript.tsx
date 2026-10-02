@@ -61,6 +61,7 @@ const HOLD_MARGIN = 240;
 const HOLD_POSITION = { minIndexForVisible: 1 };
 
 const ASKING: TurnActivity = { kind: "asking" };
+const SENDING: TurnActivity = { kind: "sending" };
 
 // Stands in for the reply while a turn is starting but has no reply of its own
 // yet: a rerun holds the chat while it re-reads the transcript and has the
@@ -132,7 +133,8 @@ export function Transcript({
   const lastMessage = reversed[0];
   const regenerableId = !turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
-  const liveId = turnActive && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  const liveId =
+    (turnActive || staged) && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const questionIndex = reversed.findIndex((message) => message.role === "user");
   const questionId = reversed[questionIndex]?.id ?? null;
   // The list is newest first: everything before the edited message is replaced by the edit.
@@ -233,7 +235,7 @@ export function Transcript({
             <MessageBubble
               message={item}
               showReasoning={showReasoning}
-              activity={item.id === liveId ? activity : null}
+              activity={item.id !== liveId ? null : staged ? SENDING : activity}
               onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
               // An edit rolls the chat back to the message, which cannot be
               // done while a run is still going.
@@ -251,6 +253,7 @@ export function Transcript({
     [
       showReasoning,
       liveId,
+      staged,
       activity,
       regenerableId,
       onRegenerate,

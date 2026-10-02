@@ -285,6 +285,7 @@ export default {
     toolFailed: "Failed",
     openSource: "Opens the page in your browser",
     activity: {
+      sending: "Sending",
       thinking: "Thinking",
       asking: "Waiting for your answer",
       retrying: "Retrying",

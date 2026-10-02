@@ -297,6 +297,7 @@ export default {
     toolFailed: "Ошибка",
     openSource: "Открывает страницу в браузере",
     activity: {
+      sending: "Отправка",
       thinking: "Размышляет",
       asking: "Ждёт вашего ответа",
       retrying: "Повторная попытка",

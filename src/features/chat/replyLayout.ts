@@ -198,6 +198,8 @@ export function workItemIcon(item: WorkItem): IconName {
 
 function activityRow(activity: TurnActivity): { icon: IconName; label: string } {
   switch (activity.kind) {
+    case "sending":
+      return { icon: "arrow-up", label: t("reply.activity.sending") };
     case "thinking":
       return { icon: "brain", label: t("reply.activity.thinking") };
     case "tool":

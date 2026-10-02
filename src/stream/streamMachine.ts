@@ -550,12 +550,12 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
   if (replaceIds.length > 0) messages.removeMessages(chatId, replaceIds);
   messages.appendMessage(chatId, user);
   messages.appendMessage(chatId, assistant);
-  trackTurn(chatId, assistant);
+  trackTurn(chatId, assistant, SENDING);
   useChatsStore.getState().touch(chatId);
 }
 
 /** Makes `draft` the chat's live reply; its events stream into it from here on. */
-function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
+function trackTurn(chatId: ChatId, draft: Message, activity: TurnActivity): LiveTurn {
   let resolveCompletion!: () => void;
   const completion = new Promise<void>((resolve) => {
     resolveCompletion = resolve;
@@ -571,7 +571,7 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
     resolveCompletion,
     finished: false,
     pendingFrame: null,
-    activity: null,
+    activity,
     lastDelta: null,
     followed: false,
     stale: false,
@@ -581,7 +581,7 @@ function trackTurn(chatId: ChatId, draft: Message): LiveTurn {
   liveTurns.set(chatId, turn);
   const messages = useMessagesStore.getState();
   messages.setTurnActive(chatId, true);
-  messages.setActivity(chatId, null);
+  messages.setActivity(chatId, activity);
   return turn;
 }
 
@@ -619,11 +619,9 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
     messages.appendMessage(chatId, draft);
   }
   messages.setTurnError(chatId, null);
-  const turn = trackTurn(chatId, draft);
-  turn.followed = true;
   // The run is well under way, so it may be between events for a while.
-  turn.activity = THINKING;
-  messages.setActivity(chatId, turn.activity);
+  const turn = trackTurn(chatId, draft, THINKING);
+  turn.followed = true;
 
   await Promise.race([consumeEvents(turn), turn.completion]);
   if (turn.draft.status === "complete" && !isTurnLive(chatId)) {
@@ -1017,6 +1015,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
 }
 
+const SENDING: TurnActivity = { kind: "sending" };
 const THINKING: TurnActivity = { kind: "thinking" };
 
 function hasContent(reply: Message): boolean {
