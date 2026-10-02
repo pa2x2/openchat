@@ -982,12 +982,19 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
   if (event.type === "text-delta" || event.type === "reasoning-delta") {
     const kind = event.type === "text-delta" ? "text" : "reasoning";
-    // Text replaces the activity row once its first word is in. Reasoning
-    // covers a missed start event, e.g. when it started during a reconnect.
-    if (kind === "text" && turn.activity) setActivity(turn, null);
-    if (kind === "reasoning" && turn.activity?.kind !== "thinking") setActivity(turn, THINKING);
     turn.draft = appendDelta(turn.draft, kind, event.text, turn.lastDelta === kind);
     turn.lastDelta = kind;
+    if (kind === "text" && turn.activity) {
+      // Text replaces the activity row. Its first word is written at once: a
+      // frame with the row gone and no text yet would show the fallback row.
+      if (turn.pendingFrame !== null) cancelAnimationFrame(turn.pendingFrame);
+      turn.pendingFrame = null;
+      writeDraft(turn);
+      setActivity(turn, null);
+      return;
+    }
+    // Covers a missed start event, e.g. when the reasoning started during a reconnect.
+    if (kind === "reasoning" && turn.activity?.kind !== "thinking") setActivity(turn, THINKING);
     scheduleDraftWrite(turn);
     return;
   }
