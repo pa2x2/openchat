@@ -20,8 +20,9 @@ jest.mock("@/src/lib/providerFactory", () => ({
 
 const getProviderMock = getProvider as jest.Mock;
 
-/** One event subscription. Unless `drop`, the stream stays open after its
- * events until aborted, like a live connection. */
+/** One event subscription. It opens with `connected`, as the server's do, and
+ * unless `drop`, stays open after its events until aborted, like a live
+ * connection. */
 interface Script {
   events: StreamEvent[];
   drop?: boolean;
@@ -32,7 +33,7 @@ function scriptedEvents(scripts: Script[]): ChatProvider["events"] {
   return jest.fn((_chatId: ChatId, signal?: AbortSignal) =>
     (async function* () {
       const script = scripts[Math.min(call++, scripts.length - 1)];
-      for (const event of script.events) {
+      for (const event of [{ type: "connected" } as const, ...script.events]) {
         if (signal?.aborted) return;
         yield event;
       }
@@ -71,7 +72,7 @@ const assistant = (patch: Partial<Message> = {}): Message => ({
 const state = () => useMessagesStore.getState();
 
 async function flush() {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  for (let i = 0; i < 16; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -356,6 +357,7 @@ describe("interruptTurn", () => {
     const provider = useProvider({
       events: jest.fn(() =>
         (async function* () {
+          yield { type: "connected" } as const;
           yield textDelta("Hel");
           yield textDelta("lo");
           await new Promise<void>(() => undefined);
@@ -447,7 +449,7 @@ it("ends a followed run that finished before its subscription connected", async 
   // subscription; nothing else will arrive, so the turn must not wait on them.
   state().setMessages("c11", [assistant({ text: "Hello" })]);
   useProvider({
-    events: scriptedEvents([{ events: [{ type: "connected" }] }]),
+    events: scriptedEvents([{ events: [] }]),
     isRunning: jest.fn().mockResolvedValueOnce(true).mockResolvedValue(false),
     fetchMessages: jest.fn().mockResolvedValue([assistant({ text: "Hello", status: "complete" })]),
   });
@@ -526,6 +528,35 @@ describe("regenerateReply", () => {
     expect(provider.events).not.toHaveBeenCalled();
     expect(state().turnErrors.c21).toBe("Session is busy");
     expect(state().byChat.c21).toHaveLength(4);
+  });
+
+  it("sends nothing and drops the rollback when stopped before the stream is up", async () => {
+    const provider = useProvider({
+      capabilities: { regenerate: true } as ChatProvider["capabilities"],
+      prepareRegenerate: jest.fn().mockResolvedValue(undefined),
+      regenerate: jest.fn().mockResolvedValue(undefined),
+      discardRegenerate: jest.fn().mockResolvedValue(undefined),
+      fetchMessages: jest.fn().mockResolvedValue(serverTurn()),
+      // Never connects: the prompt is still held back when Stop comes.
+      events: jest.fn((_chatId: ChatId, signal?: AbortSignal) =>
+        (async function* (): AsyncGenerator<StreamEvent> {
+          await new Promise((resolve) =>
+            signal?.addEventListener("abort", resolve, { once: true }),
+          );
+        })(),
+      ),
+    });
+    state().setMessages("c25", serverTurn());
+
+    const rerun = regenerateReply("c25");
+    await flush();
+    await interruptTurn("c25");
+    await rerun;
+    await flush();
+
+    expect(provider.regenerate).not.toHaveBeenCalled();
+    expect(provider.discardRegenerate).toHaveBeenCalledWith("c25");
+    expect(useChatsStore.getState().pendingRegenerate.c25).toBeUndefined();
   });
 
   it("holds the chat while the rerun is set up, so a second tap cannot orphan it", async () => {

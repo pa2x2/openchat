@@ -60,6 +60,12 @@ const WATCHDOG_TICK_MS = 5_000;
  * events' way here.
  */
 const LINGER_MS = 5_000;
+/**
+ * How long a send holds its prompt for the event subscription to go live.
+ * The run's first event goes out as the prompt lands, before a subscription
+ * opened alongside it is up. Past this the prompt goes anyway.
+ */
+const CONNECT_WAIT_MS = 3_000;
 
 /**
  * Optimistic messages carry a local id until the server-assigned one arrives.
@@ -95,6 +101,9 @@ interface LiveTurn {
   /** Resolves when the local turn lifecycle ends, even if a provider iterator is slow to abort. */
   completion: Promise<void>;
   resolveCompletion: () => void;
+  /** Resolves once the event subscription is live, or the turn is over. */
+  connected: Promise<void>;
+  markConnected: () => void;
   /** Prevents a stale event stream from mutating a turn after it is settled. */
   finished: boolean;
   /**
@@ -135,6 +144,7 @@ function settleTurn(turn: LiveTurn): void {
   stopLingering(turn);
   flushDraft(turn);
   turn.finished = true;
+  turn.markConnected();
   // A form belongs to its run: once the run is over there is nothing left to
   // answer, and no subscription to hear the backend drop it.
   if (!liveTurns.has(turn.chatId)) {
@@ -252,11 +262,18 @@ async function runTurn(
   const turn = liveTurns.get(chatId);
   if (!turn) return;
 
-  // Subscribe first so early deltas are not missed, then deliver the prompt.
+  // Subscribe first so the run's first events are not missed, then deliver the prompt.
   const consuming = consumeEvents(turn);
   try {
-    const delivery = getProvider().then((provider) => {
+    const delivery = getProvider().then(async (provider) => {
       if (!provider) throw new Error(t("errors.notConnected"));
+      await untilConnected(turn);
+      // Stopped before the prompt went out: nothing is sent, and a rollback
+      // staged for it must not wait for the next message.
+      if (turn.finished) {
+        await options.discardPrepared?.(provider).catch(() => undefined);
+        return;
+      }
       return options.deliver(provider, userMessage);
     });
     // Some provider event iterators do not promptly close when their signal is
@@ -277,6 +294,16 @@ async function runTurn(
     return;
   }
   await Promise.race([consuming, turn.completion]);
+}
+
+function untilConnected(turn: LiveTurn): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, CONNECT_WAIT_MS);
+    void turn.connected.then(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 }
 
 function describe(error: unknown): string {
@@ -577,6 +604,10 @@ function trackTurn(chatId: ChatId, draft: Message, activity: TurnActivity): Live
   const completion = new Promise<void>((resolve) => {
     resolveCompletion = resolve;
   });
+  let markConnected!: () => void;
+  const connected = new Promise<void>((resolve) => {
+    markConnected = resolve;
+  });
   const turn: LiveTurn = {
     chatId,
     draft,
@@ -586,6 +617,8 @@ function trackTurn(chatId: ChatId, draft: Message, activity: TurnActivity): Live
     lastSnapshotText: null,
     completion,
     resolveCompletion,
+    connected,
+    markConnected,
     finished: false,
     pendingFrame: null,
     activity,
@@ -755,6 +788,7 @@ async function consumeEvents(turn: LiveTurn): Promise<void> {
             continue;
           }
           if (event.type === "connected") {
+            turn.markConnected();
             // A followed run can end between the check that it runs and this
             // subscription, and its closing events are then gone for good.
             // A send subscribes before its prompt goes out, so it is exempt.
