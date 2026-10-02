@@ -2,6 +2,13 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-10-02
+
+### 🧩 Improved
+
+- A reply says Sending until the server starts on it, where it used to say Thinking from the moment you sent. If the server hasn't started after 10 seconds, it says Still waiting for the server. Regenerating a reply and editing a message show the same status.
+- Once the server is on a reply, it says Working, and Thinking only while the model reasons.
+
 ## [1.3.0] - 2026-10-01
 
 ### ✨ Added
@@ -212,6 +219,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.3.2]: https://github.com/pa2x2/openchat/releases/tag/v1.3.2
 [1.3.0]: https://github.com/pa2x2/openchat/releases/tag/v1.3.0
 [1.2.1]: https://github.com/pa2x2/openchat/releases/tag/v1.2.1
 [1.2.0]: https://github.com/pa2x2/openchat/releases/tag/v1.2.0
