@@ -83,7 +83,6 @@ describe("normalizeV2Event", () => {
     const dropped = [
       "server.connected",
       "session.inbox.enqueued",
-      "session.execution.started",
       "session.text.ended",
       "session.renamed",
       "permission.asked",

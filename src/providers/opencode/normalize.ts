@@ -268,6 +268,9 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
         ? { type: "reasoning-delta", text: delta }
         : null;
     }
+    // The server has the prompt and readies the first step, which can take
+    // seconds; until now the reply was still being sent.
+    case "session.execution.started":
     // A step hands control back to the model, which may sit silent for a
     // while before its next token.
     case "session.step.started":
