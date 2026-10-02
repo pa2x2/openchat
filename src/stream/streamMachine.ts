@@ -317,15 +317,18 @@ async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcom
   if (isTurnLive(chatId)) return { ok: false, error: t("errors.turnLive") };
   // The rerun only goes live once the transcript is fetched and the rollback
   // staged. Until then it holds the chat, so a second tap or a send cannot
-  // start a turn beside it and leave this one's reply "Thinking" forever.
+  // start a turn beside it and leave this one's reply "Sending" forever.
   startingTurns.add(chatId);
-  useMessagesStore.getState().setTurnActive(chatId, true);
+  const messages = useMessagesStore.getState();
+  messages.setTurnActive(chatId, true);
+  messages.setActivity(chatId, SENDING);
   try {
     return await rerun(chatId, edit);
   } finally {
     // Once live, the turn itself owns the chat; this only covers not starting.
     if (startingTurns.delete(chatId) && !liveTurns.has(chatId)) {
       useMessagesStore.getState().setTurnActive(chatId, false);
+      useMessagesStore.getState().setActivity(chatId, null);
     }
   }
 }

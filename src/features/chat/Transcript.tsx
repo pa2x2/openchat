@@ -316,7 +316,11 @@ export function Transcript({
             {/* Until the pinned question has a reply of its own, this holds the reply's space. */}
             <View style={pinned && questionIndex === 0 ? { minHeight: slotHeight } : undefined}>
               {starting ? (
-                <MessageBubble message={PENDING_REPLY} showReasoning={showReasoning} />
+                <MessageBubble
+                  message={PENDING_REPLY}
+                  showReasoning={showReasoning}
+                  activity={activity}
+                />
               ) : null}
             </View>
             <View onLayout={(event) => setQueuedHeight(event.nativeEvent.layout.height)}>
