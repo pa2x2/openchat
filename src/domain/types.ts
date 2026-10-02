@@ -268,6 +268,8 @@ export type TurnActivity =
    * or the message sent. `since` is when the user sent it, in epoch ms.
    */
   | { kind: "sending"; since: number }
+  /** A model step is under way, but the model is not reasoning yet. */
+  | { kind: "working" }
   | { kind: "thinking" }
   /** `name` is the backend's own tool name, shown for the "other" category. */
   | { kind: "tool"; category: ToolCategory; name: string }

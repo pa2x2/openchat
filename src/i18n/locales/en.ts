@@ -287,6 +287,7 @@ export default {
     activity: {
       sending: "Sending",
       slowStart: "Still waiting for the server",
+      working: "Working",
       thinking: "Thinking",
       asking: "Waiting for your answer",
       retrying: "Retrying",

@@ -212,6 +212,7 @@ export function webSources(content: unknown): WebSource[] {
   return sources;
 }
 
+const WORKING: StreamEvent = { type: "activity", activity: { kind: "working" } };
 const THINKING: StreamEvent = { type: "activity", activity: { kind: "thinking" } };
 
 /** Structural subset of the client's V2Event union the normalizer consumes. */
@@ -270,8 +271,9 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
     // A step hands control back to the model, which may sit silent for a
     // while before its next token.
     case "session.step.started":
-    case "session.reasoning.started":
     case "session.compaction.ended":
+      return WORKING;
+    case "session.reasoning.started":
       return THINKING;
     case "session.text.started":
       return { type: "activity", activity: null };

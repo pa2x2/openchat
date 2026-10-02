@@ -103,7 +103,7 @@ describe("OpenCodeProvider.events", () => {
     });
     const usage = { input: 1361, output: 25, reasoning: 42, cacheRead: 0, cacheWrite: 0 };
     expect(events).toEqual([
-      { type: "activity", activity: { kind: "thinking" } },
+      { type: "activity", activity: { kind: "working" } },
       {
         type: "message-complete",
         usage,

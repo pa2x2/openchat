@@ -637,7 +637,7 @@ export async function followRunningTurn(chatId: ChatId): Promise<void> {
   }
   messages.setTurnError(chatId, null);
   // The run is well under way, so it may be between events for a while.
-  const turn = trackTurn(chatId, draft, THINKING);
+  const turn = trackTurn(chatId, draft, WORKING);
   turn.followed = true;
 
   await Promise.race([consumeEvents(turn), turn.completion]);
@@ -948,8 +948,9 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
   if (event.type === "text-delta" || event.type === "reasoning-delta") {
     const kind = event.type === "text-delta" ? "text" : "reasoning";
-    // Covers a missed `activity: null`, e.g. when the text started during a reconnect.
+    // Covers a missed activity event, e.g. when the text or reasoning started during a reconnect.
     if (kind === "text" && turn.activity) setActivity(turn, null);
+    if (kind === "reasoning" && turn.activity?.kind !== "thinking") setActivity(turn, THINKING);
     turn.draft = appendDelta(turn.draft, kind, event.text, turn.lastDelta === kind);
     turn.lastDelta = kind;
     scheduleDraftWrite(turn);
@@ -973,7 +974,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
       const running = runningTool(turn.draft);
       setActivity(
         turn,
-        running ? { kind: "tool", category: running.category, name: running.name } : THINKING,
+        running ? { kind: "tool", category: running.category, name: running.name } : WORKING,
       );
       break;
     }
@@ -1032,6 +1033,7 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
 }
 
+const WORKING: TurnActivity = { kind: "working" };
 const THINKING: TurnActivity = { kind: "thinking" };
 
 function hasContent(reply: Message): boolean {
@@ -1088,7 +1090,7 @@ function deliverQueued(turn: LiveTurn, id: string): void {
   messages.appendMessage(chatId, reply);
   turn.draft = reply;
   turn.lastSnapshotText = null;
-  setActivity(turn, THINKING);
+  setActivity(turn, WORKING);
 }
 
 function appendDelta(

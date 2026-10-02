@@ -299,6 +299,7 @@ export default {
     activity: {
       sending: "Отправка",
       slowStart: "Сервер пока не ответил",
+      working: "Работает",
       thinking: "Размышляет",
       asking: "Ждёт вашего ответа",
       retrying: "Повторная попытка",

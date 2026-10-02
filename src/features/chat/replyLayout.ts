@@ -42,7 +42,7 @@ export interface ReplyLayout {
   answer: string;
 }
 
-const THINKING: TurnActivity = { kind: "thinking" };
+const WORKING: TurnActivity = { kind: "working" };
 
 function toBlocks(parts: ReplyPart[], showReasoning: boolean, running: boolean): ReplyBlock[] {
   const blocks: ReplyBlock[] = [];
@@ -82,8 +82,8 @@ export function layoutReply(
   const answer = answerBlock?.type === "text" ? answerBlock.text : "";
 
   if (running) {
-    // Unless it is writing text, a running reply is at least thinking.
-    const live = activity ?? (blocks.at(-1)?.type === "text" ? null : THINKING);
+    // Unless it is writing text, a running reply is at least working.
+    const live = activity ?? (blocks.at(-1)?.type === "text" ? null : WORKING);
     if (live) {
       const last = blocks.at(-1);
       if (last?.type === "work") last.live = live;
@@ -206,6 +206,8 @@ function activityRow(activity: TurnActivity, slow: boolean): { icon: IconName; l
         icon: "arrow-up",
         label: slow ? t("reply.activity.slowStart") : t("reply.activity.sending"),
       };
+    case "working":
+      return { icon: "creation", label: t("reply.activity.working") };
     case "thinking":
       return { icon: "brain", label: t("reply.activity.thinking") };
     case "tool":
