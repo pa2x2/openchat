@@ -263,8 +263,11 @@ export type ReplyPart =
  * tells the user the run is still alive.
  */
 export type TurnActivity =
-  /** The server has not started the run yet: the chat is still being created or the message sent. */
-  | { kind: "sending" }
+  /**
+   * The server has not started the run yet: the chat is still being created
+   * or the message sent. `since` is when the user sent it, in epoch ms.
+   */
+  | { kind: "sending"; since: number }
   | { kind: "thinking" }
   /** `name` is the backend's own tool name, shown for the "other" category. */
   | { kind: "tool"; category: ToolCategory; name: string }

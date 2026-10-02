@@ -298,6 +298,7 @@ export default {
     openSource: "Открывает страницу в браузере",
     activity: {
       sending: "Отправка",
+      slowStart: "Сервер пока не ответил",
       thinking: "Размышляет",
       asking: "Ждёт вашего ответа",
       retrying: "Повторная попытка",

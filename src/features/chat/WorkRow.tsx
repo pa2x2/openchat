@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, View } from "react-native";
 import type { WebSource } from "@/src/domain";
@@ -7,6 +7,7 @@ import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Pulse } from "@/src/ui/Pulse";
 import {
+  SLOW_START_MS,
   searchSources,
   sourceSite,
   toolLabel,
@@ -126,7 +127,17 @@ export function WorkRow({ block }: { block: WorkBlock }) {
   // Re-renders the labels `workRow` builds when the language changes.
   useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const { icon, label } = workRow(block);
+  const since = block.live?.kind === "sending" ? block.live.since : null;
+  const [slowSince, setSlowSince] = useState<number | null>(null);
+  useEffect(() => {
+    if (since === null) return;
+    const timer = setTimeout(
+      () => setSlowSince(since),
+      Math.max(0, since + SLOW_START_MS - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [since]);
+  const { icon, label } = workRow(block, since !== null && slowSince === since);
   const expandable = block.items.length > 0;
   const row = (
     <View className="flex-row items-center gap-2 py-1">

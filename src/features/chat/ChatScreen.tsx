@@ -78,7 +78,8 @@ import type { MenuItem } from "@/src/ui/Menu";
 /** Route id for the not-yet-created chat; the backend chat is made lazily. */
 export const NEW_CHAT = "new";
 
-function stageDraftTurn(text: string, attachments: Attachment[]): void {
+/** Returns when the turn was staged, which is when the user sent it. */
+function stageDraftTurn(text: string, attachments: Attachment[]): number {
   const messages = useMessagesStore.getState();
   const now = Date.now();
   messages.setMessages(NEW_CHAT, [
@@ -99,6 +100,7 @@ function stageDraftTurn(text: string, attachments: Attachment[]): void {
       createdAt: now + 1,
     },
   ]);
+  return now;
 }
 
 /**
@@ -329,7 +331,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       }
       if (isDraft) {
         // Lazy chat creation: the backend chat exists only once something is said.
-        stageDraftTurn(text, files);
+        const sentAt = stageDraftTurn(text, files);
         let created;
         try {
           created = await provider.createChat(currentModel ? { model: currentModel } : undefined);
@@ -338,7 +340,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
         }
         if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
         useChatsStore.getState().upsert(created);
-        const streaming = sendMessage(created.id, text, files);
+        const streaming = sendMessage(created.id, text, files, sentAt);
         router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
         await streaming;
       } else {

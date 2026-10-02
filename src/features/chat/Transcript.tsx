@@ -61,7 +61,6 @@ const HOLD_MARGIN = 240;
 const HOLD_POSITION = { minIndexForVisible: 1 };
 
 const ASKING: TurnActivity = { kind: "asking" };
-const SENDING: TurnActivity = { kind: "sending" };
 
 // Stands in for the reply while a turn is starting but has no reply of its own
 // yet: a rerun holds the chat while it re-reads the transcript and has the
@@ -235,7 +234,13 @@ export function Transcript({
             <MessageBubble
               message={item}
               showReasoning={showReasoning}
-              activity={item.id !== liveId ? null : staged ? SENDING : activity}
+              activity={
+                item.id !== liveId
+                  ? null
+                  : staged
+                    ? { kind: "sending", since: item.createdAt }
+                    : activity
+              }
               onRegenerate={item.id === regenerableId ? onRegenerate : undefined}
               // An edit rolls the chat back to the message, which cannot be
               // done while a run is still going.

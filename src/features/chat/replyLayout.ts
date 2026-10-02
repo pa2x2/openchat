@@ -196,10 +196,16 @@ export function workItemIcon(item: WorkItem): IconName {
   return item.type === "tool" ? toolIconFor(item.tool) : "brain";
 }
 
-function activityRow(activity: TurnActivity): { icon: IconName; label: string } {
+/** How long a reply may wait on the server to start before the row says it is slow. */
+export const SLOW_START_MS = 10_000;
+
+function activityRow(activity: TurnActivity, slow: boolean): { icon: IconName; label: string } {
   switch (activity.kind) {
     case "sending":
-      return { icon: "arrow-up", label: t("reply.activity.sending") };
+      return {
+        icon: "arrow-up",
+        label: slow ? t("reply.activity.slowStart") : t("reply.activity.sending"),
+      };
     case "thinking":
       return { icon: "brain", label: t("reply.activity.thinking") };
     case "tool":
@@ -241,8 +247,11 @@ function summarizeTools(tools: ToolCall[]): string {
   });
 }
 
-/** The icon and one-line label of a work row. */
-export function workRow(block: WorkBlock): { icon: IconName; label: string } {
+/**
+ * The icon and one-line label of a work row. `slow`: the reply has waited on
+ * the server longer than `SLOW_START_MS`.
+ */
+export function workRow(block: WorkBlock, slow = false): { icon: IconName; label: string } {
   const tools = block.items.flatMap((item) => (item.type === "tool" ? [item.tool] : []));
   if (block.live) {
     // The call still going says more than the generic activity does.
@@ -250,7 +259,7 @@ export function workRow(block: WorkBlock): { icon: IconName; label: string } {
     if (running && block.live.kind === "tool") {
       return { icon: toolIcon(running.category), label: toolLabel(running) };
     }
-    return activityRow(block.live);
+    return activityRow(block.live, slow);
   }
   if (tools.length === 0) {
     const thoughts = block.items.length;

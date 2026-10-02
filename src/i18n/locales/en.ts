@@ -286,6 +286,7 @@ export default {
     openSource: "Opens the page in your browser",
     activity: {
       sending: "Sending",
+      slowStart: "Still waiting for the server",
       thinking: "Thinking",
       asking: "Waiting for your answer",
       retrying: "Retrying",

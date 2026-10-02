@@ -181,17 +181,21 @@ function flushDraft(turn: LiveTurn): void {
  * interrupt. Delivery failures (the prompt POST itself) mark the turn
  * failed immediately — the optimistic messages stay on screen with error
  * status so nothing the user typed is lost.
+ *
+ * `sentAt` is earlier than now when the chat had to be created first.
  */
 export async function sendMessage(
   chatId: ChatId,
   text: string,
   attachments?: Attachment[],
+  sentAt = Date.now(),
 ): Promise<void> {
   await runTurn(
     chatId,
     { id: localId("user"), text, ...(attachments ? { attachments } : {}) },
     {
       deliver: (provider, message) => provider.send(chatId, message),
+      sentAt,
     },
   );
 }
@@ -201,6 +205,8 @@ type Deliver = (provider: ChatProvider, message: UserMessage) => Promise<void>;
 
 interface RunTurnOptions {
   deliver: Deliver;
+  /** When the user asked for the turn; a rerun asks before it gets the chat ready. */
+  sentAt: number;
   /**
    * Runs before the event subscription opens. A rerun uses it to ask the
    * backend to roll the old turn back first: the events the backend emits
@@ -242,7 +248,7 @@ async function runTurn(
     }
   }
 
-  beginTurn(chatId, userMessage, options.replaceIds);
+  beginTurn(chatId, userMessage, options.sentAt, options.replaceIds);
   const turn = liveTurns.get(chatId);
   if (!turn) return;
 
@@ -319,11 +325,12 @@ async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcom
   // staged. Until then it holds the chat, so a second tap or a send cannot
   // start a turn beside it and leave this one's reply "Sending" forever.
   startingTurns.add(chatId);
+  const sentAt = Date.now();
   const messages = useMessagesStore.getState();
   messages.setTurnActive(chatId, true);
-  messages.setActivity(chatId, SENDING);
+  messages.setActivity(chatId, { kind: "sending", since: sentAt });
   try {
-    return await rerun(chatId, edit);
+    return await rerun(chatId, sentAt, edit);
   } finally {
     // Once live, the turn itself owns the chat; this only covers not starting.
     if (startingTurns.delete(chatId) && !liveTurns.has(chatId)) {
@@ -333,7 +340,7 @@ async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcom
   }
 }
 
-async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
+async function rerun(chatId: ChatId, sentAt: number, edit?: Edit): Promise<RegenerateOutcome> {
   const provider = await getProvider();
   if (!provider) return { ok: false, error: t("errors.notConnected") };
 
@@ -381,6 +388,7 @@ async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
         discardPrepared: (active) => active.discardRegenerate!(chatId),
         replaceIds: target.replaceIds,
         markRegeneratePending: true,
+        sentAt,
       },
     );
   } else {
@@ -391,6 +399,7 @@ async function rerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
       { id: localId("user"), ...carried },
       {
         deliver: (active, outgoing) => active.send(chatId, outgoing),
+        sentAt,
       },
     );
   }
@@ -529,7 +538,12 @@ async function branchBefore(
   return { ok: true, chat };
 }
 
-function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[] = []): void {
+function beginTurn(
+  chatId: ChatId,
+  userMessage: UserMessage,
+  sentAt: number,
+  replaceIds: string[] = [],
+): void {
   const messages = useMessagesStore.getState();
   const user: Message = {
     id: userMessage.id,
@@ -553,7 +567,7 @@ function beginTurn(chatId: ChatId, userMessage: UserMessage, replaceIds: string[
   if (replaceIds.length > 0) messages.removeMessages(chatId, replaceIds);
   messages.appendMessage(chatId, user);
   messages.appendMessage(chatId, assistant);
-  trackTurn(chatId, assistant, SENDING);
+  trackTurn(chatId, assistant, { kind: "sending", since: sentAt });
   useChatsStore.getState().touch(chatId);
 }
 
@@ -1018,7 +1032,6 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
 }
 
-const SENDING: TurnActivity = { kind: "sending" };
 const THINKING: TurnActivity = { kind: "thinking" };
 
 function hasContent(reply: Message): boolean {
@@ -1402,7 +1415,7 @@ export async function sendQueuedNow(chatId: ChatId, id: string): Promise<void> {
   await runTurn(
     chatId,
     { id, text: queued.text, ...(queued.attachments ? { attachments: queued.attachments } : {}) },
-    { deliver: (active) => active.steerQueued!(chatId, id) },
+    { deliver: (active) => active.steerQueued!(chatId, id), sentAt: Date.now() },
   );
 }
 
