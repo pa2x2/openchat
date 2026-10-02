@@ -278,8 +278,6 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       return WORKING;
     case "session.reasoning.started":
       return THINKING;
-    case "session.text.started":
-      return { type: "activity", activity: null };
     // A call is named when the model starts writing its input, and gets that
     // input once the model is done with it.
     case "session.tool.input.started": {

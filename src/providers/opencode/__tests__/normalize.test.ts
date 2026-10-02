@@ -83,6 +83,8 @@ describe("normalizeV2Event", () => {
     const dropped = [
       "server.connected",
       "session.inbox.enqueued",
+      // The row keeps what the reply was doing until its first word arrives.
+      "session.text.started",
       "session.text.ended",
       "session.renamed",
       "permission.asked",

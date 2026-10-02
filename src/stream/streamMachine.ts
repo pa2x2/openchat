@@ -948,7 +948,8 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
   }
   if (event.type === "text-delta" || event.type === "reasoning-delta") {
     const kind = event.type === "text-delta" ? "text" : "reasoning";
-    // Covers a missed activity event, e.g. when the text or reasoning started during a reconnect.
+    // Text replaces the activity row once its first word is in. Reasoning
+    // covers a missed start event, e.g. when it started during a reconnect.
     if (kind === "text" && turn.activity) setActivity(turn, null);
     if (kind === "reasoning" && turn.activity?.kind !== "thinking") setActivity(turn, THINKING);
     turn.draft = appendDelta(turn.draft, kind, event.text, turn.lastDelta === kind);
