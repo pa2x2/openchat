@@ -40,6 +40,18 @@ export async function getProvider(): Promise<ChatProvider | null> {
   return provider;
 }
 
+/**
+ * Re-reads the server version, which is otherwise saved only on connect and
+ * goes stale once the server is upgraded.
+ */
+export async function refreshServerVersion(): Promise<void> {
+  const profile = useConnectionStore.getState().profile;
+  const provider = await getProvider();
+  if (!profile || !provider) return;
+  const { serverVersion } = await provider.connect(await resolveConfig(profile));
+  useConnectionStore.getState().setServerVersion(profile.baseUrl, serverVersion);
+}
+
 /** Test hook: forget the memoized instance. */
 export function resetProviderCache(): void {
   cached = null;

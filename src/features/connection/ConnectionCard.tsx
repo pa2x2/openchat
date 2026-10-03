@@ -20,7 +20,7 @@ import { Input } from "@/src/ui/Input";
 import { showDialog } from "@/src/ui/Dialog";
 import { cn } from "@/src/lib/cn";
 import { clearPassword, loadPassword, savePassword } from "@/src/lib/secrets";
-import { useProviderDescriptor } from "@/src/lib/providerFactory";
+import { refreshServerVersion, useProviderDescriptor } from "@/src/lib/providerFactory";
 import { listProviderDescriptors } from "@/src/providers/registry";
 import type { ConnectionConfig } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
@@ -46,6 +46,10 @@ export function ConnectionCard() {
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
+
+  useEffect(() => {
+    void refreshServerVersion().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
