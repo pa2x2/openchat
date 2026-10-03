@@ -20,6 +20,7 @@ import type {
   TurnActivity,
   WebSource,
 } from "@/src/domain";
+import type { TFunction } from "i18next";
 import { t } from "@/src/i18n";
 import { formatNumber } from "@/src/i18n/format";
 import type { IconName } from "@/src/ui/Icon";
@@ -69,9 +70,18 @@ function toBlocks(parts: ReplyPart[], showReasoning: boolean, running: boolean):
   return blocks;
 }
 
+/**
+ * `t` is the calling component's, from `useTranslation`: a component that
+ * keeps the layout between renders then makes it again when the language
+ * changes.
+ */
 export function layoutReply(
   message: Message,
-  { showReasoning, activity }: { showReasoning: boolean; activity: TurnActivity | null },
+  {
+    showReasoning,
+    activity,
+    t,
+  }: { showReasoning: boolean; activity: TurnActivity | null; t: TFunction },
 ): ReplyLayout {
   const parts: ReplyPart[] =
     message.parts ?? (message.text ? [{ type: "text", text: message.text }] : []);
@@ -104,13 +114,13 @@ export function layoutReply(
   if (!foldsWork) return { fold: null, blocks, answer };
   const forms = before.filter((block) => block.type === "form");
   return {
-    fold: { label: foldLabel(message), blocks: before.filter((block) => block.type !== "form") },
+    fold: { label: foldLabel(message, t), blocks: before.filter((block) => block.type !== "form") },
     blocks: [...forms, ...after],
     answer,
   };
 }
 
-function foldLabel(message: Message): string {
+function foldLabel(message: Message, t: TFunction): string {
   const duration =
     message.completedAt !== undefined
       ? formatDuration(message.completedAt - message.createdAt)

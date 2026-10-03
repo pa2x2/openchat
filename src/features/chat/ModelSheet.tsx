@@ -248,6 +248,17 @@ function ModelBrowser({
 
   const labelOf = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
 
+  // Declared before its callers: React Compiler skips a component that calls
+  // a function declared further down.
+  function scrollToRow(itemIndex: number) {
+    listRef.current?.scrollToLocation({
+      sectionIndex: 0,
+      itemIndex,
+      viewPosition: 0.5,
+      animated: false,
+    });
+  }
+
   // Runs on every content size change: the list renders its rows in batches,
   // and a scroll made before the batch holding the selected row has landed
   // stops short at the end of the content rendered so far.
@@ -258,15 +269,6 @@ function ModelBrowser({
     if (index < 4) return;
     // In a SectionList, item 0 is the section header.
     scrollToRow(index + 1);
-  }
-
-  function scrollToRow(itemIndex: number) {
-    listRef.current?.scrollToLocation({
-      sectionIndex: 0,
-      itemIndex,
-      viewPosition: 0.5,
-      animated: false,
-    });
   }
 
   // The first content size change comes before any row is measured, so that

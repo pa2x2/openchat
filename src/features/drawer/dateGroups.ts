@@ -1,5 +1,5 @@
+import type { TFunction } from "i18next";
 import type { ChatSummary } from "@/src/domain";
-import { t } from "@/src/i18n";
 
 export interface ChatGroup {
   title: string;
@@ -10,7 +10,7 @@ function startOfDay(time: Date): number {
   return new Date(time.getFullYear(), time.getMonth(), time.getDate()).getTime();
 }
 
-function groupTitle(updatedAt: number, now: Date): string {
+function groupTitle(updatedAt: number, now: Date, t: TFunction): string {
   // A chat the server gave no time for would otherwise land in January 1970.
   if (updatedAt <= 0) return t("drawer.groups.older");
   const time = new Date(updatedAt);
@@ -28,10 +28,10 @@ function groupTitle(updatedAt: number, now: Date): string {
 }
 
 /** Groups chats sorted newest first into ChatGPT's date sections, in order. */
-export function groupChatsByDate(chats: ChatSummary[], now: Date): ChatGroup[] {
+export function groupChatsByDate(chats: ChatSummary[], now: Date, t: TFunction): ChatGroup[] {
   const groups: ChatGroup[] = [];
   for (const chat of chats) {
-    const title = groupTitle(chat.updatedAt, now);
+    const title = groupTitle(chat.updatedAt, now, t);
     const last = groups.at(-1);
     if (last?.title === title) last.data.push(chat);
     else groups.push({ title, data: [chat] });

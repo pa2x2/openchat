@@ -56,7 +56,8 @@
       "./plugins/withAndroidDaemonJvm"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     }
   }
 }

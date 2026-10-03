@@ -1,4 +1,5 @@
 import type { ChatSummary } from "@/src/domain";
+import { t } from "@/src/i18n";
 import { groupChatsByDate } from "../dateGroups";
 
 const chat = (id: string, updatedAt: Date): ChatSummary => ({
@@ -19,6 +20,7 @@ describe("groupChatsByDate", () => {
         chat("last-month", new Date(2025, 11, 1, 12, 0)),
       ],
       now,
+      t,
     );
     expect(groups.map((group) => [group.title, group.data.map((each) => each.id)])).toEqual([
       ["Today", ["minutes-ago"]],

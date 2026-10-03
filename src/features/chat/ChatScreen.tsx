@@ -322,38 +322,38 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     busy.current = true;
     setBanner(null);
     setAttachments([]);
-    try {
-      const provider = await getProvider();
-      if (!provider) {
+    // Failures are caught on the promise rather than with try: React Compiler
+    // 1.0 skips the whole screen over a try that has a `finally`, a `throw`
+    // or a conditional expression in it.
+    const sent = await deliver(text, files).then(
+      () => true,
+      (error: unknown) => {
         setAttachments(files);
-        setBanner(t("errors.notConnected"));
+        setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
         return false;
-      }
-      if (isDraft) {
-        // Lazy chat creation: the backend chat exists only once something is said.
-        const sentAt = stageDraftTurn(text, files);
-        let created;
-        try {
-          created = await provider.createChat(currentModel ? { model: currentModel } : undefined);
-        } finally {
-          useMessagesStore.getState().removeChat(NEW_CHAT);
-        }
-        if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
-        useChatsStore.getState().upsert(created);
-        const streaming = sendMessage(created.id, text, files, sentAt);
-        router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
-        await streaming;
-      } else {
-        await sendMessage(chatId, text, files);
-      }
-      return true;
-    } catch (error) {
-      setAttachments(files);
-      setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
-      return false;
-    } finally {
-      busy.current = false;
+      },
+    );
+    busy.current = false;
+    return sent;
+  }
+
+  async function deliver(text: string, files: Attachment[]) {
+    const provider = await getProvider();
+    if (!provider) throw new Error(t("errors.notConnected"));
+    if (!isDraft) {
+      await sendMessage(chatId, text, files);
+      return;
     }
+    // Lazy chat creation: the backend chat exists only once something is said.
+    const sentAt = stageDraftTurn(text, files);
+    const created = await provider
+      .createChat(currentModel ? { model: currentModel } : undefined)
+      .finally(() => useMessagesStore.getState().removeChat(NEW_CHAT));
+    if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
+    useChatsStore.getState().upsert(created);
+    const streaming = sendMessage(created.id, text, files, sentAt);
+    router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
+    await streaming;
   }
 
   async function handleQueue(text: string, files: Attachment[]): Promise<boolean> {
@@ -406,21 +406,20 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     // edit itself only resolves once its reply is done.
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
-    try {
-      const outcome =
-        target.target === "new"
-          ? await sendEditToBranch(target.message, text)
-          : await editMessage(chatId, target.message, text);
-      if (outcome.ok) return true;
-      if (outcome.error) setBanner(outcome.error);
-      // Back to editing with the edited text, so nothing typed is lost.
-      setEditing({ ...target, draft: composer.current?.read() ?? target.draft });
-      setAttachments([]);
-      composer.current?.insert(text, false);
-      return false;
-    } finally {
+    const outcome = await (
+      target.target === "new"
+        ? sendEditToBranch(target.message, text)
+        : editMessage(chatId, target.message, text)
+    ).finally(() => {
       busy.current = false;
-    }
+    });
+    if (outcome.ok) return true;
+    if (outcome.error) setBanner(outcome.error);
+    // Back to editing with the edited text, so nothing typed is lost.
+    setEditing({ ...target, draft: composer.current?.read() ?? target.draft });
+    setAttachments([]);
+    composer.current?.insert(text, false);
+    return false;
   }
 
   async function sendEditToBranch(
@@ -521,22 +520,20 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (providerId) useSettingsStore.getState().setLastModel(providerId, model);
     if (isDraft) return;
     setSwitchingModel(true);
-    try {
-      const provider = await getProvider();
-      if (!provider) {
-        setBanner(t("errors.notConnected"));
-        return;
-      }
-      await provider.setChatModel(chatId, model);
-      const current = useChatsStore.getState().chats.find((candidate) => candidate.id === chatId);
-      if (current) useChatsStore.getState().upsert({ ...current, model });
-    } catch (error) {
+    await switchModel(model).catch((error: unknown) =>
       setBanner(
         error instanceof Error && error.message ? error.message : t("chat.switchModelFailed"),
-      );
-    } finally {
-      setSwitchingModel(false);
-    }
+      ),
+    );
+    setSwitchingModel(false);
+  }
+
+  async function switchModel(model: ModelRef) {
+    const provider = await getProvider();
+    if (!provider) throw new Error(t("errors.notConnected"));
+    await provider.setChatModel(chatId, model);
+    const current = useChatsStore.getState().chats.find((candidate) => candidate.id === chatId);
+    if (current) useChatsStore.getState().upsert({ ...current, model });
   }
 
   const menuItems: MenuItem[] = [];

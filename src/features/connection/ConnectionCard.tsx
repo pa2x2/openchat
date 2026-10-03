@@ -84,34 +84,37 @@ export function ConnectionCard() {
     setBusy(true);
     setLocalError(null);
     markConnecting();
-    try {
-      const storedPassword = typedPassword ? undefined : await loadPassword(descriptor.id);
-      const password = typedPassword || storedPassword;
-      const cfg: ConnectionConfig = {
-        baseUrl: values.baseUrl.trim(),
-        credentials: password ? { password } : undefined,
-      };
-      const provider = descriptor.create(cfg);
-      const info = await provider.connect(cfg);
-      if (typedPassword) {
-        await savePassword(descriptor.id, typedPassword);
-      }
-      saveProfile({
-        providerId: descriptor.id,
-        baseUrl: cfg.baseUrl,
-        serverVersion: info.serverVersion,
-      });
-      setValues({ baseUrl: cfg.baseUrl });
-      // The chat list may be another server's, or stale from before the reconnect.
-      void useChatsStore.getState().refresh();
-    } catch (error) {
+    // Caught on the promise rather than with try, which React Compiler 1.0
+    // cannot compile around the conditionals in `connect`.
+    await connect().catch((error: unknown) => {
       const message =
         error instanceof Error && error.message ? error.message : t("connection.connectFailed");
       setLocalError(message);
       markDisconnected(message);
-    } finally {
-      setBusy(false);
+    });
+    setBusy(false);
+  }
+
+  async function connect() {
+    const storedPassword = typedPassword ? undefined : await loadPassword(descriptor.id);
+    const password = typedPassword || storedPassword;
+    const cfg: ConnectionConfig = {
+      baseUrl: values.baseUrl.trim(),
+      credentials: password ? { password } : undefined,
+    };
+    const provider = descriptor.create(cfg);
+    const info = await provider.connect(cfg);
+    if (typedPassword) {
+      await savePassword(descriptor.id, typedPassword);
     }
+    saveProfile({
+      providerId: descriptor.id,
+      baseUrl: cfg.baseUrl,
+      serverVersion: info.serverVersion,
+    });
+    setValues({ baseUrl: cfg.baseUrl });
+    // The chat list may be another server's, or stale from before the reconnect.
+    void useChatsStore.getState().refresh();
   }
 
   function handleCancel() {

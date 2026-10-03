@@ -54,7 +54,7 @@ export function ChatDrawer({
   onOpenUsage,
   onDeletedActive,
 }: ChatDrawerProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardOpen();
   const allChats = useChatsStore((state) => state.chats);
@@ -105,13 +105,7 @@ export function ChatDrawer({
 
   // The layout re-reads the list at every opening, which regroups it, so
   // "Today" moves on once the day does.
-  // The group titles are in the language they were made in.
-  const language = i18n.language;
-  const sections = useMemo(
-    () => groupChatsByDate(visible, new Date()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visible, language],
-  );
+  const sections = useMemo(() => groupChatsByDate(visible, new Date(), t), [visible, t]);
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
