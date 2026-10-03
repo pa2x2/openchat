@@ -3,9 +3,10 @@ allowBuilds:
   msgpackr-extract: true
   unrs-resolver: true
 packageExtensions:
-  # Its math renderer needs this native module; OpenChat only uses the
-  # headless parser, so keep it out of the install and the app build.
-  react-native-nitro-markdown:
+  # Only its opt-in bundle mode needs a Metro config, and nothing in it imports
+  # this. As a required peer it gets auto-installed at the newest version, which
+  # React Native's CLI plugin then shares although it wants its own version.
+  react-native-worklets:
     peerDependenciesMeta:
-      ratex-react-native:
+      "@react-native/metro-config":
         optional: true
