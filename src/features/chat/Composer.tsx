@@ -170,10 +170,8 @@ export function Composer({
   }
 
   const sendDisabled = empty || locked;
-  // The model chip steps aside while a reply streams; attach stays only for
-  // a message to queue.
+  // While a reply streams, attach stays only for a message to queue.
   const showAttach = Boolean(onAttach) && (!streaming || queueing);
-  const showModel = Boolean(model) && !streaming;
   const sendButton = (
     <Pressable
       accessibilityHint={queueing ? t("composer.queueHint") : t("composer.sendHint")}
@@ -291,7 +289,7 @@ export function Composer({
             <Icon name="plus" size={26} />
           </Pressable>
         ) : null}
-        {showModel && model ? (
+        {model ? (
           <Pressable
             accessibilityHint={t("composer.modelHint")}
             accessibilityLabel={[
