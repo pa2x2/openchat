@@ -16,6 +16,7 @@
  * it and closes the sheet; the caller decides what the choice applies to.
  */
 
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNumber } from "@/src/i18n/format";
 import { useTranslation } from "react-i18next";
@@ -35,10 +36,10 @@ import { TextInput } from "@/src/ui/TextInput";
 import { favoriteModels, groupByProvider, monogram, searchGroups } from "./modelPicker";
 
 /** A context window as a short size, e.g. 200000 → "200K", 1048576 → "1M". */
-export function formatContextWindow(tokens: number): string {
+export function formatContextWindow(t: TFunction, tokens: number): string {
   if (tokens >= 1_000_000) {
     const millions = Number((tokens / 1_000_000).toFixed(1));
-    return `${formatNumber(millions, Number.isInteger(millions) ? 0 : 1)}M`;
+    return `${formatNumber(t, millions, Number.isInteger(millions) ? 0 : 1)}M`;
   }
   return `${Math.round(tokens / 1_000)}K`;
 }
@@ -248,6 +249,17 @@ function ModelBrowser({
 
   const labelOf = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
 
+  // Declared before its callers: React Compiler skips a component that calls
+  // a function declared further down.
+  function scrollToRow(itemIndex: number) {
+    listRef.current?.scrollToLocation({
+      sectionIndex: 0,
+      itemIndex,
+      viewPosition: 0.5,
+      animated: false,
+    });
+  }
+
   // Runs on every content size change: the list renders its rows in batches,
   // and a scroll made before the batch holding the selected row has landed
   // stops short at the end of the content rendered so far.
@@ -258,15 +270,6 @@ function ModelBrowser({
     if (index < 4) return;
     // In a SectionList, item 0 is the section header.
     scrollToRow(index + 1);
-  }
-
-  function scrollToRow(itemIndex: number) {
-    listRef.current?.scrollToLocation({
-      sectionIndex: 0,
-      itemIndex,
-      viewPosition: 0.5,
-      animated: false,
-    });
   }
 
   // The first content size change comes before any row is measured, so that
@@ -566,7 +569,7 @@ function ModelRow({
   const detail = [
     providerLabel,
     model.ref.id,
-    model.contextWindow ? formatContextWindow(model.contextWindow) : undefined,
+    model.contextWindow ? formatContextWindow(t, model.contextWindow) : undefined,
   ]
     .filter(Boolean)
     .join(" · ");

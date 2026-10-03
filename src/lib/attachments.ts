@@ -8,8 +8,8 @@
  * exact form.
  */
 
+import type { TFunction } from "i18next";
 import type { Attachment } from "@/src/domain";
-import { t } from "@/src/i18n";
 import { formatNumber } from "@/src/i18n/format";
 
 /** Largest single attachment the app will send, in bytes. */
@@ -44,9 +44,9 @@ export function describeAttachment(attachment: Attachment): string {
   return attachment.name || "attachment";
 }
 
-export function formatBytes(bytes: number | undefined): string {
+export function formatBytes(t: TFunction, bytes: number | undefined): string {
   if (bytes === undefined || bytes <= 0) return "";
   if (bytes < 1024) return t("format.bytes", { value: bytes });
   if (bytes < 1024 * 1024) return t("format.kilobytes", { value: Math.round(bytes / 1024) });
-  return t("format.megabytes", { value: formatNumber(bytes / (1024 * 1024), 1) });
+  return t("format.megabytes", { value: formatNumber(t, bytes / (1024 * 1024), 1) });
 }

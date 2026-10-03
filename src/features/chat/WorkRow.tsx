@@ -104,7 +104,7 @@ function WorkItems({ items }: { items: WorkItem[] }) {
                 />
               </View>
               <Text numberOfLines={2} className="shrink text-[14.5px] text-text-muted">
-                {toolLabel(item.tool)}
+                {toolLabel(t, item.tool)}
                 {item.tool.status === "failed" ? (
                   <Text className="text-danger"> · {t("reply.toolFailed")}</Text>
                 ) : null}
@@ -124,8 +124,7 @@ function WorkItems({ items }: { items: WorkItem[] }) {
  * what the reply is doing now.
  */
 export function WorkRow({ block }: { block: WorkBlock }) {
-  // Re-renders the labels `workRow` builds when the language changes.
-  useTranslation();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const since = block.live?.kind === "sending" ? block.live.since : null;
   const [slowSince, setSlowSince] = useState<number | null>(null);
@@ -137,7 +136,7 @@ export function WorkRow({ block }: { block: WorkBlock }) {
     );
     return () => clearTimeout(timer);
   }, [since]);
-  const { icon, label } = workRow(block, since !== null && slowSince === since);
+  const { icon, label } = workRow(t, block, since !== null && slowSince === since);
   const expandable = block.items.length > 0;
   const row = (
     <View className="flex-row items-center gap-2 py-1">

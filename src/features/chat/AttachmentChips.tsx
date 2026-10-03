@@ -87,7 +87,7 @@ export function AttachmentChip({
   size?: "small" | "large";
 }) {
   const { t } = useTranslation();
-  const bytes = formatBytes(attachment.size);
+  const bytes = formatBytes(t, attachment.size);
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()!.toUpperCase()
     : t("attach.fileBadge");

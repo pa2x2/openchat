@@ -1,8 +1,8 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import type { Message, ModelInfo } from "@/src/domain";
 import { formatNumber } from "@/src/i18n/format";
-import { t } from "@/src/i18n";
 import { sameModelRef, useModelsStore } from "@/src/stores/models";
 import { Text } from "@/src/ui/Text";
 import { formatCost, formatModelTime, tokenFigures, type Figure } from "./usageFormat";
@@ -20,7 +20,7 @@ function modelLabel(message: Message, models: ModelInfo[]): string | null {
 }
 
 /** A reply's figures in the order the card lists them; one the backend did not send is left out. */
-export function replyFigures(message: Message, models: ModelInfo[]): Figure[] {
+export function replyFigures(t: TFunction, message: Message, models: ModelInfo[]): Figure[] {
   const figures: Figure[] = [];
   const model = modelLabel(message, models);
   if (model) figures.push({ label: t("usage.figures.model"), value: model });
@@ -28,14 +28,14 @@ export function replyFigures(message: Message, models: ModelInfo[]): Figure[] {
   const { generationMs, completedAt, createdAt, usage } = message;
   if (generationMs !== undefined) {
     // The whole is what "Worked for" shows, so the two read as part and total.
-    const part = formatModelTime(generationMs);
+    const part = formatModelTime(t, generationMs);
     figures.push({
       label: t("usage.figures.modelTime"),
       value:
         completedAt !== undefined
           ? t("usage.figures.modelTimeOf", {
               part,
-              whole: formatDuration(completedAt - createdAt),
+              whole: formatDuration(t, completedAt - createdAt),
             })
           : part,
     });
@@ -45,15 +45,15 @@ export function replyFigures(message: Message, models: ModelInfo[]): Figure[] {
       figures.push({
         label: t("usage.figures.speed"),
         value: t("usage.figures.speedValue", {
-          speed: speed < 10 ? formatNumber(speed, 1) : formatNumber(speed),
+          speed: speed < 10 ? formatNumber(t, speed, 1) : formatNumber(t, speed),
         }),
       });
     }
   }
 
-  const cost = formatCost(message.cost);
+  const cost = formatCost(t, message.cost);
   if (cost) figures.push({ label: t("usage.figures.cost"), value: cost });
-  return [...figures, ...tokenFigures(usage)];
+  return [...figures, ...tokenFigures(t, usage)];
 }
 
 /**
@@ -61,10 +61,9 @@ export function replyFigures(message: Message, models: ModelInfo[]): Figure[] {
  * the longest label.
  */
 export function ReplyDetails({ message }: { message: Message }) {
-  // Re-renders the labels `replyFigures` builds when the language changes.
-  useTranslation();
+  const { t } = useTranslation();
   const models = useModelsStore((state) => state.models);
-  const figures = replyFigures(message, models);
+  const figures = replyFigures(t, message, models);
   return (
     <View
       accessible

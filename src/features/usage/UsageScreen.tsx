@@ -49,7 +49,7 @@ function Totals({
     <View accessibilityRole="radiogroup" className="mt-3 flex-row gap-2">
       {MEASURES.map((value) => {
         const label = t(`usage.measure.${value}`);
-        const figure = formatMeasured(report, value);
+        const figure = formatMeasured(t, report, value);
         if (figure === null) return null;
         const active = value === measure;
         return (
@@ -92,15 +92,15 @@ function Report({ report }: { report: UsageReport }) {
   const catalog = useModelsStore((state) => state.models);
   // A period with nothing priced has no cost to chart.
   const measure = chosen === "cost" && !report.cost ? "tokens" : chosen;
-  const days = chartDays(report, period);
-  const models = modelRows(report, catalog, measure);
-  const tokens = tokenFigures(report.usage);
+  const days = chartDays(t, report, period);
+  const models = modelRows(t, report, catalog, measure);
+  const tokens = tokenFigures(t, report.usage);
 
   return (
     <>
       <Totals report={report} measure={measure} onChange={setMeasure} />
       <Text className="px-0.5 pt-2.5 text-[13px] text-text-muted" testID="usage-summary">
-        {summaryLine(report, period)}
+        {summaryLine(t, report, period)}
       </Text>
       {days && report.days.length > 0 ? (
         <UsageChart days={days} measure={measure} currency={report.cost?.currency ?? "USD"} />

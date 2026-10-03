@@ -54,7 +54,7 @@ export function ChatDrawer({
   onOpenUsage,
   onDeletedActive,
 }: ChatDrawerProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardOpen();
   const allChats = useChatsStore((state) => state.chats);
@@ -99,19 +99,13 @@ export function ChatDrawer({
     const needle = query.trim().toLowerCase();
     return allChats.filter(
       (chat) =>
-        !temporary[chat.id] && (!needle || chatTitle(chat.title).toLowerCase().includes(needle)),
+        !temporary[chat.id] && (!needle || chatTitle(t, chat.title).toLowerCase().includes(needle)),
     );
-  }, [allChats, temporary, query]);
+  }, [allChats, temporary, query, t]);
 
   // The layout re-reads the list at every opening, which regroups it, so
   // "Today" moves on once the day does.
-  // The group titles are in the language they were made in.
-  const language = i18n.language;
-  const sections = useMemo(
-    () => groupChatsByDate(visible, new Date()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visible, language],
-  );
+  const sections = useMemo(() => groupChatsByDate(t, visible, new Date()), [visible, t]);
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
@@ -486,7 +480,7 @@ const ChatRow = memo(function ChatRow({
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
   const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
   const { t } = useTranslation();
-  const title = chatTitle(chat.title);
+  const title = chatTitle(t, chat.title);
   return (
     <Pressable
       accessibilityRole="button"

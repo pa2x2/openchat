@@ -25,7 +25,7 @@ export function contextTone(share: number): PaletteKey {
  */
 export function ContextMeter({ context, onPress }: { context: ContextUse; onPress: () => void }) {
   const { t } = useTranslation();
-  const short = formatTokensShort(context.tokens);
+  const short = formatTokensShort(t, context.tokens);
   const share = context.window ? contextShare(context.tokens, context.window) : null;
   return (
     <Pressable

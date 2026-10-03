@@ -6,6 +6,7 @@
  * connection UI and store wiring.
  */
 
+import type { TFunction } from "i18next";
 import type {
   Capabilities,
   ChatForm,
@@ -189,7 +190,7 @@ export interface ConfigField {
 export interface ProviderDescriptor {
   id: ProviderId;
   label: string;
-  fields: ConfigField[];
+  fields(t: TFunction): ConfigField[];
   /** The same as every instance's `capabilities`; the UI reads them from here. */
   capabilities: Capabilities;
   create(cfg: ConnectionConfig): ChatProvider;

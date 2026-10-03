@@ -17,7 +17,7 @@ import { showDialog } from "@/src/ui/Dialog";
 export function confirmDeleteChat(chat: Pick<ChatSummary, "id" | "title">, onDeleted?: () => void) {
   showDialog({
     title: t("drawer.delete.title"),
-    message: t("drawer.delete.message", { title: chatTitle(chat.title) }),
+    message: t("drawer.delete.message", { title: chatTitle(t, chat.title) }),
     actions: [
       { label: t("common.cancel"), style: "cancel" },
       {

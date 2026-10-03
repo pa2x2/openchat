@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Animated,
@@ -71,15 +71,16 @@ export function Sheet({
   // Whether the sheet was open on the previous pass, so that one which mounts
   // closed is not mistaken for one on its way down.
   const wasVisible = useRef(visible);
-  // The responder is built once, so it reads the latest onClose from here.
-  const onCloseRef = useRef(onClose);
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose;
-  });
+  // Drags that ended in a dismissal. The responder is built once, so it
+  // cannot hold the current onClose; it counts here, and the effect below
+  // passes each one on.
+  const [dismissals, setDismissals] = useState(0);
+  const dismiss = useEffectEvent(onClose);
+  useEffect(() => {
+    if (dismissals > 0) dismiss();
+  }, [dismissals]);
 
-  // Built once: a new responder mid-drag would lose its gesture state. The
-  // ref is only read when a gesture ends, never during render.
-  // eslint-disable-next-line react-hooks/refs
+  // Built once: a new responder mid-drag would lose its gesture state.
   const [panResponder] = useState(() =>
     PanResponder.create({
       // Claim touches on the card's own surface (grabber, title, padding) and
@@ -90,7 +91,7 @@ export function Sheet({
       onPanResponderMove: (_, g) => drag.setValue(Math.max(0, g.dy)),
       onPanResponderRelease: (_, g) => {
         if (g.dy > DISMISS_DISTANCE || g.vy > DISMISS_VELOCITY) {
-          onCloseRef.current();
+          setDismissals((count) => count + 1);
           return;
         }
         Animated.spring(drag, { toValue: 0, bounciness: 0, useNativeDriver: true }).start();

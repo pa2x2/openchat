@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { cn } from "@/src/lib/cn";
 import type { UsageMeasure } from "@/src/stores/settings";
@@ -27,6 +28,7 @@ export interface UsageChartProps {
 }
 
 export function UsageChart({ days, measure, currency }: UsageChartProps) {
+  const { t } = useTranslation();
   const [picked, setPicked] = useState<string | null>(null);
   const values = days.map((day) => (day.totals ? measured(day.totals, measure) : 0));
   const top = chartTop(Math.max(...values));
@@ -36,7 +38,7 @@ export function UsageChart({ days, measure, currency }: UsageChartProps) {
   const shown =
     days.find((day) => day.date === picked) ?? days.findLast((day) => day.totals) ?? days.at(-1);
   if (!shown) return null;
-  const readout = dayReadout(shown, measure);
+  const readout = dayReadout(t, shown, measure);
   const everyDayLabelled = days.length <= MAX_LABELLED_DAYS;
   const middle = days[Math.floor((days.length - 1) / 2)];
 
@@ -57,7 +59,7 @@ export function UsageChart({ days, measure, currency }: UsageChartProps) {
               className="absolute right-1.5 text-[11px] text-text-faint"
               style={{ bottom: height(tick) - TICK_LINE_HEIGHT / 2, lineHeight: TICK_LINE_HEIGHT }}
             >
-              {formatTick(tick, measure, currency)}
+              {formatTick(t, tick, measure, currency)}
             </Text>
           ))}
         </View>
@@ -76,7 +78,7 @@ export function UsageChart({ days, measure, currency }: UsageChartProps) {
                 <Pressable
                   key={day.date}
                   accessibilityRole="button"
-                  accessibilityLabel={`${day.label}: ${dayReadout(day, measure).lead}`}
+                  accessibilityLabel={`${day.label}: ${dayReadout(t, day, measure).lead}`}
                   accessibilityState={{ selected }}
                   className={cn(
                     "flex-1 items-center justify-end rounded-t-[4px]",

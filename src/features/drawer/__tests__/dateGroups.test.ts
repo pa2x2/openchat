@@ -1,4 +1,5 @@
 import type { ChatSummary } from "@/src/domain";
+import { t } from "@/src/i18n";
 import { groupChatsByDate } from "../dateGroups";
 
 const chat = (id: string, updatedAt: Date): ChatSummary => ({
@@ -12,6 +13,7 @@ describe("groupChatsByDate", () => {
     // Just past midnight on 2 January, local time.
     const now = new Date(2026, 0, 2, 0, 30);
     const groups = groupChatsByDate(
+      t,
       [
         chat("minutes-ago", new Date(2026, 0, 2, 0, 5)),
         // Under an hour ago, but on the previous calendar day.

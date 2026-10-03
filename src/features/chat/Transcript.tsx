@@ -11,7 +11,7 @@
  * laid out that way until the next one starts or the screen is left.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
@@ -179,14 +179,16 @@ export function Transcript({
   // The edit is typed in the composer, so the message goes just above it,
   // with the start of what the edit replaces under it. Placed from the
   // bottom, it stays in view as the keyboard opens and the list shrinks.
-  useEffect(() => {
-    if (editingIndex >= 0) scrollToEdited(editingIndex);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per edit, not as the list changes under it
-  }, [editingId]);
-
   function scrollToEdited(index: number) {
     listRef.current?.scrollToIndex({ index, viewPosition: 0, viewOffset: EDIT_PEEK });
   }
+  // Once per edit, not as the list changes under it.
+  const scrollToEditing = useEffectEvent(() => {
+    if (editingIndex >= 0) scrollToEdited(editingIndex);
+  });
+  useEffect(() => {
+    scrollToEditing();
+  }, [editingId]);
 
   const dragged = useRef(false);
   const wandered = useRef(false);

@@ -1,12 +1,12 @@
 import * as Clipboard from "expo-clipboard";
 import { memo, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
 import { totalTokens, type Message, type TurnActivity } from "@/src/domain";
-import { t } from "@/src/i18n";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
@@ -43,7 +43,7 @@ export interface MessageBubbleProps {
 }
 
 /** A terminal outcome worth a line under the message; live states show inline, errors in a card. */
-function statusFor(message: Message): string | undefined {
+function statusFor(t: TFunction, message: Message): string | undefined {
   return message.status === "interrupted" ? t("reply.stopped") : undefined;
 }
 
@@ -64,11 +64,11 @@ function CopyButton({ text, label, testID }: { text: string; label: string; test
 }
 
 /** What a running reply has used so far; it moves when a step ends, not as text arrives. */
-function runningCount(message: Message): string | null {
+function runningCount(t: TFunction, message: Message): string | null {
   if (!message.usage) return null;
   const used = [
-    t("context.tokenCount", { tokens: formatTokensShort(totalTokens(message.usage)) }),
-    formatCost(message.cost),
+    t("context.tokenCount", { tokens: formatTokensShort(t, totalTokens(message.usage)) }),
+    formatCost(t, message.cost),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -192,7 +192,7 @@ function UserText({
     <>
       <Bubble
         role="user"
-        status={statusFor(message)}
+        status={statusFor(t, message)}
         highlighted={editing}
         onLongPress={(event) => {
           setMenuAt(event.nativeEvent.pageY + 12);
@@ -229,19 +229,16 @@ export const MessageBubble = memo(function MessageBubble({
   dimmed = false,
   error = null,
 }: MessageBubbleProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const streaming = message.status === "pending" || message.status === "streaming";
   const attachments = message.attachments ?? [];
   const isUser = message.role === "user";
   const hasText = message.text.length > 0;
   const [foldOpen, setFoldOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // The layout's labels are in the language they were made in.
-  const language = i18n.language;
   const layout = useMemo(
-    () => (isUser ? null : layoutReply(message, { showReasoning, activity })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isUser, message, showReasoning, activity, language],
+    () => (isUser ? null : layoutReply(t, message, { showReasoning, activity })),
+    [isUser, message, showReasoning, activity, t],
   );
 
   if (isUser || !layout) {
@@ -260,13 +257,13 @@ export const MessageBubble = memo(function MessageBubble({
     );
   }
 
-  const status = statusFor(message);
+  const status = statusFor(t, message);
   const failed = message.status === "error";
   const hasDetails = message.usage !== undefined;
   // Retry sits in the error card, so a failed reply offers no regenerate here.
   const canRegenerate = Boolean(onRegenerate) && !failed;
   const canBranch = Boolean(onBranch) && !failed;
-  const running = streaming ? runningCount(message) : null;
+  const running = streaming ? runningCount(t, message) : null;
   const lastBlock = layout.blocks.at(-1);
   const renderBlock = (block: ReplyBlock) =>
     block.type === "work" ? (

@@ -7,6 +7,12 @@
  * what it returns is fixed in the language of the moment: an error kept in a
  * store stays in the language it was raised in. Components read strings
  * through `useTranslation`, which re-renders them when the language changes.
+ *
+ * A helper that writes text for the screen takes `t` as its first parameter
+ * rather than importing this one, and a component passes its own. React
+ * Compiler keeps a call's result until its arguments change, so text made
+ * with this `t` would stay in the old language. ESLint keeps this `t` out of
+ * everything but the modules that never render.
  */
 
 // Hermes on Android has no Intl.PluralRules, which i18next picks plural

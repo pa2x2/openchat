@@ -4,13 +4,13 @@
  * nothing in its place.
  */
 
+import type { TFunction } from "i18next";
 import type { Money, TokenUsage } from "@/src/domain";
-import { t } from "@/src/i18n";
 import { formatNumber } from "@/src/i18n/format";
 import { formatDuration } from "./replyLayout";
 
-export function formatTokens(count: number): string {
-  return formatNumber(count);
+export function formatTokens(t: TFunction, count: number): string {
+  return formatNumber(t, count);
 }
 
 /**
@@ -18,13 +18,13 @@ export function formatTokens(count: number): string {
  * picked from the rounded figure, so a count just under a boundary moves up
  * to the next unit instead of printing `100.0k` or `1000k`.
  */
-export function formatTokensShort(count: number): string {
+export function formatTokensShort(t: TFunction, count: number): string {
   if (count < 1_000) return String(Math.round(count));
   const tenths = Math.round(count / 100);
-  if (tenths < 1_000) return `${formatNumber(tenths / 10, 1)}k`;
+  if (tenths < 1_000) return `${formatNumber(t, tenths / 10, 1)}k`;
   const thousands = Math.round(count / 1_000);
   if (thousands < 1_000) return `${thousands}k`;
-  return `${formatNumber(count / 1_000_000, 2)}M`;
+  return `${formatNumber(t, count / 1_000_000, 2)}M`;
 }
 
 /**
@@ -32,23 +32,23 @@ export function formatTokensShort(count: number): string {
  * zero, since two decimals would print nearly every reply as 0.00. Null for
  * an amount that is not above zero: a cost is never shown as nothing.
  */
-export function formatCost(cost: Money | undefined): string | null {
+export function formatCost(t: TFunction, cost: Money | undefined): string | null {
   if (!cost || !(cost.amount > 0)) return null;
   const { amount, currency } = cost;
   const decimals = amount >= 1 ? 2 : Math.max(2, Math.ceil(-Math.log10(amount)) + 1);
   // Rounding can leave a zero past the second decimal: 0.0996 is "0.100" at three.
   const fixed = amount.toFixed(decimals).replace(/(\.\d\d\d*?)0+$/, "$1");
-  const text = formatNumber(Number(fixed), fixed.split(".")[1].length);
+  const text = formatNumber(t, Number(fixed), fixed.split(".")[1].length);
   return currency === "USD"
     ? t("format.usd", { amount: text })
     : t("format.currency", { amount: text, currency });
 }
 
 /** One decimal under a minute, where "Worked for" rounds to whole seconds. */
-export function formatModelTime(ms: number): string {
+export function formatModelTime(t: TFunction, ms: number): string {
   return ms < 59_950
-    ? t("format.seconds", { value: formatNumber(ms / 1_000, 1) })
-    : formatDuration(ms);
+    ? t("format.seconds", { value: formatNumber(t, ms / 1_000, 1) })
+    : formatDuration(t, ms);
 }
 
 export interface Figure {
@@ -60,7 +60,7 @@ export interface Figure {
  * Tokens by kind. Input written to the provider's cache was new input on
  * this reply, so it counts as input. A kind with no tokens has no row.
  */
-export function tokenFigures(usage: TokenUsage | undefined): Figure[] {
+export function tokenFigures(t: TFunction, usage: TokenUsage | undefined): Figure[] {
   if (!usage) return [];
   const counts: [string, number][] = [
     [t("usage.figures.input"), (usage.input ?? 0) + (usage.cacheWrite ?? 0)],
@@ -70,7 +70,7 @@ export function tokenFigures(usage: TokenUsage | undefined): Figure[] {
   ];
   return counts
     .filter(([, count]) => count > 0)
-    .map(([label, count]) => ({ label, value: formatTokens(count) }));
+    .map(([label, count]) => ({ label, value: formatTokens(t, count) }));
 }
 
 /** How full the context is, as a share of the window: 0 to 1. */

@@ -48,7 +48,7 @@ function FigureRow({ label, value }: Figure) {
 function ContextCard({ context }: { context: ContextUse }) {
   const { t } = useTranslation();
   const { colors } = useAppTheme();
-  const used = formatTokensShort(context.tokens);
+  const used = formatTokensShort(t, context.tokens);
   if (!context.window) {
     return (
       <Group className="bg-raised">
@@ -59,7 +59,7 @@ function ContextCard({ context }: { context: ContextUse }) {
     );
   }
   const share = contextShare(context.tokens, context.window);
-  const usedOf = t("context.tokensOf", { used, window: formatTokensShort(context.window) });
+  const usedOf = t("context.tokensOf", { used, window: formatTokensShort(t, context.window) });
   return (
     <Group className="bg-raised">
       <View
@@ -89,9 +89,9 @@ export function UsageSheet({ visible, onClose, context, usage, cost, onCompact }
   const nearlyFull =
     context?.window !== undefined &&
     contextTone(contextShare(context.tokens, context.window)) !== "textMuted";
-  const costText = formatCost(cost);
+  const costText = formatCost(t, cost);
   const totals: Figure[] = [
-    ...tokenFigures(usage),
+    ...tokenFigures(t, usage),
     ...(costText ? [{ label: t("usage.figures.cost"), value: costText }] : []),
   ];
   return (

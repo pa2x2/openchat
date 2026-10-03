@@ -20,7 +20,7 @@ import type {
   TurnActivity,
   WebSource,
 } from "@/src/domain";
-import { t } from "@/src/i18n";
+import type { TFunction } from "i18next";
 import { formatNumber } from "@/src/i18n/format";
 import type { IconName } from "@/src/ui/Icon";
 
@@ -70,6 +70,7 @@ function toBlocks(parts: ReplyPart[], showReasoning: boolean, running: boolean):
 }
 
 export function layoutReply(
+  t: TFunction,
   message: Message,
   { showReasoning, activity }: { showReasoning: boolean; activity: TurnActivity | null },
 ): ReplyLayout {
@@ -104,16 +105,16 @@ export function layoutReply(
   if (!foldsWork) return { fold: null, blocks, answer };
   const forms = before.filter((block) => block.type === "form");
   return {
-    fold: { label: foldLabel(message), blocks: before.filter((block) => block.type !== "form") },
+    fold: { label: foldLabel(t, message), blocks: before.filter((block) => block.type !== "form") },
     blocks: [...forms, ...after],
     answer,
   };
 }
 
-function foldLabel(message: Message): string {
+function foldLabel(t: TFunction, message: Message): string {
   const duration =
     message.completedAt !== undefined
-      ? formatDuration(message.completedAt - message.createdAt)
+      ? formatDuration(t, message.completedAt - message.createdAt)
       : null;
   if (message.status === "interrupted") {
     return duration ? t("reply.stoppedAfter", { duration }) : t("reply.stoppedResponse");
@@ -121,10 +122,10 @@ function foldLabel(message: Message): string {
   return duration ? t("reply.workedFor", { duration }) : t("reply.worked");
 }
 
-export function formatDuration(ms: number): string {
+export function formatDuration(t: TFunction, ms: number): string {
   if (!Number.isFinite(ms) || ms < 1_000) return t("format.seconds", { value: 1 });
   if (ms < 10_000) {
-    return t("format.seconds", { value: formatNumber(Math.round(ms / 100) / 10, 1) });
+    return t("format.seconds", { value: formatNumber(t, Math.round(ms / 100) / 10, 1) });
   }
   if (ms < 60_000) return t("format.seconds", { value: Math.round(ms / 1_000) });
   const total = Math.round(ms / 1_000);
@@ -155,7 +156,7 @@ function toolIcon(category: ToolCategory): IconName {
   return TOOL_ICONS[category];
 }
 
-function bareToolLabel(category: ToolCategory, running: boolean): string {
+function bareToolLabel(t: TFunction, category: ToolCategory, running: boolean): string {
   return running ? t(`reply.tools.${category}.bareRunning`) : t(`reply.tools.${category}.bare`);
 }
 
@@ -173,16 +174,16 @@ export function searchSources(tool: ToolCall): WebSource[] {
   return tool.category === "web-search" ? (tool.sources ?? []) : [];
 }
 
-function formatSubject(tool: ToolCall): string {
+function formatSubject(t: TFunction, tool: ToolCall): string {
   if (tool.category === "web-search") return t("format.quoted", { text: tool.subject });
   if (tool.category === "web-fetch") return bareUrl(tool.subject);
   return tool.subject;
 }
 
-export function toolLabel(tool: ToolCall): string {
+export function toolLabel(t: TFunction, tool: ToolCall): string {
   const running = tool.status === "running";
-  const subject = tool.category === "other" ? tool.name : tool.subject && formatSubject(tool);
-  if (!subject) return bareToolLabel(tool.category, running);
+  const subject = tool.category === "other" ? tool.name : tool.subject && formatSubject(t, tool);
+  if (!subject) return bareToolLabel(t, tool.category, running);
   return running
     ? t(`reply.tools.${tool.category}.running`, { subject })
     : t(`reply.tools.${tool.category}.done`, { subject });
@@ -199,7 +200,11 @@ export function workItemIcon(item: WorkItem): IconName {
 /** How long a reply may wait on the server to start before the row says it is slow. */
 export const SLOW_START_MS = 10_000;
 
-function activityRow(activity: TurnActivity, slow: boolean): { icon: IconName; label: string } {
+function activityRow(
+  t: TFunction,
+  activity: TurnActivity,
+  slow: boolean,
+): { icon: IconName; label: string } {
   switch (activity.kind) {
     case "sending":
       return {
@@ -216,7 +221,7 @@ function activityRow(activity: TurnActivity, slow: boolean): { icon: IconName; l
         label:
           activity.category === "other" && activity.name
             ? t("reply.tools.other.running", { subject: activity.name })
-            : bareToolLabel(activity.category, true),
+            : bareToolLabel(t, activity.category, true),
       };
     case "asking":
       return { icon: "comment-question-outline", label: t("reply.activity.asking") };
@@ -233,7 +238,7 @@ function activityRow(activity: TurnActivity, slow: boolean): { icon: IconName; l
   }
 }
 
-function summarizeTools(tools: ToolCall[]): string {
+function summarizeTools(t: TFunction, tools: ToolCall[]): string {
   const counts = new Map<ToolCategory, number>();
   for (const tool of tools) counts.set(tool.category, (counts.get(tool.category) ?? 0) + 1);
   const phrases = [...counts].map(([category, count]) =>
@@ -253,15 +258,19 @@ function summarizeTools(tools: ToolCall[]): string {
  * The icon and one-line label of a work row. `slow`: the reply has waited on
  * the server longer than `SLOW_START_MS`.
  */
-export function workRow(block: WorkBlock, slow = false): { icon: IconName; label: string } {
+export function workRow(
+  t: TFunction,
+  block: WorkBlock,
+  slow = false,
+): { icon: IconName; label: string } {
   const tools = block.items.flatMap((item) => (item.type === "tool" ? [item.tool] : []));
   if (block.live) {
     // The call still going says more than the generic activity does.
     const running = tools.findLast((tool) => tool.status === "running");
     if (running && block.live.kind === "tool") {
-      return { icon: toolIcon(running.category), label: toolLabel(running) };
+      return { icon: toolIcon(running.category), label: toolLabel(t, running) };
     }
-    return activityRow(block.live, slow);
+    return activityRow(t, block.live, slow);
   }
   if (tools.length === 0) {
     const thoughts = block.items.length;
@@ -272,5 +281,5 @@ export function workRow(block: WorkBlock, slow = false): { icon: IconName; label
   }
   const categories = new Set(tools.map((tool) => tool.category));
   const icon = categories.size === 1 ? toolIcon(tools[0].category) : "wrench-outline";
-  return { icon, label: tools.length === 1 ? toolLabel(tools[0]) : summarizeTools(tools) };
+  return { icon, label: tools.length === 1 ? toolLabel(t, tools[0]) : summarizeTools(t, tools) };
 }
