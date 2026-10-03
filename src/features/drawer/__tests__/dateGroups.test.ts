@@ -13,6 +13,7 @@ describe("groupChatsByDate", () => {
     // Just past midnight on 2 January, local time.
     const now = new Date(2026, 0, 2, 0, 30);
     const groups = groupChatsByDate(
+      t,
       [
         chat("minutes-ago", new Date(2026, 0, 2, 0, 5)),
         // Under an hour ago, but on the previous calendar day.
@@ -20,7 +21,6 @@ describe("groupChatsByDate", () => {
         chat("last-month", new Date(2025, 11, 1, 12, 0)),
       ],
       now,
-      t,
     );
     expect(groups.map((group) => [group.title, group.data.map((each) => each.id)])).toEqual([
       ["Today", ["minutes-ago"]],

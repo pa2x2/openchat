@@ -65,7 +65,7 @@ function updateStatusLine(
     default:
       if (version) return t("settings.updates.available", { version });
       return lastCheckedAt !== null
-        ? t("settings.updates.lastChecked", { time: formatTimestamp(lastCheckedAt) })
+        ? t("settings.updates.lastChecked", { time: formatTimestamp(t, lastCheckedAt) })
         : undefined;
   }
 }

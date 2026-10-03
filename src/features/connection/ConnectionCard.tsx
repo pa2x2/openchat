@@ -181,7 +181,7 @@ export function ConnectionCard() {
         </Text>
       </View>
 
-      {descriptor.fields.map((field) => {
+      {descriptor.fields(t).map((field) => {
         // A saved password is never read back into the field; it shows as
         // saved until the user types a new one.
         const showSaved = field.key === "password" && passwordSaved && !values[field.key];

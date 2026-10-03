@@ -6,16 +6,14 @@
  * concrete adapter directly.
  */
 
-import { t } from "@/src/i18n";
+import type { TFunction } from "i18next";
 import type { ConfigField, ConnectionConfig, ProviderDescriptor } from "./types";
 import { OpenCodeProvider, openCodeCapabilities } from "./opencode/provider";
 
 const openCodeDescriptor: ProviderDescriptor = {
   id: "opencode",
   label: "OpenCode",
-  // A getter, so the labels are in the language of the moment, not the
-  // one the app started in.
-  get fields(): ConfigField[] {
+  fields(t: TFunction): ConfigField[] {
     return [
       {
         key: "baseUrl",

@@ -99,13 +99,13 @@ export function ChatDrawer({
     const needle = query.trim().toLowerCase();
     return allChats.filter(
       (chat) =>
-        !temporary[chat.id] && (!needle || chatTitle(chat.title).toLowerCase().includes(needle)),
+        !temporary[chat.id] && (!needle || chatTitle(t, chat.title).toLowerCase().includes(needle)),
     );
-  }, [allChats, temporary, query]);
+  }, [allChats, temporary, query, t]);
 
   // The layout re-reads the list at every opening, which regroups it, so
   // "Today" moves on once the day does.
-  const sections = useMemo(() => groupChatsByDate(visible, new Date(), t), [visible, t]);
+  const sections = useMemo(() => groupChatsByDate(t, visible, new Date()), [visible, t]);
 
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
@@ -480,7 +480,7 @@ const ChatRow = memo(function ChatRow({
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
   const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
   const { t } = useTranslation();
-  const title = chatTitle(chat.title);
+  const title = chatTitle(t, chat.title);
   return (
     <Pressable
       accessibilityRole="button"

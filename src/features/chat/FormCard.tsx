@@ -62,7 +62,7 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
   const index = Math.max(0, Math.min(page, paged ? shown.length : shown.length - 1));
   const reviewing = paged && index === shown.length;
   const field = reviewing ? undefined : shown.at(index);
-  const invalid = field ? fieldError(field, draft[field.key]) : null;
+  const invalid = field ? fieldError(t, field, draft[field.key]) : null;
 
   function update(key: string, value: DraftValue) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -166,7 +166,9 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           size="sm"
           disabled={busy}
           loading={pending === "dismiss"}
-          onPress={() => void run("dismiss", () => onDismiss(formResult(form, draft, "dismissed")))}
+          onPress={() =>
+            void run("dismiss", () => onDismiss(formResult(t, form, draft, "dismissed")))
+          }
           testID="form-dismiss"
         />
         <View className="flex-1" />
@@ -184,11 +186,11 @@ export function FormCard({ form, onSubmit, onDismiss }: FormCardProps) {
           <Button
             label={t("forms.submit")}
             size="sm"
-            disabled={busy || !canSubmit(form, draft)}
+            disabled={busy || !canSubmit(t, form, draft)}
             loading={pending === "submit"}
             onPress={() =>
               void run("submit", () =>
-                onSubmit(buildAnswer(form, draft), formResult(form, draft, "answered")),
+                onSubmit(buildAnswer(form, draft), formResult(t, form, draft, "answered")),
               )
             }
             testID="form-submit"
@@ -216,8 +218,8 @@ interface ReviewRowProps {
 
 function ReviewRow({ field, value, disabled, onPress }: ReviewRowProps) {
   const { t } = useTranslation();
-  const invalid = fieldError(field, value);
-  const answer = answerText(field, value).join(", ");
+  const invalid = fieldError(t, field, value);
+  const answer = answerText(t, field, value).join(", ");
   return (
     <Pressable
       accessibilityRole="button"

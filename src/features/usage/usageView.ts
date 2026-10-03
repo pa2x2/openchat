@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import {
   addTotals,
   localDay,
@@ -8,7 +9,6 @@ import {
   type UsageTotals,
 } from "@/src/domain";
 import { formatCost, formatTokens, formatTokensShort } from "@/src/features/chat/usageFormat";
-import { t } from "@/src/i18n";
 import { formatMonthDay, formatTimestamp, formatWeekday } from "@/src/lib/time";
 import { modelKey, sameModelRef } from "@/src/stores/models";
 import type { UsageMeasure, UsagePeriod } from "@/src/stores/settings";
@@ -38,15 +38,19 @@ export function measured(totals: UsageTotals, measure: UsageMeasure): number {
 }
 
 /** A total as a bare figure; null for a cost nothing was priced at. */
-export function formatMeasured(totals: UsageTotals, measure: UsageMeasure): string | null {
-  if (measure === "cost") return formatCost(totals.cost);
+export function formatMeasured(
+  t: TFunction,
+  totals: UsageTotals,
+  measure: UsageMeasure,
+): string | null {
+  if (measure === "cost") return formatCost(t, totals.cost);
   const count = measured(totals, measure);
-  return measure === "tokens" ? formatTokensShort(count) : formatTokens(count);
+  return measure === "tokens" ? formatTokensShort(t, count) : formatTokens(t, count);
 }
 
 /** A total with its unit, as a sentence would have it. */
-function describeMeasured(totals: UsageTotals, measure: UsageMeasure): string | null {
-  const figure = formatMeasured(totals, measure);
+function describeMeasured(t: TFunction, totals: UsageTotals, measure: UsageMeasure): string | null {
+  const figure = formatMeasured(t, totals, measure);
   if (figure === null || measure === "cost") return figure;
   if (measure === "tokens") return t("context.tokenCount", { tokens: figure });
   return t("usage.requests", { count: measured(totals, measure), formatted: figure });
@@ -64,6 +68,7 @@ export interface ChartDay {
 
 /** Every day of a period, used or not, oldest first; null for a period that has no chart. */
 export function chartDays(
+  t: TFunction,
   report: UsageReport,
   period: UsagePeriod,
   now = new Date(),
@@ -74,8 +79,8 @@ export function chartDays(
   return Array.from({ length: count }, (_, index) => {
     const day = dayStart(now, count - 1 - index);
     const date = localDay(day.getTime());
-    const weekday = formatWeekday(day);
-    const monthDay = formatMonthDay(day);
+    const weekday = formatWeekday(t, day);
+    const monthDay = formatMonthDay(t, day);
     return {
       date,
       label: t("time.weekdayDate", { weekday, date: monthDay }),
@@ -97,21 +102,30 @@ export function chartTop(max: number): number {
   return [2, 4, 10].map((step) => step * magnitude).find((top) => max <= top) ?? 10 * magnitude;
 }
 
-export function formatTick(value: number, measure: UsageMeasure, currency: string): string {
+export function formatTick(
+  t: TFunction,
+  value: number,
+  measure: UsageMeasure,
+  currency: string,
+): string {
   if (value === 0) return "0";
-  if (measure === "cost") return formatCost({ amount: value, currency }) ?? "0";
-  return measure === "tokens" ? formatTokensShort(value) : formatTokens(value);
+  if (measure === "cost") return formatCost(t, { amount: value, currency }) ?? "0";
+  return measure === "tokens" ? formatTokensShort(t, value) : formatTokens(t, value);
 }
 
 /** What a tap on a day shows: the charted figure first, then the day and its other figures. */
-export function dayReadout(day: ChartDay, measure: UsageMeasure): { lead: string; rest: string } {
+export function dayReadout(
+  t: TFunction,
+  day: ChartDay,
+  measure: UsageMeasure,
+): { lead: string; rest: string } {
   if (!day.totals) return { lead: t("usage.nothingUsed"), rest: day.label };
   const { totals } = day;
   const others = MEASURES.filter((each) => each !== measure)
-    .map((each) => describeMeasured(totals, each))
+    .map((each) => describeMeasured(t, totals, each))
     .filter((text) => text !== null);
   return {
-    lead: describeMeasured(totals, measure) ?? t("usage.noCost"),
+    lead: describeMeasured(t, totals, measure) ?? t("usage.noCost"),
     rest: [day.label, ...others].join(" · "),
   };
 }
@@ -128,6 +142,7 @@ export interface ModelRow {
  * model once per variant it ran with; those are added together here.
  */
 export function modelRows(
+  t: TFunction,
   report: UsageReport,
   catalog: ModelInfo[],
   measure: UsageMeasure,
@@ -146,25 +161,30 @@ export function modelRows(
         key,
         label: info?.label ?? row.model.id,
         provider: info?.providerLabel ?? row.model.provider,
-        value: formatMeasured(row, measure),
+        value: formatMeasured(t, row, measure),
       };
     });
 }
 
-export function summaryLine(report: UsageReport, period: UsagePeriod, now = new Date()): string {
+export function summaryLine(
+  t: TFunction,
+  report: UsageReport,
+  period: UsagePeriod,
+  now = new Date(),
+): string {
   const parts: string[] = [];
   if (report.chats !== undefined) {
-    parts.push(t("usage.chats", { count: report.chats, formatted: formatTokens(report.chats) }));
+    parts.push(t("usage.chats", { count: report.chats, formatted: formatTokens(t, report.chats) }));
   }
   if (report.prompts !== undefined) {
     parts.push(
-      t("usage.messages", { count: report.prompts, formatted: formatTokens(report.prompts) }),
+      t("usage.messages", { count: report.prompts, formatted: formatTokens(t, report.prompts) }),
     );
   }
   const days = PERIOD_DAYS[period];
   if (days === null) {
     if (report.from !== undefined) {
-      parts.push(t("usage.since", { time: formatTimestamp(report.from, now) }));
+      parts.push(t("usage.since", { time: formatTimestamp(t, report.from, now) }));
     }
   } else if (days > 1) {
     parts.push(t("usage.daysOf", { count: days, used: report.days.length }));

@@ -589,7 +589,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     ? undefined
     : source
       ? {
-          title: chatTitle(source.title),
+          title: chatTitle(t, source.title),
           onOpen: () => router.replace({ pathname: "/chat/[id]", params: { id: source.id } }),
         }
       : { title: null };

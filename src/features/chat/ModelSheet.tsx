@@ -16,6 +16,7 @@
  * it and closes the sheet; the caller decides what the choice applies to.
  */
 
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNumber } from "@/src/i18n/format";
 import { useTranslation } from "react-i18next";
@@ -35,10 +36,10 @@ import { TextInput } from "@/src/ui/TextInput";
 import { favoriteModels, groupByProvider, monogram, searchGroups } from "./modelPicker";
 
 /** A context window as a short size, e.g. 200000 → "200K", 1048576 → "1M". */
-export function formatContextWindow(tokens: number): string {
+export function formatContextWindow(t: TFunction, tokens: number): string {
   if (tokens >= 1_000_000) {
     const millions = Number((tokens / 1_000_000).toFixed(1));
-    return `${formatNumber(millions, Number.isInteger(millions) ? 0 : 1)}M`;
+    return `${formatNumber(t, millions, Number.isInteger(millions) ? 0 : 1)}M`;
   }
   return `${Math.round(tokens / 1_000)}K`;
 }
@@ -568,7 +569,7 @@ function ModelRow({
   const detail = [
     providerLabel,
     model.ref.id,
-    model.contextWindow ? formatContextWindow(model.contextWindow) : undefined,
+    model.contextWindow ? formatContextWindow(t, model.contextWindow) : undefined,
   ]
     .filter(Boolean)
     .join(" · ");

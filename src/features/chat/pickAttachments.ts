@@ -51,7 +51,7 @@ function checkTotal(candidates: Attachment[], existing: Attachment[]): void {
   const total = [...existing, ...candidates].reduce((sum, file) => sum + (file.size ?? 0), 0);
   if (total > MAX_ATTACHMENTS_TOTAL_BYTES) {
     throw new AttachmentError(
-      t("attach.errors.tooLarge", { size: formatBytes(MAX_ATTACHMENTS_TOTAL_BYTES) }),
+      t("attach.errors.tooLarge", { size: formatBytes(t, MAX_ATTACHMENTS_TOTAL_BYTES) }),
     );
   }
 }
@@ -163,7 +163,7 @@ async function toAttachment(asset: {
   const name = asset.name || "attachment";
   if (asset.size && asset.size > MAX_ATTACHMENT_BYTES) {
     throw new AttachmentError(
-      `${name} is ${formatBytes(asset.size)} — the limit is ${formatBytes(MAX_ATTACHMENT_BYTES)}.`,
+      `${name} is ${formatBytes(t, asset.size)} — the limit is ${formatBytes(t, MAX_ATTACHMENT_BYTES)}.`,
     );
   }
   const bytes = fromUint8Array(new Uint8Array(await new File(asset.uri).arrayBuffer()));

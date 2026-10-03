@@ -1,4 +1,5 @@
 import type { ChatForm } from "@/src/domain";
+import { t } from "@/src/i18n";
 import { buildAnswer, canSubmit, initialDraft } from "../formDraft";
 
 // A field whose condition fails is off screen: requiring or sending it would
@@ -20,11 +21,11 @@ it("skips fields whose conditions fail and sends hidden defaults", () => {
   };
   const draft = initialDraft(form);
 
-  expect(canSubmit(form, draft)).toBe(true);
+  expect(canSubmit(t, form, draft)).toBe(true);
   expect(buildAnswer(form, draft)).toEqual({ mode: "allow", source: "app" });
 
   const choosing = { ...draft, mode: "choose" };
-  expect(canSubmit(form, choosing)).toBe(false);
+  expect(canSubmit(t, form, choosing)).toBe(false);
   expect(buildAnswer(form, { ...choosing, provider: "exa" })).toEqual({
     mode: "choose",
     provider: "exa",

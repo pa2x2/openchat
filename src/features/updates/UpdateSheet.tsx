@@ -4,19 +4,19 @@
  * launch check or from Settings; all state lives in the updates store.
  */
 
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Linking, ScrollView, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
-import { t } from "@/src/i18n";
 import { formatNumber } from "@/src/i18n/format";
 import { useUpdatesStore } from "@/src/stores/updates";
 import { Button } from "@/src/ui/Button";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import { Sheet } from "@/src/ui/Sheet";
 
-export function formatSize(bytes: number): string {
-  return t("format.megabytes", { value: formatNumber(bytes / (1024 * 1024), 1) });
+export function formatSize(t: TFunction, bytes: number): string {
+  return t("format.megabytes", { value: formatNumber(t, bytes / (1024 * 1024), 1) });
 }
 
 function ProgressBar({ progress }: { progress: number | null }) {
@@ -48,7 +48,7 @@ export function UpdateSheet() {
   const subtitle = release
     ? [
         t("updates.version", { version: release.version }),
-        formatSize(release.apk.size),
+        formatSize(t, release.apk.size),
         release.prerelease ? t("settings.updates.channel.prerelease") : null,
       ]
         .filter(Boolean)

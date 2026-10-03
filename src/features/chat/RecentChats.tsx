@@ -32,7 +32,7 @@ export function RecentChats({ onOpen }: { onOpen: (id: ChatId) => void }) {
     <View className="mb-2" testID="recent-chats">
       <Text className="px-3 pb-1 text-[13px] font-medium text-text-muted">{t("chat.recent")}</Text>
       {recent.map((chat) => {
-        const title = chatTitle(chat.title);
+        const title = chatTitle(t, chat.title);
         return (
           <Pressable
             key={chat.id}
@@ -46,7 +46,7 @@ export function RecentChats({ onOpen }: { onOpen: (id: ChatId) => void }) {
             <Text className="flex-1 text-[15.5px] text-text" numberOfLines={1}>
               {title}
             </Text>
-            <Text className="text-[13px] text-text-muted">{formatRelative(chat.updatedAt)}</Text>
+            <Text className="text-[13px] text-text-muted">{formatRelative(t, chat.updatedAt)}</Text>
           </Pressable>
         );
       })}

@@ -7,8 +7,8 @@
  * send their default.
  */
 
+import type { TFunction } from "i18next";
 import type { ChatForm, FormAnswer, FormField, FormResult, FormValue } from "@/src/domain";
-import { t } from "@/src/i18n";
 
 export type DraftValue = string | boolean | string[];
 export type FormDraft = Record<string, DraftValue>;
@@ -71,7 +71,11 @@ export function isFieldShown(form: ChatForm, field: FormField, draft: FormDraft)
 }
 
 /** Why the field's current value cannot be sent, or null when it can. */
-export function fieldError(field: FormField, value: DraftValue | undefined): string | null {
+export function fieldError(
+  t: TFunction,
+  field: FormField,
+  value: DraftValue | undefined,
+): string | null {
   if (field.type === "link") return null;
   const answer = toValue(field, value);
   if (answer === undefined) {
@@ -129,9 +133,9 @@ function matchesPattern(pattern: string, text: string): boolean {
   }
 }
 
-export function canSubmit(form: ChatForm, draft: FormDraft): boolean {
+export function canSubmit(t: TFunction, form: ChatForm, draft: FormDraft): boolean {
   return form.fields.every(
-    (field) => !isFieldShown(form, field, draft) || fieldError(field, draft[field.key]) === null,
+    (field) => !isFieldShown(form, field, draft) || fieldError(t, field, draft[field.key]) === null,
   );
 }
 
@@ -154,7 +158,11 @@ export function fieldQuestion(field: FormField): string {
 }
 
 /** The field's answer as the user reads it: option labels, not their values. */
-export function answerText(field: FormField, value: DraftValue | undefined): string[] {
+export function answerText(
+  t: TFunction,
+  field: FormField,
+  value: DraftValue | undefined,
+): string[] {
   const answer = toValue(field, value);
   if (answer === undefined) return [];
   if (typeof answer === "boolean") return [answer ? t("forms.yes") : t("forms.no")];
@@ -164,6 +172,7 @@ export function answerText(field: FormField, value: DraftValue | undefined): str
 }
 
 export function formResult(
+  t: TFunction,
   form: ChatForm,
   draft: FormDraft,
   status: "answered" | "dismissed",
@@ -175,6 +184,7 @@ export function formResult(
     id: form.id,
     status,
     questions: asked.map(fieldQuestion),
-    answers: status === "answered" ? asked.map((field) => answerText(field, draft[field.key])) : [],
+    answers:
+      status === "answered" ? asked.map((field) => answerText(t, field, draft[field.key])) : [],
   };
 }
