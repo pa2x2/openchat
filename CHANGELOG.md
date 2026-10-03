@@ -2,6 +2,21 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-03
+
+### ✨ Added
+
+- Quote part of a message in your next one. Select words in a reply and tap Quote in the selection toolbar, or open Select text from the long-press menu of your own message. Each quote waits above the composer with its own comment field. You can stack several quotes, and a message can go with nothing but quotes. While you type a comment, the chat highlights the words it quotes. Words quoted from a code block stay formatted as code.
+- A sent message shows its quotes above what you typed. Tap one to scroll back to the words it quotes. The model and other clients get the quotes as blockquotes in the message text.
+
+### 🔄 Changed
+
+- The model chip stays in the composer while a reply is written. It used to hide until the reply was done.
+
+### 🐛 Fixed
+
+- Settings kept showing the server version from when you connected, even after the server was upgraded. It now checks the version each time Settings opens.
+
 ## [1.3.2] - 2026-10-02
 
 ### 🧩 Improved
@@ -219,6 +234,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.4.0]: https://github.com/pa2x2/openchat/releases/tag/v1.4.0
 [1.3.2]: https://github.com/pa2x2/openchat/releases/tag/v1.3.2
 [1.3.0]: https://github.com/pa2x2/openchat/releases/tag/v1.3.0
 [1.2.1]: https://github.com/pa2x2/openchat/releases/tag/v1.2.1
