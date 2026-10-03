@@ -20,6 +20,7 @@ export type {
   Money,
   ProviderId,
   QueuedMessage,
+  Quote,
   ReplyPart,
   StreamEvent,
   TokenUsage,

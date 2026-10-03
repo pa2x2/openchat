@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import type { Attachment } from "@/src/domain";
+import type { Attachment, Quote } from "@/src/domain";
 import { useDraftsStore } from "@/src/stores/drafts";
 import { cn } from "@/src/lib/cn";
 import { Icon } from "@/src/ui/Icon";
@@ -20,6 +20,7 @@ import { TextInput, type TextInputHandle } from "@/src/ui/TextInput";
 import { useAppTheme } from "@/src/ui/theme";
 import { AttachmentChips } from "./AttachmentChips";
 import { ContextMeter, type ContextUse } from "./ContextMeter";
+import { QuoteCards } from "./QuoteCards";
 
 export interface ComposerProps {
   ref?: Ref<ComposerHandle>;
@@ -41,6 +42,14 @@ export interface ComposerProps {
   /** Files staged for the next message. */
   attachments?: Attachment[];
   onRemoveAttachment?: (attachment: Attachment) => void;
+  /** Quotes staged for the next message; with one, the message can go without text. */
+  quotes?: readonly Quote[];
+  /** The index of the quote whose comment has the cursor. */
+  commenting?: number | null;
+  onCommenting?: (index: number) => void;
+  onCommentingEnd?: (index: number) => void;
+  onCommentQuote?: (index: number, comment: string) => void;
+  onRemoveQuote?: (index: number) => void;
   /** Present when the backend lets the user pick the model; opens the picker. */
   model?: {
     label: string;
@@ -82,6 +91,7 @@ export interface ComposerProps {
 }
 
 const NO_ATTACHMENTS: Attachment[] = [];
+const NO_QUOTES: readonly Quote[] = [];
 
 /** Where an edit goes: in place of the message, or to a branch cut just before it. */
 export type EditTarget = "here" | "new";
@@ -103,6 +113,12 @@ export function Composer({
   onAttach,
   attachments = NO_ATTACHMENTS,
   onRemoveAttachment,
+  quotes = NO_QUOTES,
+  commenting = null,
+  onCommenting,
+  onCommentingEnd,
+  onCommentQuote,
+  onRemoveQuote,
   model,
   context,
   editing,
@@ -141,7 +157,7 @@ export function Composer({
     if (locked) input.current?.blur();
   }, [locked]);
 
-  const empty = text.trim().length === 0 && attachments.length === 0;
+  const empty = text.trim().length === 0 && attachments.length === 0 && quotes.length === 0;
   const queueing = streaming && Boolean(onQueue);
 
   async function handleSend() {
@@ -154,10 +170,8 @@ export function Composer({
   }
 
   const sendDisabled = empty || locked;
-  // The model chip steps aside while a reply streams; attach stays only for
-  // a message to queue.
+  // While a reply streams, attach stays only for a message to queue.
   const showAttach = Boolean(onAttach) && (!streaming || queueing);
-  const showModel = Boolean(model) && !streaming;
   const sendButton = (
     <Pressable
       accessibilityHint={queueing ? t("composer.queueHint") : t("composer.sendHint")}
@@ -233,6 +247,16 @@ export function Composer({
           </Pressable>
         </View>
       ) : null}
+      {quotes.length > 0 ? (
+        <QuoteCards
+          quotes={quotes}
+          focused={commenting}
+          onFocus={(index) => onCommenting?.(index)}
+          onBlur={(index) => onCommentingEnd?.(index)}
+          onComment={(index, comment) => onCommentQuote?.(index, comment)}
+          onRemove={(index) => onRemoveQuote?.(index)}
+        />
+      ) : null}
       {attachments.length > 0 ? (
         <AttachmentChips
           attachments={attachments}
@@ -265,7 +289,7 @@ export function Composer({
             <Icon name="plus" size={26} />
           </Pressable>
         ) : null}
-        {showModel && model ? (
+        {model ? (
           <Pressable
             accessibilityHint={t("composer.modelHint")}
             accessibilityLabel={[

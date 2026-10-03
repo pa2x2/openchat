@@ -59,10 +59,24 @@ export interface Attachment {
   size?: number;
 }
 
+/**
+ * Words the user quoted from a message to ask about them. A message's `text`
+ * already carries its quotes (see `src/lib/quotes.ts`); this is what lets the
+ * app show them apart from what was typed and find where they came from.
+ */
+export interface Quote {
+  messageId: string;
+  text: string;
+  comment?: string;
+  /** Set when the words come from a code block: its language, or "" for none. */
+  code?: string;
+}
+
 export interface UserMessage {
   id: string;
   text: string;
   attachments?: Attachment[];
+  quotes?: Quote[];
 }
 
 /**
@@ -338,6 +352,8 @@ export interface Message {
   /** A reply's parts in order. Missing on replies cached before parts existed. */
   parts?: ReplyPart[];
   attachments?: Attachment[];
+  /** User messages only. */
+  quotes?: Quote[];
   status: MessageStatus;
   /** What a reply used, over all of its round-trips to the model. */
   usage?: TokenUsage;

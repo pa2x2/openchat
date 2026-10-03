@@ -10,7 +10,7 @@
 
 import type { Attachment, ChatId, Delivery, QueuedMessage, UserMessage } from "@/src/domain";
 import { timeoutSignal, type OpenCodeClient } from "./client";
-import { toAttachment } from "./messages";
+import { quotesMetadata, toAttachment, toQuotes } from "./messages";
 
 const PROMPT_TIMEOUT_MS = 30_000;
 const CONTROL_TIMEOUT_MS = 10_000;
@@ -37,6 +37,7 @@ async function deliver(
         sessionID: chatId,
         text: msg.text,
         ...(files.length > 0 ? { files } : {}),
+        ...quotesMetadata(msg.quotes),
         ...(queued ? { id: msg.id, delivery: queued.delivery } : {}),
       },
       { signal: timeout.signal },
@@ -100,21 +101,22 @@ export async function queuedMessages(
       { signal: timeout.signal },
     );
     // The inbox also holds work the server queued for itself, such as a compaction.
-    return inbox.flatMap((item) =>
-      item.type === "user"
-        ? [
-            {
-              id: item.id,
-              text: item.payload.text,
-              ...(item.payload.files?.length
-                ? { attachments: item.payload.files.map(toAttachment) }
-                : {}),
-              delivery: item.delivery,
-              createdAt: item.time.created,
-            },
-          ]
-        : [],
-    );
+    return inbox.flatMap((item) => {
+      if (item.type !== "user") return [];
+      const quotes = toQuotes(item.payload.metadata);
+      return [
+        {
+          id: item.id,
+          text: item.payload.text,
+          ...(item.payload.files?.length
+            ? { attachments: item.payload.files.map(toAttachment) }
+            : {}),
+          ...(quotes ? { quotes } : {}),
+          delivery: item.delivery,
+          createdAt: item.time.created,
+        },
+      ];
+    });
   } finally {
     timeout.done();
   }

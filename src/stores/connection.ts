@@ -27,6 +27,8 @@ interface ConnectionStoreState {
     baseUrl: string;
     serverVersion?: string;
   }) => void;
+  /** Ignored unless `baseUrl` is still the saved server, so a late reply can't land on another one. */
+  setServerVersion: (baseUrl: string, serverVersion: string | undefined) => void;
   markConnecting: () => void;
   markDisconnected: (error?: string | null) => void;
   /** Drops the saved server; the password is the caller's to clear. */
@@ -41,6 +43,12 @@ export function createConnectionStore(storage = mmkvStorage) {
         state: "disconnected",
         error: null,
         saveProfile: (profile) => set({ profile, state: "connected", error: null }),
+        setServerVersion: (baseUrl, serverVersion) =>
+          set((state) =>
+            state.profile?.baseUrl === baseUrl && state.profile.serverVersion !== serverVersion
+              ? { profile: { ...state.profile, serverVersion } }
+              : {},
+          ),
         markConnecting: () => set({ state: "connecting", error: null }),
         markDisconnected: (error = null) => set({ state: "disconnected", error }),
         forget: () => set({ profile: null, state: "disconnected", error: null }),

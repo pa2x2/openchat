@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, Keyboard, View } from "react-native";
 import { Text } from "@/src/ui/Text";
@@ -57,10 +57,12 @@ import {
 import { getProvider, useProviderCapabilities } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useMessagesStore } from "@/src/stores/messages";
+import { NO_QUOTES, useDraftsStore } from "@/src/stores/drafts";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
 import { chatTitle } from "@/src/lib/chatTitle";
+import { bodyAfterQuotes, quotedText } from "@/src/lib/quotes";
 import { cn } from "@/src/lib/cn";
 import {
   UNTITLED_CHAT,
@@ -69,6 +71,7 @@ import {
   type ModelInfo,
   type ModelRef,
   type QueuedMessage,
+  type Quote,
 } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
 import { Icon } from "@/src/ui/Icon";
@@ -78,8 +81,22 @@ import type { MenuItem } from "@/src/ui/Menu";
 /** Route id for the not-yet-created chat; the backend chat is made lazily. */
 export const NEW_CHAT = "new";
 
+function withComment({ messageId, text, code }: Quote, comment: string): Quote {
+  return {
+    messageId,
+    text,
+    ...(comment ? { comment } : {}),
+    ...(code !== undefined ? { code } : {}),
+  };
+}
+
+/** The quotes as they go out: a comment is typed as-is and only tidied here. */
+function tidied(quotes: Quote[]): Quote[] {
+  return quotes.map((quote) => withComment(quote, quote.comment?.trim() ?? ""));
+}
+
 /** Returns when the turn was staged, which is when the user sent it. */
-function stageDraftTurn(text: string, attachments: Attachment[]): number {
+function stageDraftTurn(text: string, attachments: Attachment[], quotes: Quote[]): number {
   const messages = useMessagesStore.getState();
   const now = Date.now();
   messages.setMessages(NEW_CHAT, [
@@ -88,6 +105,7 @@ function stageDraftTurn(text: string, attachments: Attachment[]): number {
       role: "user",
       text,
       ...(attachments.length > 0 ? { attachments } : {}),
+      ...(quotes.length > 0 ? { quotes } : {}),
       status: "complete",
       createdAt: now,
     },
@@ -151,6 +169,11 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [usageSheetOpen, setUsageSheetOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>(
+    () => useDraftsStore.getState().quotesByChat[chatId] ?? NO_QUOTES,
+  );
+  // The quote whose comment has the cursor; its words are lit in the transcript.
+  const [commenting, setCommenting] = useState<number | null>(null);
   // null until the user flips the toggle: until then the draft follows the setting.
   const [temporaryToggle, setTemporaryToggle] = useState<boolean | null>(null);
   const [switchingModel, setSwitchingModel] = useState(false);
@@ -161,6 +184,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     message: Message;
     draft: string;
     attachments: Attachment[];
+    quotes: Quote[];
     target: EditTarget;
   } | null>(null);
   const editRemoves = useMessagesStore((state) => {
@@ -309,6 +333,55 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   }, [chatId, turnActive]);
   const expireUndo = useCallback(() => settleBranchUndo(chatId), [chatId]);
 
+  // The quotes of a message being edited are not a draft.
+  useEffect(() => {
+    if (!editing) useDraftsStore.getState().setQuotes(chatId, quotes);
+  }, [chatId, quotes, editing]);
+
+  // Read by `handleQuote`, which would otherwise change, and re-render the
+  // transcript, on every key typed in a comment.
+  const quoteCount = useRef(quotes.length);
+  useEffect(() => {
+    quoteCount.current = quotes.length;
+  }, [quotes]);
+
+  const handleQuote = useCallback((quote: Quote) => {
+    setCommenting(quoteCount.current);
+    setQuotes((current) => [...current, quote]);
+  }, []);
+
+  // Kept while a comment is typed: a new highlight scrolls the transcript.
+  const litId = commenting === null ? undefined : quotes[commenting]?.messageId;
+  const litText = commenting === null ? undefined : quotes[commenting]?.text;
+  const commentedWords = useMemo(
+    () =>
+      litId !== undefined && litText !== undefined ? { messageId: litId, text: litText } : null,
+    [litId, litText],
+  );
+
+  function commentQuote(index: number, comment: string) {
+    setQuotes((current) =>
+      current.map((quote, at) => (at === index ? withComment(quote, comment) : quote)),
+    );
+  }
+
+  // Android hands the cursor of a removed field to the next one it finds,
+  // which would be another quote's comment.
+  function removeQuote(index: number) {
+    setQuotes((current) => current.filter((_, at) => at !== index));
+    if (commenting === index) {
+      setCommenting(null);
+      composer.current?.focus();
+    } else if (commenting !== null && commenting > index) setCommenting(commenting - 1);
+  }
+
+  // The field left can report it after the next one took the cursor.
+  function endCommenting(index: number) {
+    setCommenting((current) => (current === index ? null : current));
+  }
+
+  const showQuoteMissing = useCallback(() => setBanner(t("quote.missing")), [t]);
+
   /** Resolves to false when nothing was sent, so the composer keeps the draft. */
   async function handleSend(text: string, files: Attachment[]): Promise<boolean> {
     if (busy.current) return false;
@@ -322,13 +395,17 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     busy.current = true;
     setBanner(null);
     setAttachments([]);
+    const quoted = tidied(quotes);
+    setQuotes([]);
+    setCommenting(null);
     // Failures are caught on the promise rather than with try: React Compiler
     // 1.0 skips the whole screen over a try that has a `finally`, a `throw`
     // or a conditional expression in it.
-    const sent = await deliver(text, files).then(
+    const sent = await deliver(text, files, quoted).then(
       () => true,
       (error: unknown) => {
         setAttachments(files);
+        setQuotes(quoted);
         setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
         return false;
       },
@@ -337,21 +414,23 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     return sent;
   }
 
-  async function deliver(text: string, files: Attachment[]) {
+  async function deliver(typed: string, files: Attachment[], quoted: Quote[]) {
     const provider = await getProvider();
     if (!provider) throw new Error(t("errors.notConnected"));
+    const text = quotedText(quoted, typed);
+    const extras = { attachments: files, quotes: quoted };
     if (!isDraft) {
-      await sendMessage(chatId, text, files);
+      await sendMessage(chatId, text, extras);
       return;
     }
     // Lazy chat creation: the backend chat exists only once something is said.
-    const sentAt = stageDraftTurn(text, files);
+    const sentAt = stageDraftTurn(text, files, quoted);
     const created = await provider
       .createChat(currentModel ? { model: currentModel } : undefined)
       .finally(() => useMessagesStore.getState().removeChat(NEW_CHAT));
     if (draftTemporary) useChatsStore.getState().markTemporary(created.id);
     useChatsStore.getState().upsert(created);
-    const streaming = sendMessage(created.id, text, files, sentAt);
+    const streaming = sendMessage(created.id, text, extras, sentAt);
     router.replace({ pathname: "/chat/[id]", params: { id: created.id } });
     await streaming;
   }
@@ -361,11 +440,15 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     if (!isTurnLive(chatId)) return handleSend(text, files);
     setBanner(null);
     setAttachments([]);
+    const quoted = tidied(quotes);
+    setQuotes([]);
+    setCommenting(null);
     try {
-      await queueMessage(chatId, text, files);
+      await queueMessage(chatId, quotedText(quoted, text), { attachments: files, quotes: quoted });
       return true;
     } catch (error) {
       setAttachments(files);
+      setQuotes(quoted);
       setBanner(error instanceof Error && error.message ? error.message : t("chat.sendFailed"));
       return false;
     }
@@ -385,10 +468,14 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       setBanner(null);
       cancelQueuedMessage(chatId, message.id).then(
         (taken) => {
+          const body = taken.quotes ? bodyAfterQuotes(taken.text, taken.quotes) : null;
+          const typed = body ?? taken.text;
           const draft = composer.current?.read().trim() ?? "";
-          composer.current?.insert(draft ? `${draft}\n\n${taken.text}` : taken.text);
+          composer.current?.insert(draft && typed ? `${draft}\n\n${typed}` : draft || typed);
           const files = taken.attachments;
           if (files) setAttachments((current) => [...current, ...files]);
+          const back = body !== null ? taken.quotes : undefined;
+          if (back) setQuotes((current) => [...current, ...back]);
         },
         () => setBanner(t("queue.cancelFailed")),
       );
@@ -399,25 +486,35 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   async function sendEdit(text: string): Promise<boolean> {
     const target = editing;
     if (!target) return false;
+    const edited = tidied(quotes);
     busy.current = true;
     setEditing(null);
     setBanner(null);
+    setCommenting(null);
     // What the composer held before the edit comes back straight away; the
     // edit itself only resolves once its reply is done.
     composer.current?.insert(target.draft, false);
     setAttachments(target.attachments);
+    setQuotes(target.quotes);
+    const full = quotedText(edited, text);
     const outcome = await (
       target.target === "new"
-        ? sendEditToBranch(target.message, text)
-        : editMessage(chatId, target.message, text)
+        ? sendEditToBranch(target.message, full, edited)
+        : editMessage(chatId, target.message, full, edited)
     ).finally(() => {
       busy.current = false;
     });
     if (outcome.ok) return true;
     if (outcome.error) setBanner(outcome.error);
-    // Back to editing with the edited text, so nothing typed is lost.
-    setEditing({ ...target, draft: composer.current?.read() ?? target.draft });
+    // Back to editing with the edited text, so nothing typed is lost. The
+    // draft's quotes are read from the store: they may have changed meanwhile.
+    setEditing({
+      ...target,
+      draft: composer.current?.read() ?? target.draft,
+      quotes: useDraftsStore.getState().quotesByChat[chatId] ?? NO_QUOTES,
+    });
     setAttachments([]);
+    setQuotes(edited);
     composer.current?.insert(text, false);
     return false;
   }
@@ -425,10 +522,14 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   async function sendEditToBranch(
     message: Message,
     text: string,
+    quoted: Quote[],
   ): Promise<{ ok: boolean; error?: string }> {
     const outcome = await branchForEdit(chatId, message);
     if (!outcome.ok) return outcome;
-    const streaming = sendMessage(outcome.chat.id, text, outcome.attachments);
+    const streaming = sendMessage(outcome.chat.id, text, {
+      attachments: outcome.attachments,
+      quotes: quoted,
+    });
     router.replace({ pathname: "/chat/[id]", params: { id: outcome.chat.id } });
     await streaming;
     return { ok: true };
@@ -437,15 +538,26 @@ export function ChatScreen({ chatId }: { chatId: string }) {
   function startEdit(message: Message) {
     // Files staged for a new message would not go with the edit; they wait
     // for it to finish, as the typed draft does.
-    setEditing({ message, draft: composer.current?.read() ?? "", attachments, target: "here" });
+    setEditing({
+      message,
+      draft: composer.current?.read() ?? "",
+      attachments,
+      quotes,
+      target: "here",
+    });
     setAttachments([]);
-    composer.current?.insert(message.text);
+    setCommenting(null);
+    const body = message.quotes ? bodyAfterQuotes(message.text, message.quotes) : null;
+    setQuotes(body !== null && message.quotes ? message.quotes : []);
+    composer.current?.insert(body ?? message.text);
   }
 
   function cancelEdit() {
     if (!editing) return;
     composer.current?.insert(editing.draft, false);
     setAttachments(editing.attachments);
+    setQuotes(editing.quotes);
+    setCommenting(null);
     setEditing(null);
   }
 
@@ -657,6 +769,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               editReplaces={editing?.target !== "new"}
               onSendQueuedNow={handleSendQueuedNow}
               onCancelQueued={handleCancelQueued}
+              onQuote={handleQuote}
+              highlight={commentedWords}
+              onQuoteMissing={showQuoteMissing}
             />
           )}
 
@@ -741,6 +856,12 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             onRemoveAttachment={(attachment) =>
               setAttachments((current) => current.filter((file) => file !== attachment))
             }
+            quotes={quotes}
+            commenting={commenting}
+            onCommenting={setCommenting}
+            onCommentingEnd={endCommenting}
+            onCommentQuote={commentQuote}
+            onRemoveQuote={removeQuote}
             editing={
               editing
                 ? {

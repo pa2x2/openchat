@@ -4,6 +4,8 @@ import type { QueuedMessage } from "@/src/domain";
 import { Icon } from "@/src/ui/Icon";
 import { Pressable } from "@/src/ui/Pressable";
 import { Text } from "@/src/ui/Text";
+import { cn } from "@/src/lib/cn";
+import { bodyAfterQuotes } from "@/src/lib/quotes";
 import { AttachmentStrip } from "./AttachmentChips";
 
 export interface QueuedMessagesProps {
@@ -41,6 +43,9 @@ function QueuedBubble({
   const steering = message.delivery === "steer";
   const status = steering ? t("queue.sending") : t("queue.queued");
   const attachments = message.attachments ?? [];
+  const body = message.quotes ? bodyAfterQuotes(message.text, message.quotes) : null;
+  // With only quotes, the first one stands in for the text.
+  const shown = body === null ? message.text : body || (message.quotes?.[0]?.text ?? "");
   return (
     <View className="mb-3 px-4 opacity-80" testID={`queued-${message.id}`}>
       {attachments.length > 0 ? (
@@ -49,8 +54,23 @@ function QueuedBubble({
         </View>
       ) : null}
       <View className="max-w-[82%] self-end rounded-[22px] border border-dashed border-border pb-1 pl-4 pr-1.5 pt-2.5">
-        {message.text ? (
-          <Text className="pr-2.5 text-base leading-[23px] text-text">{message.text}</Text>
+        {shown ? (
+          <View className="flex-row gap-1.5 pr-2.5">
+            {body !== null ? (
+              <View className="pt-1">
+                <Icon name="format-quote-open" size={16} tone="textMuted" />
+              </View>
+            ) : null}
+            <Text
+              className={cn(
+                "shrink text-base leading-[23px]",
+                body === "" ? "text-text-muted" : "text-text",
+              )}
+              numberOfLines={body === "" ? 3 : undefined}
+            >
+              {shown}
+            </Text>
+          </View>
         ) : null}
         <View className="mt-1 flex-row items-center gap-4">
           <View

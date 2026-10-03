@@ -9,6 +9,7 @@ import { ScrollView } from "react-native-gesture-handler";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { Icon } from "@/src/ui/Icon";
 import { useCodeLines, type CodeLine } from "./highlight";
+import { QuoteTarget } from "./quoting";
 import { MONOSPACE, type MarkdownTheme } from "./styles";
 
 export interface CodeBlockProps {
@@ -79,27 +80,29 @@ export function CodeBlock({ code, language, theme, live }: CodeBlockProps) {
         <Text style={{ color: theme.codeMuted, fontSize: 13 }}>{language ?? ""}</Text>
         {copyButton}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <Text
-          selectable={theme.selectable}
-          style={{
-            color: theme.codeText,
-            fontFamily: MONOSPACE,
-            fontSize: 13.5,
-            lineHeight: LINE_HEIGHT,
-            paddingHorizontal: 14,
-            paddingTop: 2,
-            paddingBottom: tall ? 2 : 14,
-          }}
-        >
-          {lines.map((tokens, index) => (
-            <Text key={index}>
-              {index > 0 ? "\n" : null}
-              <Line tokens={tokens} />
-            </Text>
-          ))}
-        </Text>
-      </ScrollView>
+      <QuoteTarget code={language ?? ""}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Text
+            selectable={theme.selectable}
+            style={{
+              color: theme.codeText,
+              fontFamily: MONOSPACE,
+              fontSize: 13.5,
+              lineHeight: LINE_HEIGHT,
+              paddingHorizontal: 14,
+              paddingTop: 2,
+              paddingBottom: tall ? 2 : 14,
+            }}
+          >
+            {lines.map((tokens, index) => (
+              <Text key={index}>
+                {index > 0 ? "\n" : null}
+                <Line tokens={tokens} />
+              </Text>
+            ))}
+          </Text>
+        </ScrollView>
+      </QuoteTarget>
       {/* The button above is a screen or more back by the time the block is read. */}
       {tall ? (
         <View style={{ alignItems: "flex-end", paddingRight: 4, paddingBottom: 4 }}>

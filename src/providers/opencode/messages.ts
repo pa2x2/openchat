@@ -14,6 +14,7 @@ import {
   type FormResult,
   type Message,
   type MessageStatus,
+  type Quote,
   type ReplyPart,
 } from "@/src/domain";
 import type { OpenCodeClient } from "./client";
@@ -63,6 +64,44 @@ export function toAttachment(file: PromptFileAttachment): Attachment {
 }
 
 /**
+ * The message metadata this app writes its quotes under. The server keeps it
+ * with the message and hands it back; what the model reads is the text.
+ */
+const METADATA_KEY = "openchat";
+
+export function quotesMetadata(quotes: readonly Quote[] | undefined) {
+  if (!quotes?.length) return {};
+  // Copied field by field: the server takes plain JSON objects, which an interface isn't.
+  const plain = quotes.map(({ messageId, text, comment, code }) => ({
+    messageId,
+    text,
+    ...(comment ? { comment } : {}),
+    ...(code !== undefined ? { code } : {}),
+  }));
+  return { metadata: { [METADATA_KEY]: { quotes: plain } } };
+}
+
+/** Another client can write anything under the key, so each quote is checked. */
+export function toQuotes(metadata: unknown): Quote[] | undefined {
+  const quotes = (metadata as { [METADATA_KEY]?: { quotes?: unknown } } | undefined)?.[METADATA_KEY]
+    ?.quotes;
+  if (!Array.isArray(quotes)) return undefined;
+  const valid = quotes.flatMap((value: unknown): Quote[] => {
+    const quote = value as Partial<Record<keyof Quote, unknown>> | null;
+    if (typeof quote?.messageId !== "string" || typeof quote.text !== "string") return [];
+    return [
+      {
+        messageId: quote.messageId,
+        text: quote.text,
+        ...(typeof quote.comment === "string" && quote.comment ? { comment: quote.comment } : {}),
+        ...(typeof quote.code === "string" ? { code: quote.code } : {}),
+      },
+    ];
+  });
+  return valid.length > 0 ? valid : undefined;
+}
+
+/**
  * The server stores a run as one assistant entry per model step: one that
  * calls tools, the next that reads their results, and so on, closed by an
  * idle entry. The app shows one reply per prompt, so a run's steps merge.
@@ -96,6 +135,7 @@ export function toMessages(wire: readonly SessionMessageInfo[]): Message[] {
 }
 
 function toUserMessage(wire: SessionMessageUser): Message {
+  const quotes = toQuotes(wire.metadata);
   return {
     id: wire.id,
     role: "user",
@@ -103,6 +143,7 @@ function toUserMessage(wire: SessionMessageUser): Message {
     status: "complete",
     createdAt: wire.time.created,
     ...(wire.files && wire.files.length > 0 ? { attachments: wire.files.map(toAttachment) } : {}),
+    ...(quotes ? { quotes } : {}),
   };
 }
 
