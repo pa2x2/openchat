@@ -1,4 +1,5 @@
 import type { TextStyle } from "react-native";
+import { withAlpha } from "@/src/ui/palette";
 import type { ColorSchemeName, ResolvedPalette } from "@/src/ui/theme";
 
 /** What the markdown is drawn on: the page itself, or a `raised` card in a sheet. */
@@ -18,6 +19,8 @@ export interface MarkdownTheme {
   code: string;
   codeText: string;
   codeMuted: string;
+  /** Behind words a quote points at. */
+  highlight: string;
   /**
    * Off for the user's own bubble: a long press there opens the message menu,
    * which selectable text would take over. Its "Select text" shows the text
@@ -71,6 +74,7 @@ export function getMarkdownTheme(
     code: palette.code,
     codeText: palette.codeText,
     codeMuted: palette.codeMuted,
+    highlight: withAlpha(isUser ? palette.userBubbleText : palette.primary, isUser ? 0.25 : 0.3),
     selectable: !isUser,
   };
 }

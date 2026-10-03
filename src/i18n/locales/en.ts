@@ -253,6 +253,16 @@ export default {
     sendNowFailed: "Couldn’t send the message now. It’s still queued.",
     cancelFailed: "Couldn’t take the message back. It may have been sent already.",
   },
+  quote: {
+    action: "Quote",
+    comment: "Comment on the quote",
+    commentPlaceholder: "Add a comment",
+    card: "Quote: {{text}}",
+    remove: "Remove quote",
+    sent: "Quoted: {{text}}",
+    showSourceHint: "Shows the quoted words where they were written",
+    missing: "The quoted message isn’t in this chat anymore.",
+  },
   message: {
     copy: "Copy",
     selectText: "Select text",

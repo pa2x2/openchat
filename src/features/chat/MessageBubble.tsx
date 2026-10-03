@@ -2,12 +2,21 @@ import * as Clipboard from "expo-clipboard";
 import { memo, useMemo, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { ScrollView, View } from "react-native";
+import { ScrollView, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/src/ui/Text";
 import { Pressable } from "@/src/ui/Pressable";
-import { totalTokens, type Message, type TurnActivity } from "@/src/domain";
+import { totalTokens, type Message, type Quote, type TurnActivity } from "@/src/domain";
 import { MarkdownContent } from "@/src/features/markdown/MarkdownContent";
+import {
+  HighlightScope,
+  QuoteScope,
+  QuoteTarget,
+  type Highlight,
+  type QuoteHandler,
+} from "@/src/features/markdown/quoting";
+import { MONOSPACE } from "@/src/features/markdown/styles";
+import { bodyAfterQuotes, trimQuoted } from "@/src/lib/quotes";
 import { useCopyToClipboard } from "@/src/lib/clipboard";
 import { AttachmentStrip } from "./AttachmentChips";
 import { FormResultCard } from "./FormResultCard";
@@ -40,6 +49,18 @@ export interface MessageBubbleProps {
   dimmed?: boolean;
   /** Why a failed reply failed, when it is known. */
   error?: string | null;
+  /** Present where words selected in the message can be quoted. */
+  onQuote?: (quote: Quote) => void;
+  onQuotePress?: (quote: Quote) => void;
+  highlight?: Highlight | null;
+}
+
+function quoteHandler(message: Message, onQuote?: (quote: Quote) => void): QuoteHandler | null {
+  if (!onQuote) return null;
+  return (selected, code) => {
+    const text = trimQuoted(selected, code !== undefined);
+    if (text) onQuote({ messageId: message.id, text, ...(code !== undefined ? { code } : {}) });
+  };
 }
 
 /** A terminal outcome worth a line under the message; live states show inline, errors in a card. */
@@ -108,12 +129,23 @@ function ReplyError({ error, onRetry }: { error: string | null; onRetry?: () => 
   );
 }
 
+/** How long the Select text screen takes to slide away. */
+const SELECT_TEXT_CLOSE_MS = 350;
+
 /**
  * The message's text, selectable, over the whole screen. A full-screen view
  * rather than a sheet: a sheet's drag-to-dismiss takes the long press that
  * starts a selection.
  */
-function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
+function SelectText({
+  text,
+  onClose,
+  onQuote,
+}: {
+  text: string;
+  onClose: () => void;
+  onQuote: QuoteHandler | null;
+}) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
@@ -124,14 +156,18 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
           <Text className="text-lg font-medium text-text">{t("message.selectText")}</Text>
         </View>
         <ScrollView contentContainerClassName="px-5 pb-6 pt-2">
-          <Text
-            selectable
-            selectionColor={withAlpha(colors.primary, 0.35)}
-            className="text-base leading-6 text-text"
-            testID="select-text"
-          >
-            {text}
-          </Text>
+          <QuoteScope value={onQuote}>
+            <QuoteTarget>
+              <Text
+                selectable
+                selectionColor={withAlpha(colors.primary, 0.35)}
+                className="text-base leading-6 text-text"
+                testID="select-text"
+              >
+                {text}
+              </Text>
+            </QuoteTarget>
+          </QuoteScope>
         </ScrollView>
         <View className="px-4 pt-2" style={{ paddingBottom: insets.bottom + 12 }}>
           <Button
@@ -151,14 +187,49 @@ function SelectText({ text, onClose }: { text: string; onClose: () => void }) {
  * view of its own, since the bubble's text is not selectable in place) and,
  * on the message that allows it, edit.
  */
+function QuoteBar({
+  quote,
+  onPress,
+  onLongPress,
+}: {
+  quote: Quote;
+  onPress?: (quote: Quote) => void;
+  onLongPress: (event: GestureResponderEvent) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityHint={onPress ? t("quote.showSourceHint") : undefined}
+      accessibilityLabel={t("quote.sent", { text: quote.text })}
+      accessibilityRole={onPress ? "button" : undefined}
+      className="border-l-[3px] border-user-bubble-text/50 pl-2.5 active:opacity-70"
+      onLongPress={onLongPress}
+      onPress={onPress ? () => onPress(quote) : undefined}
+      testID="message-quote"
+    >
+      <Text
+        className="text-[15px] leading-[21px] text-user-bubble-text opacity-80"
+        numberOfLines={4}
+        style={quote.code !== undefined ? { fontFamily: MONOSPACE, fontSize: 13.5 } : undefined}
+      >
+        {quote.text}
+      </Text>
+    </Pressable>
+  );
+}
+
 function UserText({
   message,
   onEdit,
   editing,
+  onQuote,
+  onQuotePress,
 }: {
   message: Message;
   onEdit?: (message: Message) => void;
   editing: boolean;
+  onQuote: QuoteHandler | null;
+  onQuotePress?: (quote: Quote) => void;
 }) {
   const { t } = useTranslation();
   const [menuAt, setMenuAt] = useState<number | null>(null);
@@ -188,23 +259,41 @@ function UserText({
     });
   }
 
+  const openMenu = (event: GestureResponderEvent) => {
+    setMenuAt(event.nativeEvent.pageY + 12);
+    setMenuOpen(true);
+  };
+  const body = message.quotes ? bodyAfterQuotes(message.text, message.quotes) : null;
+
   return (
     <>
       <Bubble
         role="user"
         status={statusFor(t, message)}
         highlighted={editing}
-        onLongPress={(event) => {
-          setMenuAt(event.nativeEvent.pageY + 12);
-          setMenuOpen(true);
-        }}
+        onLongPress={openMenu}
       >
-        <MarkdownContent
-          role="user"
-          streaming={false}
-          text={message.text}
-          testID={`markdown-${message.id}`}
-        />
+        {message.quotes && body !== null ? (
+          <View className="gap-2.5" testID={`markdown-${message.id}`}>
+            {/* A sent message's quotes never change, so their place is their key. */}
+            {message.quotes.map((quote, index) => (
+              <View key={index} className="gap-1">
+                <QuoteBar quote={quote} onPress={onQuotePress} onLongPress={openMenu} />
+                {quote.comment ? (
+                  <MarkdownContent role="user" streaming={false} text={quote.comment} />
+                ) : null}
+              </View>
+            ))}
+            {body ? <MarkdownContent role="user" streaming={false} text={body} /> : null}
+          </View>
+        ) : (
+          <MarkdownContent
+            role="user"
+            streaming={false}
+            text={message.text}
+            testID={`markdown-${message.id}`}
+          />
+        )}
       </Bubble>
       <Menu
         visible={menuOpen}
@@ -213,7 +302,21 @@ function UserText({
         anchor={{ y: menuAt ?? 0, side: "right", inset: 16 }}
         testID="message-menu"
       />
-      {selecting ? <SelectText text={message.text} onClose={() => setSelecting(false)} /> : null}
+      {selecting ? (
+        <SelectText
+          text={message.text}
+          onClose={() => setSelecting(false)}
+          onQuote={
+            onQuote &&
+            ((text, code) => {
+              setSelecting(false);
+              // The comment box only gets the keyboard once this screen's
+              // window is gone; asked for while it is closing, focus is lost.
+              setTimeout(() => onQuote(text, code), SELECT_TEXT_CLOSE_MS);
+            })
+          }
+        />
+      ) : null}
     </>
   );
 }
@@ -228,6 +331,9 @@ export const MessageBubble = memo(function MessageBubble({
   editing = false,
   dimmed = false,
   error = null,
+  onQuote,
+  onQuotePress,
+  highlight = null,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const streaming = message.status === "pending" || message.status === "streaming";
@@ -252,7 +358,17 @@ export const MessageBubble = memo(function MessageBubble({
             />
           </View>
         ) : null}
-        {hasText ? <UserText message={message} onEdit={onEdit} editing={editing} /> : null}
+        {hasText ? (
+          <HighlightScope value={highlight}>
+            <UserText
+              message={message}
+              onEdit={onEdit}
+              editing={editing}
+              onQuote={quoteHandler(message, onQuote)}
+              onQuotePress={onQuotePress}
+            />
+          </HighlightScope>
+        ) : null}
       </View>
     );
   }
@@ -286,97 +402,109 @@ export const MessageBubble = memo(function MessageBubble({
       className={cn("mb-5 mt-1", dimmed && "opacity-50")}
       testID={`bubble-${message.role}`}
     >
-      {layout.fold ? (
-        <View className="mb-1 self-stretch">
-          <Pressable
-            accessibilityHint={foldOpen ? t("reply.hideFold") : t("reply.showFold")}
-            accessibilityLabel={layout.fold.label}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: foldOpen }}
-            className="flex-row items-center gap-1 self-start py-1"
-            hitSlop={6}
-            onPress={() => setFoldOpen((current) => !current)}
-            testID="reply-fold"
-          >
-            <Text className="text-[15px] text-text-muted">{layout.fold.label}</Text>
-            <Icon name={foldOpen ? "chevron-down" : "chevron-right"} size={18} tone="textMuted" />
-          </Pressable>
-          {foldOpen ? (
-            <View className="mt-1 border-b border-border pb-2">
-              {layout.fold.blocks.map(renderBlock)}
+      <QuoteScope value={quoteHandler(message, onQuote)}>
+        <HighlightScope value={highlight}>
+          {layout.fold ? (
+            <View className="mb-1 self-stretch">
+              <Pressable
+                accessibilityHint={foldOpen ? t("reply.hideFold") : t("reply.showFold")}
+                accessibilityLabel={layout.fold.label}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: foldOpen }}
+                className="flex-row items-center gap-1 self-start py-1"
+                hitSlop={6}
+                onPress={() => setFoldOpen((current) => !current)}
+                testID="reply-fold"
+              >
+                <Text className="text-[15px] text-text-muted">{layout.fold.label}</Text>
+                <Icon
+                  name={foldOpen ? "chevron-down" : "chevron-right"}
+                  size={18}
+                  tone="textMuted"
+                />
+              </Pressable>
+              {foldOpen ? (
+                <View className="mt-1 border-b border-border pb-2">
+                  {layout.fold.blocks.map(renderBlock)}
+                </View>
+              ) : null}
             </View>
           ) : null}
-        </View>
-      ) : null}
-      {layout.blocks.map(renderBlock)}
-      {/* The fold already says a stopped reply was stopped. */}
-      {status && !layout.fold ? (
-        <Text accessibilityLabel={status} className="mt-1 text-sm text-text-muted">
-          {status}
-        </Text>
-      ) : null}
-      {failed ? <ReplyError error={error} onRetry={onRegenerate} /> : null}
-      {streaming ? (
-        // Holds the action row's place so the reply doesn't jump when it ends.
-        <View className="mt-1 h-9 justify-center">
-          {running ? (
-            <Text className="text-[13px] text-text-muted" testID="reply-running-count">
-              {running}
+          {layout.blocks.map(renderBlock)}
+          {/* The fold already says a stopped reply was stopped. */}
+          {status && !layout.fold ? (
+            <Text accessibilityLabel={status} className="mt-1 text-sm text-text-muted">
+              {status}
             </Text>
           ) : null}
-        </View>
-      ) : layout.answer || canRegenerate || canBranch || hasDetails ? (
-        <View className="-ml-2 mt-1 flex-row">
-          {layout.answer ? (
-            <CopyButton label={t("reply.copy")} testID="copy-reply-button" text={layout.answer} />
+          {failed ? <ReplyError error={error} onRetry={onRegenerate} /> : null}
+          {streaming ? (
+            // Holds the action row's place so the reply doesn't jump when it ends.
+            <View className="mt-1 h-9 justify-center">
+              {running ? (
+                <Text className="text-[13px] text-text-muted" testID="reply-running-count">
+                  {running}
+                </Text>
+              ) : null}
+            </View>
+          ) : layout.answer || canRegenerate || canBranch || hasDetails ? (
+            <View className="-ml-2 mt-1 flex-row">
+              {layout.answer ? (
+                <CopyButton
+                  label={t("reply.copy")}
+                  testID="copy-reply-button"
+                  text={layout.answer}
+                />
+              ) : null}
+              {canRegenerate ? (
+                <Pressable
+                  accessibilityHint={t("reply.regenerateHint")}
+                  accessibilityLabel={t("reply.regenerate")}
+                  accessibilityRole="button"
+                  className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+                  onPress={onRegenerate}
+                  testID="regenerate-button"
+                >
+                  <Icon name="refresh" size={19} tone="textMuted" />
+                </Pressable>
+              ) : null}
+              {canBranch ? (
+                <Pressable
+                  accessibilityHint={t("reply.branchHint")}
+                  accessibilityLabel={t("reply.branch")}
+                  accessibilityRole="button"
+                  className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
+                  onPress={() => onBranch?.(message)}
+                  testID="branch-button"
+                >
+                  <Icon name="source-branch" size={19} tone="textMuted" />
+                </Pressable>
+              ) : null}
+              {hasDetails ? (
+                <Pressable
+                  accessibilityHint={detailsOpen ? t("reply.hideDetails") : t("reply.showDetails")}
+                  accessibilityLabel={t("reply.details")}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: detailsOpen }}
+                  className={cn(
+                    "h-9 w-9 items-center justify-center rounded-full active:bg-surface",
+                    detailsOpen && "bg-surface",
+                  )}
+                  onPress={() => setDetailsOpen((current) => !current)}
+                  testID="reply-details-button"
+                >
+                  <Icon
+                    name="information-outline"
+                    size={19}
+                    tone={detailsOpen ? "text" : "textMuted"}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
-          {canRegenerate ? (
-            <Pressable
-              accessibilityHint={t("reply.regenerateHint")}
-              accessibilityLabel={t("reply.regenerate")}
-              accessibilityRole="button"
-              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
-              onPress={onRegenerate}
-              testID="regenerate-button"
-            >
-              <Icon name="refresh" size={19} tone="textMuted" />
-            </Pressable>
-          ) : null}
-          {canBranch ? (
-            <Pressable
-              accessibilityHint={t("reply.branchHint")}
-              accessibilityLabel={t("reply.branch")}
-              accessibilityRole="button"
-              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface"
-              onPress={() => onBranch?.(message)}
-              testID="branch-button"
-            >
-              <Icon name="source-branch" size={19} tone="textMuted" />
-            </Pressable>
-          ) : null}
-          {hasDetails ? (
-            <Pressable
-              accessibilityHint={detailsOpen ? t("reply.hideDetails") : t("reply.showDetails")}
-              accessibilityLabel={t("reply.details")}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: detailsOpen }}
-              className={cn(
-                "h-9 w-9 items-center justify-center rounded-full active:bg-surface",
-                detailsOpen && "bg-surface",
-              )}
-              onPress={() => setDetailsOpen((current) => !current)}
-              testID="reply-details-button"
-            >
-              <Icon
-                name="information-outline"
-                size={19}
-                tone={detailsOpen ? "text" : "textMuted"}
-              />
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      {detailsOpen && hasDetails && !streaming ? <ReplyDetails message={message} /> : null}
+          {detailsOpen && hasDetails && !streaming ? <ReplyDetails message={message} /> : null}
+        </HighlightScope>
+      </QuoteScope>
     </Bubble>
   );
 });

@@ -35,6 +35,7 @@ import {
   type FormResult,
   type Message,
   type QueuedMessage,
+  type Quote,
   type ReplyPart,
   type StreamEvent,
   type ToolCall,
@@ -197,17 +198,26 @@ function flushDraft(turn: LiveTurn): void {
 export async function sendMessage(
   chatId: ChatId,
   text: string,
-  attachments?: Attachment[],
+  extras: MessageExtras = {},
   sentAt = Date.now(),
 ): Promise<void> {
   await runTurn(
     chatId,
-    { id: localId("user"), text, ...(attachments ? { attachments } : {}) },
+    { id: localId("user"), text, ...extrasOf(extras) },
     {
       deliver: (provider, message) => provider.send(chatId, message),
       sentAt,
     },
   );
+}
+
+export type MessageExtras = Pick<UserMessage, "attachments" | "quotes">;
+
+function extrasOf(source: MessageExtras): MessageExtras {
+  return {
+    ...(source.attachments?.length ? { attachments: source.attachments } : {}),
+    ...(source.quotes?.length ? { quotes: source.quotes } : {}),
+  };
 }
 
 /** How a turn reaches the backend once its events are subscribed. */
@@ -335,13 +345,15 @@ export async function editMessage(
   chatId: ChatId,
   message: Message,
   text: string,
+  quotes?: Quote[],
 ): Promise<RegenerateOutcome> {
-  return startRerun(chatId, { message, text });
+  return startRerun(chatId, { message, text, quotes });
 }
 
 interface Edit {
   message: Message;
   text: string;
+  quotes?: Quote[];
 }
 
 async function startRerun(chatId: ChatId, edit?: Edit): Promise<RegenerateOutcome> {
@@ -397,9 +409,12 @@ async function rerun(chatId: ChatId, sentAt: number, edit?: Edit): Promise<Regen
     return { ok: false, error: t("errors.transcriptUnavailable") };
   }
 
-  const carried: Pick<UserMessage, "text" | "attachments"> = {
+  const carried: Omit<UserMessage, "id"> = {
     text: edit?.text ?? target.user.text,
-    ...(target.user.attachments ? { attachments: target.user.attachments } : {}),
+    ...extrasOf({
+      attachments: target.user.attachments,
+      quotes: edit ? edit.quotes : target.user.quotes,
+    }),
   };
   if (native) {
     // The backend drops the old turn, so the rerun takes its place on screen
@@ -576,7 +591,7 @@ function beginTurn(
     id: userMessage.id,
     role: "user",
     text: userMessage.text,
-    ...(userMessage.attachments ? { attachments: userMessage.attachments } : {}),
+    ...extrasOf(userMessage),
     status: "complete",
     createdAt: Date.now(),
   };
@@ -1117,7 +1132,7 @@ function deliverQueued(turn: LiveTurn, id: string): void {
     id,
     role: "user",
     text: queued.text,
-    ...(queued.attachments ? { attachments: queued.attachments } : {}),
+    ...extrasOf(queued),
     status: "complete",
     createdAt: now,
   });
@@ -1408,7 +1423,7 @@ export async function syncQueue(chatId: ChatId, provider?: ChatProvider | null):
 export async function queueMessage(
   chatId: ChatId,
   text: string,
-  attachments?: Attachment[],
+  extras: MessageExtras = {},
 ): Promise<void> {
   const provider = await getProvider();
   if (!provider) throw new Error(t("errors.notConnected"));
@@ -1416,7 +1431,7 @@ export async function queueMessage(
   const message: QueuedMessage = {
     id: provider.newMessageId(),
     text,
-    ...(attachments?.length ? { attachments } : {}),
+    ...extrasOf(extras),
     delivery: "queue",
     createdAt: Date.now(),
   };
@@ -1458,7 +1473,7 @@ export async function sendQueuedNow(chatId: ChatId, id: string): Promise<void> {
   changeQueue(chatId, (messages) => messages.removeQueued(chatId, id));
   await runTurn(
     chatId,
-    { id, text: queued.text, ...(queued.attachments ? { attachments: queued.attachments } : {}) },
+    { id, text: queued.text, ...extrasOf(queued) },
     { deliver: (active) => active.steerQueued!(chatId, id), sentAt: Date.now() },
   );
 }

@@ -5,7 +5,16 @@
  * their native views and state.
  */
 
-import { memo, useCallback, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  memo,
+  use,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Linking, View, type LayoutChangeEvent, type TextStyle } from "react-native";
 import { Text } from "@/src/ui/Text";
 // RNGH's ScrollView claims a sideways swipe before the drawer's pan can, so a
@@ -22,6 +31,7 @@ import {
 } from "./blocks";
 import { CodeBlock } from "./CodeBlock";
 import type { MarkdownNode } from "./parse";
+import { HighlightScope } from "./quoting";
 import { MONOSPACE, type MarkdownTheme } from "./styles";
 
 function isSafeLink(url: string): boolean {
@@ -32,32 +42,82 @@ function openLink(url: string) {
   void Linking.openURL(url).catch(() => undefined);
 }
 
-function renderInline(nodes: readonly MarkdownNode[], theme: MarkdownTheme): ReactNode[] {
+/** The words to light up in a paragraph, and how far into its text rendering has got. */
+interface Mark {
+  start: number;
+  end: number;
+  at: number;
+}
+
+/** A paragraph's text as its `Text` shows it, which is what a selection in it picks from. */
+function inlineText(nodes: readonly MarkdownNode[]): string {
+  return nodes
+    .map((node) => {
+      switch (node.type) {
+        case "text":
+        case "html_inline":
+        case "math_inline":
+        case "code_inline":
+          return node.content ?? "";
+        case "soft_break":
+        case "line_break":
+          return "\n";
+        case "image":
+          return node.alt ?? "";
+        default:
+          return inlineText(node.children ?? []);
+      }
+    })
+    .join("");
+}
+
+function marked(content: string, mark: Mark | null, theme: MarkdownTheme, key: number): ReactNode {
+  if (!mark) return content;
+  const from = mark.at;
+  mark.at += content.length;
+  const start = Math.max(mark.start, from) - from;
+  const end = Math.min(mark.end, mark.at) - from;
+  if (start >= end) return content;
+  return (
+    <Fragment key={key}>
+      {content.slice(0, start)}
+      <Text style={{ backgroundColor: theme.highlight }}>{content.slice(start, end)}</Text>
+      {content.slice(end)}
+    </Fragment>
+  );
+}
+
+function renderInline(
+  nodes: readonly MarkdownNode[],
+  theme: MarkdownTheme,
+  mark: Mark | null = null,
+): ReactNode[] {
   return nodes.map((node, index) => {
     switch (node.type) {
       case "text":
       case "html_inline":
       case "math_inline":
-        return node.content ?? "";
+        return marked(node.content ?? "", mark, theme, index);
       case "soft_break":
       case "line_break":
+        if (mark) mark.at += 1;
         return "\n";
       case "bold":
         return (
           <Text key={index} style={{ fontWeight: "700" }}>
-            {renderInline(node.children ?? [], theme)}
+            {renderInline(node.children ?? [], theme, mark)}
           </Text>
         );
       case "italic":
         return (
           <Text key={index} style={{ fontStyle: "italic" }}>
-            {renderInline(node.children ?? [], theme)}
+            {renderInline(node.children ?? [], theme, mark)}
           </Text>
         );
       case "strikethrough":
         return (
           <Text key={index} style={{ color: theme.muted, textDecorationLine: "line-through" }}>
-            {renderInline(node.children ?? [], theme)}
+            {renderInline(node.children ?? [], theme, mark)}
           </Text>
         );
       case "code_inline":
@@ -70,12 +130,12 @@ function renderInline(nodes: readonly MarkdownNode[], theme: MarkdownTheme): Rea
               backgroundColor: theme.inlineCodeBackground,
             }}
           >
-            {node.content}
+            {marked(node.content ?? "", mark, theme, 0)}
           </Text>
         );
       case "link": {
         const href = node.href ?? "";
-        const children = renderInline(node.children ?? [], theme);
+        const children = renderInline(node.children ?? [], theme, mark);
         if (!isSafeLink(href)) return <Text key={index}>{children}</Text>;
         return (
           <Text
@@ -89,6 +149,7 @@ function renderInline(nodes: readonly MarkdownNode[], theme: MarkdownTheme): Rea
         );
       }
       case "image":
+        if (mark) mark.at += node.alt?.length ?? 0;
         // Remote images are never fetched; the alt text stands in.
         return node.alt ? (
           <Text key={index} style={{ color: theme.muted }}>
@@ -96,7 +157,7 @@ function renderInline(nodes: readonly MarkdownNode[], theme: MarkdownTheme): Rea
           </Text>
         ) : null;
       default:
-        return <Text key={index}>{renderInline(node.children ?? [], theme)}</Text>;
+        return <Text key={index}>{renderInline(node.children ?? [], theme, mark)}</Text>;
     }
   });
 }
@@ -110,10 +171,32 @@ function Paragraph({
   theme: MarkdownTheme;
   style?: TextStyle;
 }) {
-  return (
+  const highlight = use(HighlightScope);
+  const children = node.children ?? [];
+  const start = highlight ? inlineText(children).indexOf(highlight.text) : -1;
+  const lit = start >= 0 && highlight !== null;
+  const shown = useRef<View>(null);
+  const onShown = lit ? highlight.onShown : undefined;
+  useEffect(() => {
+    if (onShown && shown.current) onShown(shown.current);
+  }, [onShown]);
+
+  const text = (
     <Text selectable={theme.selectable} style={[theme.body, style]}>
-      {renderInline(node.children ?? [], theme)}
+      {renderInline(
+        children,
+        theme,
+        lit ? { start, end: start + highlight.text.length, at: 0 } : null,
+      )}
     </Text>
+  );
+  // Text can't be measured on its own; the view is there to say where it is.
+  return lit ? (
+    <View ref={shown} collapsable={false}>
+      {text}
+    </View>
+  ) : (
+    text
   );
 }
 

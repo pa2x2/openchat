@@ -15,7 +15,10 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatId, Message, QueuedMessage, TurnActivity } from "@/src/domain";
+import type { ChatId, Message, QueuedMessage, Quote, TurnActivity } from "@/src/domain";
+import { nodeText } from "@/src/features/markdown/blocks";
+import { parseMarkdown } from "@/src/features/markdown/parse";
+import type { Highlight } from "@/src/features/markdown/quoting";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/src/ui/Skeleton";
@@ -37,6 +40,38 @@ const FOLLOW_OFFSET = 8;
 
 /** How much of what follows a message being edited stays in view under it. */
 const EDIT_PEEK = 120;
+
+/** How long words a tapped quote points at stay lit. */
+const JUMP_HIGHLIGHT_MS = 2500;
+
+/** Lets the list settle (a scroll, the keyboard opening) before lit words are brought into view. */
+const REVEAL_DELAY_MS = 350;
+
+export interface QuotedWords {
+  messageId: string;
+  text: string;
+}
+
+const squeeze = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Where a quote came from: the message it names, or else the newest one
+ * that still has its words, other than one quoting them. A branch copies
+ * messages under new ids, and a quote can outlive its message's id in other
+ * ways too.
+ */
+function quoteSource(messages: readonly Message[], quote: Quote): number {
+  const byId = messages.findIndex((message) => message.id === quote.messageId);
+  if (byId >= 0) return byId;
+  const words = squeeze(quote.text);
+  return messages.findIndex(
+    (message) =>
+      !message.quotes?.some((quoted) => quoted.text === quote.text) &&
+      squeeze((parseMarkdown(message.text).children ?? []).map(nodeText).join("\n")).includes(
+        words,
+      ),
+  );
+}
 
 /** Space the list keeps above the oldest message and below the newest. */
 const TOP_GAP = 4;
@@ -93,6 +128,11 @@ export interface TranscriptProps {
   editReplaces?: boolean;
   onSendQueuedNow: (message: QueuedMessage) => void;
   onCancelQueued: (message: QueuedMessage) => void;
+  onQuote?: (quote: Quote) => void;
+  /** Words to keep lit, and in view, such as those a quote being commented on points at. */
+  highlight?: QuotedWords | null;
+  /** A tapped quote whose message is no longer in the transcript. */
+  onQuoteMissing?: () => void;
 }
 
 const NO_QUEUED: QueuedMessage[] = [];
@@ -109,6 +149,9 @@ export function Transcript({
   editReplaces = true,
   onSendQueuedNow,
   onCancelQueued,
+  onQuote,
+  highlight = null,
+  onQuoteMissing,
 }: TranscriptProps) {
   const { t } = useTranslation();
   const { colors, floatingShadow } = useAppTheme();
@@ -179,8 +222,15 @@ export function Transcript({
   // The edit is typed in the composer, so the message goes just above it,
   // with the start of what the edit replaces under it. Placed from the
   // bottom, it stays in view as the keyboard opens and the list shrinks.
+  const lastScroll = useRef<{ index: number; viewPosition: number; viewOffset?: number } | null>(
+    null,
+  );
+  function scrollToIndex(target: { index: number; viewPosition: number; viewOffset?: number }) {
+    lastScroll.current = target;
+    listRef.current?.scrollToIndex(target);
+  }
   function scrollToEdited(index: number) {
-    listRef.current?.scrollToIndex({ index, viewPosition: 0, viewOffset: EDIT_PEEK });
+    scrollToIndex({ index, viewPosition: 0, viewOffset: EDIT_PEEK });
   }
   // Once per edit, not as the list changes under it.
   const scrollToEditing = useEffectEvent(() => {
@@ -189,6 +239,80 @@ export function Transcript({
   useEffect(() => {
     scrollToEditing();
   }, [editingId]);
+
+  const frame = useRef<View>(null);
+  const offset = useRef(0);
+  const [jump, setJump] = useState<QuotedWords | null>(null);
+  const lit = jump ?? highlight;
+  // A quote taken while its reply streamed names the reply's local id.
+  const litId = useMemo(
+    () => (lit ? reversed[quoteSource(reversed, lit)]?.id : undefined),
+    [reversed, lit],
+  );
+  const shown = useRef<View | null>(null);
+  // Bumped whenever the lit words may have moved out of view.
+  const [revealRequest, setRevealRequest] = useState(0);
+
+  // Brings the lit words to the middle of the list when any of them is out of view.
+  const reveal = useEffectEvent(() => {
+    const target = shown.current;
+    if (!target || !frame.current) return;
+    frame.current.measureInWindow((_x, top, _width, height) => {
+      target.measureInWindow((_tx, y, _twidth, size) => {
+        const visibleTop = top + topInset + TOP_GAP;
+        const visibleBottom = top + height - BOTTOM_GAP;
+        if (y >= visibleTop && y + size <= visibleBottom) return;
+        const below = y + size / 2 - (visibleTop + visibleBottom) / 2;
+        // The list is inverted: a smaller offset moves the content up.
+        listRef.current?.scrollToOffset({
+          offset: Math.max(0, offset.current - below),
+          animated: true,
+        });
+      });
+    });
+  });
+
+  // A new object per lit quote, so the same words lit again are brought into view again.
+  const litScope = useMemo<Highlight | null>(
+    () =>
+      lit && {
+        text: lit.text,
+        onShown: (view) => {
+          shown.current = view;
+          setRevealRequest((count) => count + 1);
+        },
+      },
+    [lit],
+  );
+  useEffect(() => {
+    if (!litScope) shown.current = null;
+  }, [litScope]);
+  useEffect(() => {
+    if (revealRequest === 0) return;
+    const timer = setTimeout(reveal, REVEAL_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [revealRequest]);
+
+  useEffect(() => {
+    if (!jump) return;
+    const timer = setTimeout(() => setJump(null), JUMP_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [jump]);
+
+  const handleQuotePress = useCallback(
+    (quote: Quote) => {
+      const index = quoteSource(reversed, quote);
+      const source = reversed[index];
+      if (!source) {
+        onQuoteMissing?.();
+        return;
+      }
+      setHeld(false);
+      setJump({ messageId: source.id, text: quote.text });
+      scrollToIndex({ index, viewPosition: 0.5 });
+    },
+    [reversed, onQuoteMissing],
+  );
 
   const dragged = useRef(false);
   const wandered = useRef(false);
@@ -252,6 +376,9 @@ export function Transcript({
               dimmed={editReplaces && index < editingIndex}
               // The store keeps the reason for the latest turn only.
               error={item.id === lastMessage?.id ? turnError : null}
+              onQuote={onQuote}
+              onQuotePress={handleQuotePress}
+              highlight={item.id === litId ? litScope : null}
             />
           </View>
         </View>
@@ -275,15 +402,20 @@ export function Transcript({
       questionIndex,
       pinnedReplyId,
       slotHeight,
+      onQuote,
+      handleQuotePress,
+      litId,
+      litScope,
     ],
   );
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     // The list is inverted: offset 0 is the newest message.
-    const offset = event.nativeEvent.contentOffset.y;
-    const away = offset > (live ? LIVE_SCROLL_BUTTON_OFFSET : SCROLL_BUTTON_OFFSET);
+    const at = event.nativeEvent.contentOffset.y;
+    offset.current = at;
+    const away = at > (live ? LIVE_SCROLL_BUTTON_OFFSET : SCROLL_BUTTON_OFFSET);
     if (away !== showScrollButton) setShowScrollButton(away);
-    const atLatest = offset <= FOLLOW_OFFSET;
+    const atLatest = at <= FOLLOW_OFFSET;
     if (atLatest !== following) setFollowing(atLatest);
     // Only a return the user made counts: the hold itself moves the list off
     // the newest message, and a new question scrolls it back there.
@@ -297,59 +429,68 @@ export function Transcript({
 
   return (
     <>
-      <FlatList
-        ref={listRef}
-        inverted
-        data={reversed}
-        keyExtractor={(message) => message.id}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={following && !hold ? undefined : HOLD_POSITION}
-        // On by default on Android, where it detaches off-screen cells and the
-        // anchor with them, so a reply taller than the screen drags the view.
-        removeClippedSubviews={false}
-        onLayout={(event) => setListHeight(event.nativeEvent.layout.height)}
-        onScroll={handleScroll}
-        onScrollBeginDrag={() => {
-          dragged.current = true;
-        }}
-        // Frequent enough that a drag away from the bottom stops following
-        // before the stream moves the content under it.
-        scrollEventThrottle={16}
-        // Inverted: the header component sits at the bottom, the footer
-        // at the top.
-        ListHeaderComponent={
-          <>
-            {/* Until the pinned question has a reply of its own, this holds the reply's space. */}
-            <View style={pinned && questionIndex === 0 ? { minHeight: slotHeight } : undefined}>
-              {starting ? (
-                <MessageBubble
-                  message={PENDING_REPLY}
-                  showReasoning={showReasoning}
-                  activity={activity}
-                />
-              ) : null}
-            </View>
-            <View onLayout={(event) => setQueuedHeight(event.nativeEvent.layout.height)}>
-              {queued.length > 0 ? (
-                <QueuedMessages
-                  messages={queued}
-                  onSendNow={onSendQueuedNow}
-                  onCancel={onCancelQueued}
-                />
-              ) : null}
-            </View>
-            <View style={{ height: BOTTOM_GAP }} />
-          </>
-        }
-        ListFooterComponent={<View style={{ height: topInset + TOP_GAP }} />}
-        renderItem={renderMessage}
-        onScrollToIndexFailed={({ index, averageItemLength }) => {
-          // A message far up has not been laid out yet: get near it, then aim again.
-          listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
-          setTimeout(() => scrollToEdited(index), 100);
-        }}
-      />
+      <View ref={frame} className="flex-1" collapsable={false}>
+        <FlatList
+          ref={listRef}
+          inverted
+          data={reversed}
+          keyExtractor={(message) => message.id}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          maintainVisibleContentPosition={following && !hold ? undefined : HOLD_POSITION}
+          // On by default on Android, where it detaches off-screen cells and the
+          // anchor with them, so a reply taller than the screen drags the view.
+          removeClippedSubviews={false}
+          onLayout={(event) => {
+            setListHeight(event.nativeEvent.layout.height);
+            // The keyboard opening for a comment shrinks the list under the lit words.
+            if (shown.current) setRevealRequest((count) => count + 1);
+          }}
+          onScroll={handleScroll}
+          onScrollBeginDrag={() => {
+            dragged.current = true;
+          }}
+          // Frequent enough that a drag away from the bottom stops following
+          // before the stream moves the content under it.
+          scrollEventThrottle={16}
+          // Inverted: the header component sits at the bottom, the footer
+          // at the top.
+          ListHeaderComponent={
+            <>
+              {/* Until the pinned question has a reply of its own, this holds the reply's space. */}
+              <View style={pinned && questionIndex === 0 ? { minHeight: slotHeight } : undefined}>
+                {starting ? (
+                  <MessageBubble
+                    message={PENDING_REPLY}
+                    showReasoning={showReasoning}
+                    activity={activity}
+                  />
+                ) : null}
+              </View>
+              <View onLayout={(event) => setQueuedHeight(event.nativeEvent.layout.height)}>
+                {queued.length > 0 ? (
+                  <QueuedMessages
+                    messages={queued}
+                    onSendNow={onSendQueuedNow}
+                    onCancel={onCancelQueued}
+                  />
+                ) : null}
+              </View>
+              <View style={{ height: BOTTOM_GAP }} />
+            </>
+          }
+          ListFooterComponent={<View style={{ height: topInset + TOP_GAP }} />}
+          renderItem={renderMessage}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            // A message far up has not been laid out yet: get near it, then aim again.
+            listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+            const target = lastScroll.current;
+            setTimeout(() => {
+              if (target?.index === index) scrollToIndex(target);
+            }, 100);
+          }}
+        />
+      </View>
 
       {/* Fade the transcript out into the composer. */}
       <View

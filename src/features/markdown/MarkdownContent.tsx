@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 import { View } from "react-native";
 import { useAppTheme } from "@/src/ui/theme";
 import { MarkdownBlocks } from "./MarkdownBlocks";
 import { parseMarkdown } from "./parse";
+import { QuoteScope, QuoteTarget } from "./quoting";
 import { getMarkdownTheme, type MarkdownBackdrop } from "./styles";
 
 export interface MarkdownContentProps {
@@ -32,10 +33,8 @@ export function MarkdownContent({
     [role, colors, scheme, backdrop],
   );
   const document = useMemo(() => parseMarkdown(text), [text]);
+  const quotable = use(QuoteScope) !== null;
 
-  return (
-    <View testID={testID}>
-      <MarkdownBlocks nodes={document.children ?? []} theme={theme} live={streaming} />
-    </View>
-  );
+  const blocks = <MarkdownBlocks nodes={document.children ?? []} theme={theme} live={streaming} />;
+  return <View testID={testID}>{quotable ? <QuoteTarget>{blocks}</QuoteTarget> : blocks}</View>;
 }
