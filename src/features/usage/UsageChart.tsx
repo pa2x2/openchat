@@ -74,6 +74,9 @@ export function UsageChart({ days, measure, currency }: UsageChartProps) {
           <View className="absolute inset-0 flex-row">
             {days.map((day, index) => {
               const selected = day.date === shown.date;
+              // No minimum height: a stub for a day far below the top one reads
+              // as real spend. Its figures are still a tap away.
+              const bar = height(values[index]);
               return (
                 <Pressable
                   key={day.date}
@@ -87,13 +90,10 @@ export function UsageChart({ days, measure, currency }: UsageChartProps) {
                   onPress={() => setPicked(day.date)}
                   testID={`usage-day-${day.date}`}
                 >
-                  {values[index] > 0 ? (
+                  {bar >= 1 ? (
                     <View
                       className="rounded-t-[3px] bg-primary"
-                      style={{
-                        width: everyDayLabelled ? 20 : 7,
-                        height: Math.max(2, height(values[index])),
-                      }}
+                      style={{ width: everyDayLabelled ? 20 : 7, height: bar }}
                     />
                   ) : null}
                 </Pressable>
