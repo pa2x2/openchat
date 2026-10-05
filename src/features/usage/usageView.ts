@@ -9,6 +9,7 @@ import {
   type UsageTotals,
 } from "@/src/domain";
 import { formatCost, formatTokens, formatTokensShort } from "@/src/features/chat/usageFormat";
+import { formatNumber } from "@/src/i18n/format";
 import { formatMonthDay, formatTimestamp, formatWeekday } from "@/src/lib/time";
 import { modelKey, sameModelRef } from "@/src/stores/models";
 import type { UsageMeasure, UsagePeriod } from "@/src/stores/settings";
@@ -110,7 +111,11 @@ export function formatTick(
 ): string {
   if (value === 0) return "0";
   if (measure === "cost") return formatCost(t, { amount: value, currency }) ?? "0";
-  return measure === "tokens" ? formatTokensShort(t, value) : formatTokens(t, value);
+  if (measure !== "tokens") return formatTokens(t, value);
+  // From a million up every tick is a whole number of them (see chartTop), so
+  // the two decimals formatTokensShort gives millions would only be zeros.
+  if (value >= 1_000_000) return `${formatNumber(t, value / 1_000_000)}M`;
+  return formatTokensShort(t, value);
 }
 
 /** What a tap on a day shows: the charted figure first, then the day and its other figures. */
