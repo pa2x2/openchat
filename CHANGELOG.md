@@ -2,6 +2,13 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-05
+
+### 🐛 Fixed
+
+- On the Usage chart, a day with very little use showed a small bar even when it was far below the top day, so it looked like real spend. Bars are now drawn to scale. A day too small to show still gives its figures when you tap it.
+- The Usage chart's scale labels no longer wrap onto two lines when a value is long, such as a cost. A million tokens or more shows as 2M rather than 2.00M.
+
 ## [1.4.0] - 2026-10-03
 
 ### ✨ Added
@@ -234,6 +241,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Attach photos from your library or files from the file picker, and drop them again before sending.
 - Light, dark, or system appearance.
 
+[1.4.1]: https://github.com/pa2x2/openchat/releases/tag/v1.4.1
 [1.4.0]: https://github.com/pa2x2/openchat/releases/tag/v1.4.0
 [1.3.2]: https://github.com/pa2x2/openchat/releases/tag/v1.3.2
 [1.3.0]: https://github.com/pa2x2/openchat/releases/tag/v1.3.0
