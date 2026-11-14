@@ -14,8 +14,8 @@ importers:
         specifier: ^6.3.15
         version: 6.3.15
       '@opencode/client':
-        specifier: 2.2.7
-        version: 2.2.7(effect@4.1.0)
+        specifier: 2.3.0
+        version: 2.3.0(effect@4.1.0)
       '@react-native-vector-icons/material-design-icons':
         specifier: 13.1.4
         version: 13.1.4(@expo/config-plugins@57.0.9(supports-color@8.1.1)(typescript@6.0.3))(@react-native/assets-registry@0.86.3)(expo-font@57.0.4)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
@@ -1022,8 +1022,8 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@opencode/client@2.2.7':
-    resolution: {integrity: sha512-L1nqJqEBEHyg+OwJaMYA5jX8OA4nZ1Jxehp8xTw5u4kzKEgqLes2re7yWzXJSZmybZ5Kv4rX24gJjYHeegwf7g==}
+  '@opencode/client@2.3.0':
+    resolution: {integrity: sha512-xu74XGiYIqLZ2FzIrtjaR5UNWWXY3fRln0WLgZoQTR/wWMgG+T9XGQQGCl8ry8jnCFsJVokiHemBqft9oMzC1A==}
     peerDependencies:
       effect: 4.1.0
       solid-js: '>=1.9.0'
@@ -1033,11 +1033,11 @@ packages:
       solid-js:
         optional: true
 
-  '@opencode/protocol@2.2.7':
-    resolution: {integrity: sha512-J86R/rNrFC0KRJd4G5i2yT5FG7FB4M9Yh418NS3PcTHoWP1jwWKLV85L5JvGYPwb7sKtahyxPeN88Q/Mw+pZvQ==}
+  '@opencode/protocol@2.3.0':
+    resolution: {integrity: sha512-V37zTGXVa1j9aXUvUY01YN1EtfMMSWoT5pSCc6M0UsGdTUZX6QL/vMgGVGzPvbt7+Z8Vo40/0DFRPyqT4sdvnw==}
 
-  '@opencode/schema@2.2.7':
-    resolution: {integrity: sha512-A+aUfvpcPm8mN0ptFl2GUHwDFjyrCuLdig3jjQCRoOghF+un1+vVKek1IwIph935vMNqAwRDnwtvZDtHFiGokA==}
+  '@opencode/schema@2.3.0':
+    resolution: {integrity: sha512-9CPS4+BXWUs3ELIWo68AA2q4XEPMkRYwpGYdqd/wNz3jRTOB8swef+2/z+igkCel+UtlX+dAlGTmSnid/JcoKw==}
 
   '@radix-ui/primitive@1.1.7':
     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
@@ -6544,19 +6544,19 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@opencode/client@2.2.7(effect@4.1.0)':
+  '@opencode/client@2.3.0(effect@4.1.0)':
     dependencies:
-      '@opencode/protocol': 2.2.7
-      '@opencode/schema': 2.2.7
+      '@opencode/protocol': 2.3.0
+      '@opencode/schema': 2.3.0
     optionalDependencies:
       effect: 4.1.0
 
-  '@opencode/protocol@2.2.7':
+  '@opencode/protocol@2.3.0':
     dependencies:
-      '@opencode/schema': 2.2.7
+      '@opencode/schema': 2.3.0
       effect: 4.1.0
 
-  '@opencode/schema@2.2.7':
+  '@opencode/schema@2.3.0':
     dependencies:
       '@standard-schema/spec': 1.1.0
       effect: 4.1.0
