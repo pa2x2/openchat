@@ -36,6 +36,23 @@ export async function* catalogChanges(
   }
 }
 
+/** A run that the user stopped is left out: they know it ended. */
+const RUN_ENDS = new Set(["session.execution.succeeded", "session.execution.failed"]);
+
+export async function* runsEnded(
+  client: OpenCodeClient,
+  signal: AbortSignal,
+): AsyncGenerator<ChatId> {
+  try {
+    for await (const event of client.event.subscribe({ signal })) {
+      const chatId = (event as V2EventShape).data?.sessionID;
+      if (RUN_ENDS.has(event.type) && typeof chatId === "string") yield chatId;
+    }
+  } catch {
+    // A dropped stream just ends; the caller resubscribes.
+  }
+}
+
 type StepEnd = Extract<StreamEvent, { type: "message-complete" }>;
 
 /**

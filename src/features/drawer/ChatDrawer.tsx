@@ -20,7 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ChatId, ChatSummary } from "@/src/domain";
 import { cn } from "@/src/lib/cn";
 import { useProviderCapabilities, useProviderDescriptor } from "@/src/lib/providerFactory";
-import { useChatsStore } from "@/src/stores/chats";
+import { listedChats, useChatsStore } from "@/src/stores/chats";
+import { useTasksStore } from "@/src/stores/tasks";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { Icon } from "@/src/ui/Icon";
@@ -41,6 +42,7 @@ export interface ChatDrawerProps {
   onNewChat: () => void;
   onOpenSettings: () => void;
   onOpenUsage: () => void;
+  onOpenScheduled: () => void;
   /** Called after the active chat is deleted, so the screen can move on. */
   onDeletedActive: () => void;
 }
@@ -52,6 +54,7 @@ export function ChatDrawer({
   onNewChat,
   onOpenSettings,
   onOpenUsage,
+  onOpenScheduled,
   onDeletedActive,
 }: ChatDrawerProps) {
   const { t } = useTranslation();
@@ -97,9 +100,8 @@ export function ChatDrawer({
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return allChats.filter(
-      (chat) =>
-        !temporary[chat.id] && (!needle || chatTitle(t, chat.title).toLowerCase().includes(needle)),
+    return listedChats(allChats, temporary).filter(
+      (chat) => !needle || chatTitle(t, chat.title).toLowerCase().includes(needle),
     );
   }, [allChats, temporary, query, t]);
 
@@ -110,6 +112,9 @@ export function ChatDrawer({
   const canDelete = capabilities?.deleteChat === true;
   const canRename = capabilities?.renameChat === true;
   const canShowUsage = profile !== null && capabilities?.usageReport === true;
+  const schedulingSupported = useTasksStore((state) => Boolean(state.support));
+  const canSchedule = profile !== null && schedulingSupported;
+  const footerButtons = canShowUsage || canSchedule;
   const toggle = useCallback(
     (id: ChatId) =>
       setSelected((current) => {
@@ -419,20 +424,33 @@ export function ChatDrawer({
                   </Text>
                 </View>
               </View>
-              {/* With a usage button beside it, the cog moves out to sit after that button. */}
-              {canShowUsage ? null : <Icon name="cog-outline" size={22} tone="textMuted" />}
+              {/* With buttons beside it, the cog moves out to sit after them. */}
+              {footerButtons ? null : <Icon name="cog-outline" size={22} tone="textMuted" />}
             </Pressable>
-            {canShowUsage ? (
+            {footerButtons ? (
               <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("usage.title")}
-                  className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
-                  onPress={onOpenUsage}
-                  testID="drawer-usage"
-                >
-                  <Icon name="chart-box-outline" size={22} tone="textMuted" />
-                </Pressable>
+                {canSchedule ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("scheduled.title")}
+                    className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                    onPress={onOpenScheduled}
+                    testID="drawer-scheduled"
+                  >
+                    <Icon name="calendar-clock" size={22} tone="textMuted" />
+                  </Pressable>
+                ) : null}
+                {canShowUsage ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("usage.title")}
+                    className="h-11 w-11 items-center justify-center rounded-full active:bg-surface"
+                    onPress={onOpenUsage}
+                    testID="drawer-usage"
+                  >
+                    <Icon name="chart-box-outline" size={22} tone="textMuted" />
+                  </Pressable>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("settings.title")}
@@ -479,17 +497,23 @@ const ChatRow = memo(function ChatRow({
   // Per row, so a turn starting or ending re-renders only its own chat.
   const live = useMessagesStore((state) => state.activeTurns[chat.id] === true);
   const deleting = useChatsStore((state) => state.deleting[chat.id] === true);
+  const scheduled = useTasksStore((state) =>
+    state.tasks.some((task) => task.chatId === chat.id && task.status === "active"),
+  );
   const { t } = useTranslation();
   const title = chatTitle(t, chat.title);
+  const unread = chat.unread === true && !active && !live;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
         live
           ? t("drawer.replying", { title })
-          : chat.branchedFrom
-            ? t("chat.titleBranch", { title })
-            : title
+          : unread
+            ? t("drawer.unread", { title })
+            : chat.branchedFrom
+              ? t("chat.titleBranch", { title })
+              : title
       }
       accessibilityState={{
         ...(selection === undefined ? { selected: active } : { checked: selection }),
@@ -518,11 +542,17 @@ const ChatRow = memo(function ChatRow({
       {live ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
       {chat.branchedFrom ? <Icon name="source-branch" size={17} tone="textMuted" /> : null}
       <Text
-        className={cn("flex-1 text-[15.5px] text-text", active && "font-medium")}
+        className={cn(
+          "flex-1 text-[15.5px] text-text",
+          active && "font-medium",
+          unread && "font-semibold",
+        )}
         numberOfLines={1}
       >
         {title}
       </Text>
+      {scheduled ? <Icon name="calendar-clock" size={16} tone="textMuted" /> : null}
+      {unread ? <View className="h-2 w-2 rounded-full bg-primary" testID="unread-dot" /> : null}
       {deleting ? <Spinner size="small" /> : null}
     </Pressable>
   );

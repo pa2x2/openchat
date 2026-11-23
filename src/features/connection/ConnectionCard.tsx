@@ -27,6 +27,7 @@ import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { useMessagesStore } from "@/src/stores/messages";
 import { useModelsStore } from "@/src/stores/models";
+import { useTasksStore } from "@/src/stores/tasks";
 import { useUsageStore } from "@/src/stores/usage";
 
 export function ConnectionCard() {
@@ -119,6 +120,8 @@ export function ConnectionCard() {
     setValues({ baseUrl: cfg.baseUrl });
     // The chat list may be another server's, or stale from before the reconnect.
     void useChatsStore.getState().refresh();
+    useTasksStore.getState().clear();
+    void useTasksStore.getState().refresh();
   }
 
   function handleCancel() {
@@ -142,6 +145,7 @@ export function ConnectionCard() {
             useConnectionStore.getState().forget();
             useChatsStore.getState().clear();
             useModelsStore.getState().clear();
+            useTasksStore.getState().clear();
             useUsageStore.getState().forgetServer(baseUrl);
             const messages = useMessagesStore.getState();
             for (const chatId of Object.keys(messages.byChat)) messages.removeChat(chatId);

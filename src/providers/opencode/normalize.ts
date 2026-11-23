@@ -180,6 +180,20 @@ export function toolCategory(name: string): ToolCategory {
 // The input fields that name what the built-in tools work on.
 const SUBJECT_KEYS = ["query", "url", "command", "filePath", "pattern", "path", "description"];
 
+const SCHEDULE_CALL = /\bautomation\.create\s*\(/;
+const TASK_NAME = /\bname\s*:\s*(["'`])((?:(?!\1).)+)\1/;
+
+/**
+ * Code Mode runs the automation tools inside `execute`, so a call that
+ * creates a task is told apart by the code it runs, which names the task.
+ * Null for any other call.
+ */
+export function scheduledTask(input: unknown): string | null {
+  const code = (input as { code?: unknown } | null)?.code;
+  if (typeof code !== "string" || !SCHEDULE_CALL.test(code)) return null;
+  return TASK_NAME.exec(code)?.[2] ?? "";
+}
+
 export function toolSubject(input: unknown): string {
   if (typeof input !== "object" || input === null) return "";
   const fields = input as Record<string, unknown>;
@@ -298,7 +312,15 @@ export function normalizeV2Event(event: V2EventShape): StreamEvent | null {
       if (event.type === "session.tool.called") {
         const questions = askedQuestions(event.data.input);
         if (questions) return { type: "form-result", id, update: { status: "waiting", questions } };
-        return { type: "tool", id, update: { subject: toolSubject(event.data.input) } };
+        const task = scheduledTask(event.data.input);
+        return {
+          type: "tool",
+          id,
+          update:
+            task !== null
+              ? { category: "schedule", subject: task }
+              : { subject: toolSubject(event.data.input) },
+        };
       }
       if (event.type === "session.tool.success") {
         const answers = givenAnswers(event.data.metadata);

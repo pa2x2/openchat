@@ -142,7 +142,7 @@ function promptTitle(chatId: ChatId): string | null {
 }
 
 /** Text as plain prose: a notification shows markdown syntax verbatim. */
-function snippet(text: string, length: number): string {
+export function snippet(text: string, length: number): string {
   const flat = text
     .replace(/^\s*(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
     .replace(/[*`~]+/g, "")
@@ -153,11 +153,11 @@ function snippet(text: string, length: number): string {
 }
 
 /**
- * Android 13+ asks once, when the first reply starts: that is when the
- * notifications become useful. Declining is final; the system settings can
- * turn them on later.
+ * Android 13+ asks once, when the first reply starts or the first task is
+ * scheduled: that is when the notifications become useful. Declining is
+ * final; the system settings can turn them on later.
  */
-async function askPermissionOnce(): Promise<void> {
+export async function askPermissionOnce(): Promise<void> {
   if (Platform.OS !== "android" || Platform.Version < 33) return;
   const settings = useSettingsStore.getState();
   if (settings.notificationsAsked) return;

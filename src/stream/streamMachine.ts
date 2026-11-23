@@ -47,6 +47,7 @@ import { canResendAttachments } from "@/src/lib/attachments";
 import { ConnectionError, type ChatProvider } from "@/src/providers/types";
 import { useChatsStore } from "@/src/stores/chats";
 import { withFormRecords } from "@/src/stores/formRecords";
+import { useTasksStore } from "@/src/stores/tasks";
 import { useMessagesStore } from "@/src/stores/messages";
 import { t } from "@/src/i18n";
 
@@ -1076,6 +1077,12 @@ function applyEvent(turn: LiveTurn, event: StreamEvent): void {
         messages.setTurnError(turn.chatId, t("errors.server.noReply"));
       } else if ((messages.queued[turn.chatId] ?? []).length > 0) {
         linger(turn);
+      }
+      // The backend may move a chat the model scheduled in, so the list is read anew.
+      if (
+        turn.draft.parts?.some((part) => part.type === "tool" && part.tool.category === "schedule")
+      ) {
+        void useTasksStore.getState().refresh();
       }
       break;
     }

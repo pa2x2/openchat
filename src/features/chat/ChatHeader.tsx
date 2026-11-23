@@ -44,6 +44,12 @@ export interface ChatHeaderProps {
   temporary?: { on: boolean; onToggle: () => void };
   temporaryLabel?: boolean;
   branchedFrom?: BranchSource;
+  scheduled?: ScheduleLine;
+}
+
+export interface ScheduleLine {
+  label: string;
+  onOpen: () => void;
 }
 
 /**
@@ -64,6 +70,7 @@ export function ChatHeader({
   temporary,
   temporaryLabel = false,
   branchedFrom,
+  scheduled,
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors, floatingShadow } = useAppTheme();
@@ -79,7 +86,9 @@ export function ChatHeader({
   // fade, where the transcript's text would show through it. The solid part
   // grows to hold it.
   const solid =
-    titleLines > 1 || temporaryLabel || branchedFrom ? 1 - 16 / (insets.top + HEADER_HEIGHT) : 0.65;
+    titleLines > 1 || temporaryLabel || branchedFrom || scheduled
+      ? 1 - 16 / (insets.top + HEADER_HEIGHT)
+      : 0.65;
 
   function openMenu() {
     if (top) {
@@ -185,6 +194,7 @@ export function ChatHeader({
             title={title}
             temporaryLabel={temporaryLabel}
             branchedFrom={branchedFrom}
+            scheduled={scheduled}
             onLines={setTitleLines}
           />
         </View>
@@ -224,12 +234,14 @@ export function ChatTitleBar({
   title,
   temporaryLabel = false,
   branchedFrom,
+  scheduled,
   onRename,
 }: {
   /** Null until the chat has a name. */
   title: string | null;
   temporaryLabel?: boolean;
   branchedFrom?: BranchSource;
+  scheduled?: ScheduleLine;
   /** Present on a chat that can be renamed; a tap on the title calls it. */
   onRename?: () => void;
 }) {
@@ -253,6 +265,7 @@ export function ChatTitleBar({
         title={title}
         temporaryLabel={temporaryLabel}
         branchedFrom={branchedFrom}
+        scheduled={scheduled}
         onPress={onRename}
       />
     </View>
@@ -263,19 +276,23 @@ function ChatTitle({
   title,
   temporaryLabel,
   branchedFrom,
+  scheduled,
   onPress,
   onLines,
 }: {
   title: string | null;
   temporaryLabel: boolean;
   branchedFrom?: BranchSource;
+  scheduled?: ScheduleLine;
   onPress?: () => void;
   onLines?: (lines: number) => void;
 }) {
   const { t } = useTranslation();
   const shown = title ?? t("chat.newChat");
-  // A temporary chat's branch is temporary too, which matters more.
-  const source = temporaryLabel ? undefined : branchedFrom;
+  // One line fits under the title. A temporary chat's branch is temporary
+  // too, which matters more; a chat's tasks matter more than where it came from.
+  const schedule = temporaryLabel ? undefined : scheduled;
+  const source = temporaryLabel || schedule ? undefined : branchedFrom;
   return (
     <View className="items-center" pointerEvents="box-none">
       <Pressable
@@ -296,7 +313,7 @@ function ChatTitle({
             title === null && "text-text-muted",
           )}
           // The line under it takes the second line's place.
-          numberOfLines={temporaryLabel || source ? 1 : 2}
+          numberOfLines={temporaryLabel || source || schedule ? 1 : 2}
           onTextLayout={onLines && ((event) => onLines(event.nativeEvent.lines.length))}
         >
           {shown}
@@ -308,6 +325,20 @@ function ChatTitle({
           </View>
         ) : null}
       </Pressable>
+      {schedule ? (
+        <Pressable
+          accessibilityRole="link"
+          className="max-w-full flex-row items-center gap-1 active:opacity-60"
+          hitSlop={8}
+          onPress={schedule.onOpen}
+          testID="schedule-line"
+        >
+          <Icon name="calendar-clock" size={12} tone="textMuted" />
+          <Text className="shrink text-xs text-text-muted" numberOfLines={1}>
+            {schedule.label}
+          </Text>
+        </Pressable>
+      ) : null}
       {source ? (
         <Pressable
           accessibilityHint={source.onOpen ? t("chat.openSourceHint") : undefined}

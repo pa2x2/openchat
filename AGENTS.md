@@ -44,7 +44,6 @@ Name the bug before you write the test. "Checks that search works" is not a bug.
 - **One test per bug, not per branch.** Don't list every event type, status code or enum value. Cover only the cases that differ from the obvious.
 - **Assert related things together.** One test can check that a failed fetch keeps the cache _and_ clears the loading flag. Don't split those into separate `it`s with the same setup.
 - **Test where the logic lives.** Call the function or store that owns it, not a screen that uses it.
-- **No new test infrastructure.** If a test needs a new mock, fixture generator or render helper, it is probably the wrong test. Move the logic into a plain function and test that.
 
 ### Don't write these
 

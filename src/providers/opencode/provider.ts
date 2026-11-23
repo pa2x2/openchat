@@ -14,7 +14,10 @@ import type {
   ModelInfo,
   ModelRef,
   QueuedMessage,
+  ScheduledTask,
+  SchedulingSupport,
   StreamEvent,
+  TaskDraft,
   UsageQuery,
   UsageReport,
   UserMessage,
@@ -26,7 +29,7 @@ import {
   toConnectionError,
   type OpenCodeClient,
 } from "./client";
-import { catalogChanges, chatEvents } from "./events";
+import { catalogChanges, chatEvents, runsEnded } from "./events";
 import { answerForm, dismissForm, pendingForms } from "./forms";
 import { fetchMessages } from "./messages";
 import { listModels } from "./models";
@@ -49,10 +52,22 @@ import {
   deleteChat,
   isRunning,
   listChats,
+  markRead,
   renameChat,
   switchModel,
 } from "./sessions";
 import { usageReport } from "./stats";
+import {
+  createTask,
+  deleteChatTasks,
+  deleteTask,
+  listTasks,
+  pauseTask,
+  replaceTask,
+  resumeTask,
+  schedulingSupport,
+  taskRuns,
+} from "./tasks";
 
 export const openCodeCapabilities: Capabilities = {
   reasoning: true,
@@ -68,6 +83,7 @@ export const openCodeCapabilities: Capabilities = {
   queue: true,
   compact: true,
   branch: true,
+  scheduling: true,
 };
 
 export class OpenCodeProvider implements ChatProvider {
@@ -115,8 +131,10 @@ export class OpenCodeProvider implements ChatProvider {
     return createChat(this.client(), opts);
   }
 
-  deleteChat(id: ChatId): Promise<void> {
-    return deleteChat(this.client(), id);
+  async deleteChat(id: ChatId): Promise<void> {
+    const client = this.client();
+    await deleteChatTasks(client, id);
+    await deleteChat(client, id);
   }
 
   renameChat(id: ChatId, title: string): Promise<void> {
@@ -201,5 +219,45 @@ export class OpenCodeProvider implements ChatProvider {
 
   usageReport(query: UsageQuery): Promise<UsageReport> {
     return usageReport(this.client(), query);
+  }
+
+  runsEnded(signal: AbortSignal): AsyncIterable<ChatId> {
+    return runsEnded(this.client(), signal);
+  }
+
+  markRead(chatId: ChatId): Promise<void> {
+    return markRead(this.client(), chatId);
+  }
+
+  schedulingSupport(): Promise<SchedulingSupport | null> {
+    return schedulingSupport(this.client());
+  }
+
+  listTasks(): Promise<ScheduledTask[]> {
+    return listTasks(this.client());
+  }
+
+  createTask(draft: TaskDraft): Promise<ScheduledTask> {
+    return createTask(this.client(), draft);
+  }
+
+  replaceTask(id: string, draft: TaskDraft): Promise<ScheduledTask> {
+    return replaceTask(this.client(), id, draft);
+  }
+
+  pauseTask(id: string): Promise<void> {
+    return pauseTask(this.client(), id);
+  }
+
+  resumeTask(id: string): Promise<void> {
+    return resumeTask(this.client(), id);
+  }
+
+  deleteTask(id: string): Promise<void> {
+    return deleteTask(this.client(), id);
+  }
+
+  taskRuns(task: ScheduledTask): Promise<ChatSummary[]> {
+    return taskRuns(this.client(), task);
   }
 }

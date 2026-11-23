@@ -25,6 +25,7 @@ import {
   askedQuestions,
   givenAnswers,
   isDismissal,
+  scheduledTask,
   toolCategory,
   toolSubject,
   webSources,
@@ -64,10 +65,10 @@ export function toAttachment(file: PromptFileAttachment): Attachment {
 }
 
 /**
- * The message metadata this app writes its quotes under. The server keeps it
- * with the message and hands it back; what the model reads is the text.
+ * The metadata key this app writes under, on messages and sessions. The
+ * server keeps it and hands it back; the model never reads it.
  */
-const METADATA_KEY = "openchat";
+export const METADATA_KEY = "openchat";
 
 export function quotesMetadata(quotes: readonly Quote[] | undefined) {
   if (!quotes?.length) return {};
@@ -134,8 +135,15 @@ export function toMessages(wire: readonly SessionMessageInfo[]): Message[] {
   return messages;
 }
 
+/** The server marks a prompt a scheduled task sent with the task. */
+function toScheduledTask(metadata: unknown): string | undefined {
+  const name = (metadata as { automation?: { name?: unknown } } | undefined)?.automation?.name;
+  return typeof name === "string" ? name : undefined;
+}
+
 function toUserMessage(wire: SessionMessageUser): Message {
   const quotes = toQuotes(wire.metadata);
+  const scheduledTask = toScheduledTask(wire.metadata);
   return {
     id: wire.id,
     role: "user",
@@ -144,6 +152,7 @@ function toUserMessage(wire: SessionMessageUser): Message {
     createdAt: wire.time.created,
     ...(wire.files && wire.files.length > 0 ? { attachments: wire.files.map(toAttachment) } : {}),
     ...(quotes ? { quotes } : {}),
+    ...(scheduledTask ? { scheduledTask } : {}),
   };
 }
 
@@ -181,7 +190,10 @@ function toParts(step: SessionMessageAssistant): ReplyPart[] {
         continue;
       }
       const { state } = part;
-      const category = toolCategory(part.name);
+      // Still a raw string while the model is writing it.
+      const input = typeof state.input === "string" ? null : state.input;
+      const task = scheduledTask(input);
+      const category = task !== null ? "schedule" : toolCategory(part.name);
       const sources =
         category === "web-search" && state.status === "completed" ? webSources(state.content) : [];
       parts.push({
@@ -190,8 +202,7 @@ function toParts(step: SessionMessageAssistant): ReplyPart[] {
           id: part.id,
           name: part.name,
           category,
-          // Still a raw string while the model is writing it.
-          subject: typeof state.input === "string" ? "" : toolSubject(state.input),
+          subject: task ?? toolSubject(input),
           status:
             state.status === "completed" ? "done" : state.status === "error" ? "failed" : "running",
           ...(sources.length > 0 ? { sources } : {}),
