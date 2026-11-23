@@ -2,6 +2,10 @@ allowBuilds:
   husky: true
   msgpackr-extract: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - "@opencode/client@2.4.0"
+  - "@opencode/protocol@2.4.0"
+  - "@opencode/schema@2.4.0"
 packageExtensions:
   # Only its opt-in bundle mode needs a Metro config, and nothing in it imports
   # this. As a required peer it gets auto-installed at the newest version, which
