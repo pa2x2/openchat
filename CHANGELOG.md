@@ -1,6 +1,16 @@
 # Changelog
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.5.0] - 2026-11-23
+
+### ✨ Added
+
+- Scheduled tasks: send a prompt to a chat once, on set days, at an interval or on a cron line. Manage them from the new Scheduled screen in the sidebar, Schedule… in a chat's menu, or by asking in a chat. Requires OpenCode 2.4.
+- A notification when a scheduled run finishes.
+- Unread chats are marked in the sidebar.
+
+### 🔄 Changed
+
+- Updated OpenCode to 2.4.0.
 
 ## [1.4.1] - 2026-10-05
 
