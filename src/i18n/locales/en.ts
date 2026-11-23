@@ -561,6 +561,7 @@ export default {
     noRuns: "No runs yet.",
     runsFailed: "Couldn’t load runs.",
     actionFailed: "Couldn’t change the task",
+    moveTimedOut: "The chat didn’t finish moving. Try again.",
     section: {
       active: "Active",
       paused: "Paused",

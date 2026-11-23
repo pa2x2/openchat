@@ -8,13 +8,14 @@ import { replaceTask } from "../tasks";
 
 /**
  * Keeps the server's rules that matter here: a task belongs to the project
- * its chat was in when the task was made, and a task made without a target
- * continues its own chat.
+ * its chat was in when the task was made, a task made without a target
+ * continues its own chat, and a move lands some time after the server
+ * answers it, here after the next read of the chat.
  */
 function fakeServer(chatId: string, directory: string) {
   const tasks = new Map<string, AutomationInfo>();
   let created = 0;
-  const chat = { directory };
+  const chat: { directory: string; movingTo?: string } = { directory };
 
   function found(id: string): AutomationInfo {
     const info = tasks.get(id);
@@ -25,12 +26,16 @@ function fakeServer(chatId: string, directory: string) {
   const client = {
     location: { get: async () => ({ directory }) },
     session: {
-      get: async () =>
-        ({ id: chatId, location: { directory: chat.directory }, time: { idle: 1 } }) as SessionInfo,
+      get: async () => {
+        const session = { id: chatId, location: { directory: chat.directory }, time: { idle: 1 } };
+        if (chat.movingTo) chat.directory = chat.movingTo;
+        chat.movingTo = undefined;
+        return session as SessionInfo;
+      },
       update: async () => undefined,
       view: async () => undefined,
       move: async (input: { directory: string }) => {
-        chat.directory = input.directory;
+        chat.movingTo = input.directory;
       },
     },
     experimental: {

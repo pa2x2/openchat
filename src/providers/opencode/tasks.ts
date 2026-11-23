@@ -29,12 +29,15 @@ import type {
   TaskDraft,
   TaskSchedule,
 } from "@/src/domain";
+import { t } from "@/src/i18n";
 import type { OpenCodeClient } from "./client";
 import { METADATA_KEY } from "./messages";
 import { markRead, RUN_SESSION_PREFIX, toChatSummary } from "./sessions";
 
 const SCHEDULED_DIR = "/scheduled";
 const FRESH_AGENT = "scheduled";
+const MOVE_TIMEOUT_MS = 10_000;
+const MOVE_POLL_MS = 150;
 
 /** A server older than automations has no route for them. */
 function isMissingRoute(error: unknown): boolean {
@@ -292,10 +295,23 @@ async function placeChat(
   if (wholeChat !== inScheduled) return;
   const directory = wholeChat ? (await client.location.get()).directory : SCHEDULED_DIR;
   const tasks = await client.experimental.automation.list({ sessionID: chatId });
-  await client.session.move({ sessionID: chatId, directory });
+  await moveChat(client, chatId, directory);
   for (const info of tasks) {
     await recreate(client, info);
     await deleteTask(client, info.id);
+  }
+}
+
+/**
+ * The server queues a move in the chat's inbox and answers before applying
+ * it. A task made in between goes to the old project and fails every run.
+ */
+async function moveChat(client: OpenCodeClient, chatId: ChatId, directory: string): Promise<void> {
+  await client.session.move({ sessionID: chatId, directory });
+  const deadline = Date.now() + MOVE_TIMEOUT_MS;
+  while ((await client.session.get({ sessionID: chatId })).location.directory !== directory) {
+    if (Date.now() > deadline) throw new Error(t("scheduled.moveTimedOut"));
+    await new Promise((resolve) => setTimeout(resolve, MOVE_POLL_MS));
   }
 }
 
