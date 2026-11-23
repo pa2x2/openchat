@@ -55,10 +55,9 @@ export const useTasksStore = create<TasksStoreState>()((set, get) => ({
       set({ loading: true });
       try {
         const provider = await getProvider();
-        // Read once per connection: it only changes when the server is set up anew.
-        const known = get().support;
-        const support =
-          known !== undefined ? known : ((await provider?.schedulingSupport?.()) ?? null);
+        // Read every time: a restarted server can bring a new time zone, and
+        // one just started answers before its agents have loaded.
+        const support = (await provider?.schedulingSupport?.()) ?? null;
         const tasks = support ? ((await provider?.listTasks?.()) ?? []) : [];
         set({ support, tasks, loading: false, failed: false });
       } catch {
