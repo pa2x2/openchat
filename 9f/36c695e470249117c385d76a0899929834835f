@@ -1,0 +1,31 @@
+docker/opencode/Dockerfile
+  s_7c6d17dd1107a5::t_4492e0e3f176f1 7-11
+docker/opencode/README.md
+  s_7c6d17dd1107a5::t_14fa8b22a73b00 30-44
+docker/opencode/docker-compose.yml
+  s_7c6d17dd1107a5::t_6d447cdd7c6219 12
+docker/opencode/opencode.json
+  s_7c6d17dd1107a5::t_d62171e13b6a41 6-10,29-46
+docker/opencode/prompts/chat.md
+  s_7c6d17dd1107a5::t_1fb497ba0fd5f3 25-35
+docker/opencode/prompts/scheduled.md
+  s_7c6d17dd1107a5::t_a2fcb6c8e52b71 1-5
+docker/opencode/scheduled/opencode.json
+  s_7c6d17dd1107a5::t_e56081ffef99f5 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9f36c695e470249117c385d76a0899929834835f",
+  "prompts": {},
+  "sessions": {
+    "s_7c6d17dd1107a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70fd9aeb-90dc-4d53-8b7e-e5d96ebedc69",
+        "model": "unknown"
+      },
+      "human_author": "Kiryl Kvit <kiryl.kvit@gmail.com>"
+    }
+  }
+}
