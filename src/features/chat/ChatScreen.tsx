@@ -15,6 +15,7 @@ import {
   HEADER_HEIGHT,
   TITLE_BAR_HEIGHT,
   type BranchSource,
+  type ScheduleLine,
 } from "./ChatHeader";
 import { EmptyChat } from "./EmptyChat";
 import { FormCard } from "./FormCard";
@@ -61,6 +62,9 @@ import { NO_QUOTES, useDraftsStore } from "@/src/stores/drafts";
 import { refWithVariant, sameModelRef, useModelsStore } from "@/src/stores/models";
 import { useSettingsStore } from "@/src/stores/settings";
 import { useConnectionStore } from "@/src/stores/connection";
+import { chatTasks, useTasksStore } from "@/src/stores/tasks";
+import { describeSchedule, formatWhen } from "@/src/features/scheduled/schedule";
+import { TaskEditor, type EditorTarget } from "@/src/features/scheduled/TaskEditor";
 import { chatTitle } from "@/src/lib/chatTitle";
 import { bodyAfterQuotes, quotedText } from "@/src/lib/quotes";
 import { cn } from "@/src/lib/cn";
@@ -74,6 +78,7 @@ import {
   type Quote,
 } from "@/src/domain";
 import { SeededKeyboardAvoidingView, useKeyboardOpen } from "@/src/ui/keyboard";
+import { Button } from "@/src/ui/Button";
 import { Icon } from "@/src/ui/Icon";
 import { LinearProgress } from "@/src/ui/LinearProgress";
 import type { MenuItem } from "@/src/ui/Menu";
@@ -194,6 +199,9 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     return index < 0 ? 0 : transcript.length - 1 - index;
   });
   const markedTemporary = useChatsStore((state) => state.temporary[chatId] === true);
+  const schedulingSupported = useTasksStore((state) => Boolean(state.support));
+  const allTasks = useTasksStore((state) => state.tasks);
+  const [scheduling, setScheduling] = useState<EditorTarget | null>(null);
   const busy = useRef(false);
   const capabilities = useProviderCapabilities();
   const showReasoning = capabilities?.reasoning === true;
@@ -289,6 +297,19 @@ export function ChatScreen({ chatId }: { chatId: string }) {
     });
     return () => subscription.remove();
   }, [chatId, isDraft]);
+
+  // Read once a reply has finished in front of the user, not while the app
+  // is away: a scheduled run that lands then should stay unread.
+  const lastMessageId = useMessagesStore((state) => state.byChat[chatId]?.at(-1)?.id);
+  useEffect(() => {
+    if (isDraft || turnActive || !lastMessageId) return;
+    const markRead = () => void useChatsStore.getState().markRead(chatId);
+    if (AppState.currentState === "active") markRead();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") markRead();
+    });
+    return () => subscription.remove();
+  }, [chatId, isDraft, turnActive, lastMessageId]);
 
   // A rerun that was staged on the server but never delivered would make the
   // next message discard older turns; drop it when the chat is opened. The
@@ -657,6 +678,14 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       testID: "menu-keep",
     });
   }
+  if (!isDraft && !temporary && !chat?.runOf && schedulingSupported) {
+    menuItems.push({
+      label: t("chat.menu.schedule"),
+      icon: "calendar-clock",
+      onPress: () => setScheduling({ chatId }),
+      testID: "menu-schedule",
+    });
+  }
   const rename =
     !isDraft && !temporary && capabilities?.renameChat
       ? () => promptRenameChat({ id: chatId, title: chat?.title ?? "" })
@@ -705,6 +734,22 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           onOpen: () => router.replace({ pathname: "/chat/[id]", params: { id: source.id } }),
         }
       : { title: null };
+  const ownTasks = isDraft ? [] : chatTasks(allTasks, chatId);
+  const nextTask = ownTasks[0];
+  const scheduled: ScheduleLine | undefined = nextTask
+    ? {
+        label:
+          ownTasks.length === 1
+            ? describeSchedule(t, nextTask.schedule)
+            : nextTask.nextRunAt !== undefined
+              ? t("chat.tasksNext", {
+                  count: ownTasks.length,
+                  when: formatWhen(t, nextTask.nextRunAt),
+                })
+              : t("chat.tasks", { count: ownTasks.length }),
+        onOpen: () => router.push("/scheduled"),
+      }
+    : undefined;
   const header = (
     <ChatHeader
       placement={controls}
@@ -717,6 +762,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
       menuItems={menuItems}
       temporaryLabel={temporary}
       branchedFrom={branchedFrom}
+      scheduled={scheduled}
       temporary={
         isDraft && canTemporary
           ? { on: draftTemporary, onToggle: () => setTemporaryToggle(!draftTemporary) }
@@ -782,6 +828,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
               title={title}
               temporaryLabel={temporary}
               branchedFrom={branchedFrom}
+              scheduled={scheduled}
               onRename={rename}
             />
           )}
@@ -810,6 +857,24 @@ export function ChatScreen({ chatId }: { chatId: string }) {
             />
           ) : null}
           {undoOffered ? <BranchUndoBar onUndo={handleUndoBranch} onExpire={expireUndo} /> : null}
+          {temporary && !isDraft && ownTasks.length > 0 ? (
+            <View
+              className="mb-2 flex-row items-center gap-2.5 rounded-2xl bg-surface py-1.5 pl-3 pr-1.5"
+              testID="keep-chat-bar"
+            >
+              <Icon name="calendar-clock" size={18} tone="textMuted" />
+              <Text className="flex-1 py-1 text-sm leading-[19px] text-text-muted">
+                {t("chat.keepForTask")}
+              </Text>
+              <Button
+                label={t("chat.keepChat")}
+                size="sm"
+                variant="secondary"
+                onPress={() => useChatsStore.getState().keepTemporary(chatId)}
+                testID="keep-chat"
+              />
+            </View>
+          ) : null}
           {form ? (
             <FormCard
               key={form.id}
@@ -917,6 +982,7 @@ export function ChatScreen({ chatId }: { chatId: string }) {
           cost={chat?.cost}
           onCompact={capabilities?.compact && connected && !turnActive ? handleCompact : undefined}
         />
+        <TaskEditor target={scheduling} onClose={() => setScheduling(null)} />
         {modelSelection ? (
           <ModelSheet
             visible={sheetOpen}

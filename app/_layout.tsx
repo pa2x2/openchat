@@ -10,10 +10,17 @@ import { useLocales } from "expo-localization";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTranslation } from "react-i18next";
 import { colorScheme } from "nativewind";
-import { watchTurns } from "@/src/features/notifications/turnNotifications";
+import {
+  followScheduledRuns,
+  registerRunChecks,
+  unregisterRunChecks,
+} from "@/src/features/notifications/scheduledRuns";
+import { askPermissionOnce, watchTurns } from "@/src/features/notifications/turnNotifications";
 import { UpdateSheet } from "@/src/features/updates/UpdateSheet";
 import { useUpdateChecks } from "@/src/features/updates/useUpdateChecks";
+import { useConnectionStore } from "@/src/stores/connection";
 import { useSettingsStore } from "@/src/stores/settings";
+import { useTasksStore } from "@/src/stores/tasks";
 import { DialogHost } from "@/src/ui/Dialog";
 import { useSystemPalettesSync } from "@/src/ui/systemPalettes";
 import { useAppTheme } from "@/src/ui/theme";
@@ -45,6 +52,24 @@ export default function RootLayout() {
   useSystemPalettesSync();
 
   useEffect(watchTurns, []);
+
+  const profile = useConnectionStore((state) => state.profile);
+  const schedulingSupport = useTasksStore((state) => state.support);
+  useEffect(() => {
+    if (!profile || !schedulingSupport) return;
+    const follow = new AbortController();
+    void followScheduledRuns(follow.signal);
+    return () => follow.abort();
+  }, [profile, schedulingSupport]);
+  const hasTasks = useTasksStore((state) => state.tasks.some((task) => task.status === "active"));
+  useEffect(() => {
+    if (hasTasks) void askPermissionOnce();
+  }, [hasTasks]);
+  // Undefined until the tasks are first read: the check stays as it was until then.
+  useEffect(() => {
+    if (schedulingSupport) void registerRunChecks();
+    else if (schedulingSupport === null) void unregisterRunChecks();
+  }, [schedulingSupport]);
 
   useEffect(() => {
     colorScheme.set(appearance);
@@ -78,6 +103,7 @@ export default function RootLayout() {
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ title: t("settings.title") }} />
             <Stack.Screen name="usage" options={{ title: t("usage.title") }} />
+            <Stack.Screen name="scheduled" options={{ title: t("scheduled.title") }} />
           </Stack>
           {/* Here rather than in a screen, so a launch check can offer an
               update over whichever screen is open. */}

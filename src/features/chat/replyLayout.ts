@@ -149,6 +149,7 @@ const TOOL_ICONS: Record<ToolCategory, IconName> = {
   "web-search": "web",
   "web-fetch": "web",
   subtask: "source-branch",
+  schedule: "calendar-clock",
   other: "wrench-outline",
 };
 
@@ -175,7 +176,9 @@ export function searchSources(tool: ToolCall): WebSource[] {
 }
 
 function formatSubject(t: TFunction, tool: ToolCall): string {
-  if (tool.category === "web-search") return t("format.quoted", { text: tool.subject });
+  if (tool.category === "web-search" || tool.category === "schedule") {
+    return t("format.quoted", { text: tool.subject });
+  }
   if (tool.category === "web-fetch") return bareUrl(tool.subject);
   return tool.subject;
 }

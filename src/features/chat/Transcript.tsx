@@ -15,7 +15,14 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { useTranslation } from "react-i18next";
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Pressable } from "@/src/ui/Pressable";
-import type { ChatId, Message, QueuedMessage, Quote, TurnActivity } from "@/src/domain";
+import {
+  totalTokens,
+  type ChatId,
+  type Message,
+  type QueuedMessage,
+  type Quote,
+  type TurnActivity,
+} from "@/src/domain";
 import { nodeText } from "@/src/features/markdown/blocks";
 import { parseMarkdown } from "@/src/features/markdown/parse";
 import type { Highlight } from "@/src/features/markdown/quoting";
@@ -344,6 +351,8 @@ export function Transcript({
     ({ item, index }: { item: Message; index: number }) => {
       const isQuestion = pinned && index === questionIndex;
       const isReply = item.id === pinnedReplyId;
+      // Newest first, so the run's reply sits just before its prompt.
+      const runReply = item.scheduledTask !== undefined ? reversed[index - 1] : undefined;
       return (
         // Every cell is wrapped alike, so one that stops being the pinned
         // turn keeps its state instead of remounting.
@@ -379,12 +388,18 @@ export function Transcript({
               onQuote={onQuote}
               onQuotePress={handleQuotePress}
               highlight={item.id === litId ? litScope : null}
+              runTokens={
+                runReply?.role === "assistant" && runReply.usage
+                  ? totalTokens(runReply.usage)
+                  : undefined
+              }
             />
           </View>
         </View>
       );
     },
     [
+      reversed,
       showReasoning,
       liveId,
       staged,

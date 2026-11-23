@@ -50,9 +50,18 @@ interface ChatsStoreState {
   /** Turns a temporary chat into a normal one, so leaving it no longer deletes it. */
   keepTemporary: (id: ChatId) => void;
   setDeleting: (ids: ChatId[], deleting: boolean) => void;
+  markRead: (id: ChatId) => Promise<void>;
   /** Re-reads the chat list from the server. Safe to call concurrently. */
   refresh: () => Promise<void>;
   clear: () => void;
+}
+
+/** The chats the user picks from: not temporary ones, nor the runs of a task, which its sheet lists. */
+export function listedChats(
+  chats: readonly ChatSummary[],
+  temporary: Readonly<Record<ChatId, true>>,
+): ChatSummary[] {
+  return chats.filter((chat) => !temporary[chat.id] && !chat.runOf);
 }
 
 function sortChats(chats: ChatSummary[]): ChatSummary[] {
@@ -120,6 +129,15 @@ export function createChatsStore(storage = mmkvStorage) {
             }
             return { deleting: next };
           }),
+        markRead: async (id) => {
+          set((state) => ({
+            chats: state.chats.map((chat) =>
+              chat.id === id && chat.unread ? { ...chat, unread: false } : chat,
+            ),
+          }));
+          const provider = await getProvider();
+          await provider?.markRead?.(id).catch(() => undefined);
+        },
         refresh: async () => {
           if (get().loading) return;
           set({ loading: true, error: null });

@@ -239,7 +239,15 @@ export interface FormResult {
 }
 
 export type ToolCategory =
-  "command" | "read" | "search" | "edit" | "web-search" | "web-fetch" | "subtask" | "other";
+  | "command"
+  | "read"
+  | "search"
+  | "edit"
+  | "web-search"
+  | "web-fetch"
+  | "subtask"
+  | "schedule"
+  | "other";
 
 export type ToolStatus = "running" | "done" | "failed";
 
@@ -354,6 +362,8 @@ export interface Message {
   attachments?: Attachment[];
   /** User messages only. */
   quotes?: Quote[];
+  /** Set on a user message a scheduled task sent rather than the user: the task's name. */
+  scheduledTask?: string;
   status: MessageStatus;
   /** What a reply used, over all of its round-trips to the model. */
   usage?: TokenUsage;
@@ -391,6 +401,64 @@ export interface ChatSummary {
    */
   usage?: TokenUsage;
   cost?: Money;
+  /** A reply finished after the user last opened the chat. */
+  unread?: boolean;
+  /** Set on a chat that one run of a "fresh" task started: the chat the task was made in. */
+  runOf?: ChatId;
+}
+
+/**
+ * When a scheduled task runs: once at an instant (epoch ms), at an interval
+ * (a duration such as "30 minutes" or "2 hours"), or on a cron line read as
+ * wall-clock time in the task's time zone.
+ */
+export type TaskSchedule =
+  { type: "at"; at: number } | { type: "every"; every: string } | { type: "cron"; cron: string };
+
+/**
+ * What a scheduled run sends the model besides the task's prompt:
+ * "summarized" the chat, compacted early so a run doesn't pay for all of it;
+ * "whole-chat" the chat as it is; "fresh" nothing, as each run starts a chat
+ * of its own.
+ */
+export type EarlierRuns = "summarized" | "whole-chat" | "fresh";
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  /** The chat it continues, or that holds its fresh runs. Unset for a task made outside any chat. */
+  chatId?: ChatId;
+  /** Null when the task runs something other than a prompt; the app can't edit it. */
+  prompt: string | null;
+  /** Null when something other than time starts it, such as an event; the app can't edit it. */
+  schedule: TaskSchedule | null;
+  earlierRuns: EarlierRuns;
+  timeZone: string;
+  /** Epoch ms after which it no longer runs. */
+  endsAt?: number;
+  status: "active" | "paused" | "done";
+  nextRunAt?: number;
+  runCount: number;
+  lastRunAt?: number;
+  /** Why the last run failed or the task stopped, in the backend's words. */
+  problem?: string;
+}
+
+export interface TaskDraft {
+  name: string;
+  chatId: ChatId;
+  prompt: string;
+  schedule: TaskSchedule;
+  earlierRuns: EarlierRuns;
+  /** Epoch ms. */
+  endsAt?: number;
+}
+
+export interface SchedulingSupport {
+  /** IANA zone cron lines of new tasks are read in; unset when the backend doesn't say. */
+  timeZone?: string;
+  /** Never empty: "whole-chat" is always there. */
+  earlierRuns: EarlierRuns[];
 }
 
 /**
@@ -414,4 +482,6 @@ export interface Capabilities {
   compact: boolean;
   /** A chat can be copied, up to any of its messages, into a new chat. */
   branch: boolean;
+  /** Prompts can be scheduled, where the server supports it; see `ChatProvider.schedulingSupport`. */
+  scheduling: boolean;
 }

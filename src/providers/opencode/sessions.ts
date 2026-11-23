@@ -7,6 +7,9 @@ import { UNTITLED_CHAT, type ChatId, type ChatSummary, type ModelRef } from "@/s
 import { toConnectionError, type OpenCodeClient } from "./client";
 import { toCost, toTokenUsage } from "./usage";
 
+/** The server names a run session after its automation: `ses_<automation id>_<run>`. */
+export const RUN_SESSION_PREFIX = "ses_aut_";
+
 /**
  * What the server reports for a session switched to a model without a
  * variant: the model runs on its own defaults, which the app models as no
@@ -38,7 +41,13 @@ export async function listChats(client: OpenCodeClient): Promise<ChatSummary[]> 
     sessions.push(...page.data);
     cursor = page.data.length > 0 ? (page.cursor.next ?? undefined) : undefined;
   } while (cursor);
-  return sessions.filter((session) => !session.time?.archived).map(toChatSummary);
+  // Of the child sessions, only a fresh task's runs are chats the user reads.
+  return sessions
+    .filter(
+      (session) =>
+        !session.time?.archived && (!session.parentID || session.id.startsWith(RUN_SESSION_PREFIX)),
+    )
+    .map(toChatSummary);
 }
 
 export async function createChat(
@@ -88,6 +97,13 @@ export async function switchModel(
   await client.session.switchModel({ sessionID: id, model: toWireModel(model) });
 }
 
+export async function markRead(client: OpenCodeClient, id: ChatId): Promise<void> {
+  const session = await client.session.get({ sessionID: id });
+  if (session.time.idle !== undefined) {
+    await client.session.view({ sessionID: id, idle: session.time.idle });
+  }
+}
+
 /**
  * OpenCode names a branch after its source with " (fork #N)" appended. The
  * app marks branches itself, in the user's language, so the suffix goes.
@@ -105,5 +121,13 @@ export function toChatSummary(session: SessionInfo): ChatSummary {
     model: session.model ? fromWireModel(session.model) : undefined,
     usage: toTokenUsage(session.tokens),
     cost: toCost(session.cost),
+    ...(session.parentID && session.id.startsWith(RUN_SESSION_PREFIX)
+      ? { runOf: session.parentID }
+      : {}),
+    // Never viewed: the chat predates unread marking, or was only ever read elsewhere.
+    unread:
+      session.time.idle !== undefined &&
+      session.time.viewed !== undefined &&
+      session.time.idle > session.time.viewed,
   };
 }

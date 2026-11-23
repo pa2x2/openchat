@@ -19,7 +19,10 @@ import type {
   ModelRef,
   ProviderId,
   QueuedMessage,
+  ScheduledTask,
+  SchedulingSupport,
   StreamEvent,
+  TaskDraft,
   UsageQuery,
   UsageReport,
   UserMessage,
@@ -174,6 +177,35 @@ export interface ChatProvider {
 
   /** Only present when `capabilities.usageReport` is true. */
   usageReport?(query: UsageQuery): Promise<UsageReport>;
+
+  /**
+   * Yields a chat each time a run in it ends, whoever started it: this app,
+   * another client or a scheduled task. A run the user stopped is left out.
+   * Ends when the stream drops; the caller resubscribes.
+   */
+  runsEnded?(signal: AbortSignal): AsyncIterable<ChatId>;
+  markRead?(chatId: ChatId): Promise<void>;
+
+  /**
+   * Scheduled tasks: present when `capabilities.scheduling` is true. Whether
+   * this server can run them is for `schedulingSupport` to say: null when it
+   * can't, and then the others must not be called.
+   */
+  schedulingSupport?(): Promise<SchedulingSupport | null>;
+  /** Every task on the server, including ones the app didn't make. */
+  listTasks?(): Promise<ScheduledTask[]>;
+  /**
+   * The draft's `earlierRuns` applies to its whole chat: a backend may
+   * change the chat's other tasks to match.
+   */
+  createTask?(draft: TaskDraft): Promise<ScheduledTask>;
+  /** Replaces the task with a new one made from `draft`; the result has a new id. */
+  replaceTask?(id: string, draft: TaskDraft): Promise<ScheduledTask>;
+  pauseTask?(id: string): Promise<void>;
+  resumeTask?(id: string): Promise<void>;
+  deleteTask?(id: string): Promise<void>;
+  /** The chats a "fresh" task's runs started, newest first. */
+  taskRuns?(task: ScheduledTask): Promise<ChatSummary[]>;
 }
 
 export interface ConfigField {

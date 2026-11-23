@@ -40,6 +40,8 @@
       ],
       "expo-secure-store",
       "expo-font",
+      "expo-background-task",
+      "@react-native-community/datetimepicker",
       ["expo-localization", { "supportedLocales": ["en", "ru"] }],
       [
         "expo-image-picker",

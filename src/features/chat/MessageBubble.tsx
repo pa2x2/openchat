@@ -53,6 +53,53 @@ export interface MessageBubbleProps {
   onQuote?: (quote: Quote) => void;
   onQuotePress?: (quote: Quote) => void;
   highlight?: Highlight | null;
+  /** On a message a scheduled task sent: what the run's reply used, in tokens. */
+  runTokens?: number;
+}
+
+/** A scheduled task's prompt, which the user didn't type: one line that opens on a tap. */
+function RunMarker({
+  message,
+  task,
+  tokens,
+  dimmed,
+}: {
+  message: Message;
+  task: string;
+  tokens: number | undefined;
+  dimmed: boolean;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const label = [
+    t("message.scheduledRun", { name: task }),
+    tokens !== undefined ? t("message.runTokens", { tokens: formatTokensShort(t, tokens) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <View className={cn("mb-3 mt-2 items-center px-4", dimmed && "opacity-50")}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={label}
+        className="flex-row items-center gap-1.5 rounded-full px-3 py-1 active:bg-surface"
+        hitSlop={6}
+        onPress={() => setOpen((current) => !current)}
+        testID="run-marker"
+      >
+        <Icon name="calendar-clock" size={14} tone="textMuted" />
+        <Text className="text-[13px] text-text-muted" numberOfLines={1}>
+          {label}
+        </Text>
+      </Pressable>
+      {open ? (
+        <Text className="mt-1 text-center text-[13px] leading-[18px] text-text-muted" selectable>
+          {message.text}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 function quoteHandler(message: Message, onQuote?: (quote: Quote) => void): QuoteHandler | null {
@@ -334,6 +381,7 @@ export const MessageBubble = memo(function MessageBubble({
   onQuote,
   onQuotePress,
   highlight = null,
+  runTokens,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const streaming = message.status === "pending" || message.status === "streaming";
@@ -347,6 +395,16 @@ export const MessageBubble = memo(function MessageBubble({
     [isUser, message, showReasoning, activity, t],
   );
 
+  if (isUser && message.scheduledTask !== undefined) {
+    return (
+      <RunMarker
+        message={message}
+        task={message.scheduledTask}
+        tokens={runTokens}
+        dimmed={dimmed}
+      />
+    );
+  }
   if (isUser || !layout) {
     return (
       <View className={cn("mb-4 mt-2", dimmed && "opacity-50")} testID={`bubble-${message.role}`}>

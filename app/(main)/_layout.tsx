@@ -10,6 +10,7 @@ import { getProvider } from "@/src/lib/providerFactory";
 import { useChatsStore } from "@/src/stores/chats";
 import { useConnectionStore } from "@/src/stores/connection";
 import { watchCatalog } from "@/src/stores/models";
+import { useTasksStore } from "@/src/stores/tasks";
 import { useAppTheme, withAlpha } from "@/src/ui/theme";
 
 /** Horizontal travel (dp) before a swipe opens the sidebar; above ScrollView's touch slop. */
@@ -25,6 +26,7 @@ export default function MainLayout() {
   const { width } = useWindowDimensions();
   const { colors } = useAppTheme();
   const refreshChats = useChatsStore((state) => state.refresh);
+  const refreshTasks = useTasksStore((state) => state.refresh);
   const profile = useConnectionStore((state) => state.profile);
   const [open, setOpen] = useState(false);
 
@@ -34,9 +36,9 @@ export default function MainLayout() {
     void purgeTemporaryChats();
     void (async () => {
       await getProvider();
-      await refreshChats();
+      await Promise.all([refreshChats(), refreshTasks()]);
     })();
-  }, [refreshChats]);
+  }, [refreshChats, refreshTasks]);
 
   // The header and the composer's reasoning chip read the catalog, so it is
   // kept current while the app is in front rather than when the picker opens.
@@ -64,8 +66,10 @@ export default function MainLayout() {
   }, [profile]);
 
   useEffect(() => {
-    if (open) void refreshChats();
-  }, [open, refreshChats]);
+    if (!open) return;
+    void refreshChats();
+    void refreshTasks();
+  }, [open, refreshChats, refreshTasks]);
 
   // The drawer library leaves the hardware back button alone; without this,
   // back would leave the app instead of closing the sidebar.
@@ -127,6 +131,10 @@ export default function MainLayout() {
     setOpen(false);
     router.push("/usage");
   }, [router]);
+  const openScheduled = useCallback(() => {
+    setOpen(false);
+    router.push("/scheduled");
+  }, [router]);
 
   return (
     <DrawerContext.Provider value={controls}>
@@ -148,6 +156,7 @@ export default function MainLayout() {
             onNewChat={startNewChat}
             onOpenSettings={openSettings}
             onOpenUsage={openUsage}
+            onOpenScheduled={openScheduled}
             onDeletedActive={startNewChat}
           />
         )}

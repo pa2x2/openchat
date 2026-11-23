@@ -10,7 +10,7 @@ import { View } from "react-native";
 import type { ChatId } from "@/src/domain";
 import { chatTitle } from "@/src/lib/chatTitle";
 import { formatRelative } from "@/src/lib/time";
-import { useChatsStore } from "@/src/stores/chats";
+import { listedChats, useChatsStore } from "@/src/stores/chats";
 import { Pressable } from "@/src/ui/Pressable";
 import { Icon } from "@/src/ui/Icon";
 import { Text } from "@/src/ui/Text";
@@ -23,7 +23,7 @@ export function RecentChats({ onOpen }: { onOpen: (id: ChatId) => void }) {
   const temporary = useChatsStore((state) => state.temporary);
   // The store keeps the list newest first.
   const recent = useMemo(
-    () => chats.filter((chat) => !temporary[chat.id]).slice(0, RECENT_COUNT),
+    () => listedChats(chats, temporary).slice(0, RECENT_COUNT),
     [chats, temporary],
   );
   if (recent.length === 0) return null;
