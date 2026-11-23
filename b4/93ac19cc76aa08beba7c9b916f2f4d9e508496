@@ -1,0 +1,25 @@
+src/i18n/locales/en.ts
+  s_7c6d17dd1107a5::t_bd4addd9fef625 564
+src/i18n/locales/ru.ts
+  s_7c6d17dd1107a5::t_2abde213435608 612
+src/providers/opencode/__tests__/tasks.test.ts
+  s_7c6d17dd1107a5::t_30762c5e3048b9 11-13,18,29-34,38
+src/providers/opencode/tasks.ts
+  s_7c6d17dd1107a5::t_5caa4d81a75316 32,39-40,298,305-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b493ac19cc76aa08beba7c9b916f2f4d9e508496",
+  "prompts": {},
+  "sessions": {
+    "s_7c6d17dd1107a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70fd9aeb-90dc-4d53-8b7e-e5d96ebedc69",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kiryl Kvit <kiryl.kvit@gmail.com>"
+    }
+  }
+}
