@@ -3,6 +3,11 @@
   "default_agent": "chat",
   "share": "disabled",
   "snapshots": false,
+  "timezone": "{env:TZ}",
+  "experimental": {
+    // Enables the session search and read tools.
+    "sqlite_fts": true
+  },
   // Global backstop: V2 defaults to "ask" here, which deadlocks any
   // non-interactive client. Deny at top level so it covers every agent.
   "permissions": [
@@ -21,7 +26,24 @@
         { "action": "webfetch", "resource": "*", "effect": "allow" },
         { "action": "websearch", "resource": "*", "effect": "allow" },
         // Asks arrive as server forms, which the app shows above the composer.
-        { "action": "question", "resource": "*", "effect": "allow" }
+        { "action": "question", "resource": "*", "effect": "allow" },
+        // The automation tools are only reachable through execute.
+        { "action": "execute", "resource": "*", "effect": "allow" },
+        { "action": "automation_*", "resource": "*", "effect": "allow" },
+        { "action": "subagent", "resource": "scheduled", "effect": "allow" }
+      ]
+    },
+    "scheduled": {
+      "description": "Runs a scheduled task in a fresh session",
+      "mode": "subagent",
+      "system": "{file:./prompts/chat.md}\n\n{file:./prompts/scheduled.md}",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "webfetch", "resource": "*", "effect": "allow" },
+        { "action": "websearch", "resource": "*", "effect": "allow" },
+        { "action": "execute", "resource": "*", "effect": "allow" },
+        { "action": "opencode_session_search", "resource": "*", "effect": "allow" },
+        { "action": "opencode_session_read", "resource": "*", "effect": "allow" }
       ]
     },
     "general": {
