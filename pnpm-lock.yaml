@@ -14,8 +14,8 @@ importers:
         specifier: ^6.3.15
         version: 6.3.15
       '@opencode/client':
-        specifier: 2.4.1
-        version: 2.4.1(effect@4.1.0)
+        specifier: 2.4.2
+        version: 2.4.2(effect@4.1.0)
       '@react-native-community/datetimepicker':
         specifier: 9.1.0
         version: 9.1.0(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
@@ -1031,8 +1031,8 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@opencode/client@2.4.1':
-    resolution: {integrity: sha512-VKMsNqK8p8EplzwhS3rKBtnBR08Xiz76r6yJ/eZ/7hNF5CTdvWVEjVKZB6dTp5CJ/fyGJBaVPtSPiBaNmhWU+g==}
+  '@opencode/client@2.4.2':
+    resolution: {integrity: sha512-Wnb/wMl3HzPHu7WR4DYc4TkziFDdB6xUpNoLGGz7SMUIbBWPYhV2wPRenR7UEeMdlHlKgaYcxixTH80H+5YP2g==}
     peerDependencies:
       effect: 4.1.0
       solid-js: '>=1.9.0'
@@ -1042,11 +1042,11 @@ packages:
       solid-js:
         optional: true
 
-  '@opencode/protocol@2.4.1':
-    resolution: {integrity: sha512-RYG7ZTmKMVQZifntclOzSFr+WoukftY6h46niMS1k1YJHa8PqqLPlZuXYVv3dcjWexyOTKnMrOLdNP1Fx/nifQ==}
+  '@opencode/protocol@2.4.2':
+    resolution: {integrity: sha512-w87Ym2Xd449fngSXNNbWE5d5mWl5sxeK8I/yp0TVb0rpQM1+jriwKh6g2Akxrp1Xzdwrz84gfms+ZEtM30R00g==}
 
-  '@opencode/schema@2.4.1':
-    resolution: {integrity: sha512-lYkxvxAEbsJEf56o3P8C5ukTThhFRYqJuSGqsGr6QV9mmRxDyhI36ExuuMirXKoa3vmZOeU9tEm8U6Mp5rSnvw==}
+  '@opencode/schema@2.4.2':
+    resolution: {integrity: sha512-/qAbNPjIO4uOvaBB9UcxUZUGXtdp8OeR65gUi8HrVrxSJMxocMg7Yky7U2iiZzGiE9mE4NsQQK9F8cN/2vjkoA==}
 
   '@radix-ui/primitive@1.1.7':
     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
@@ -6580,19 +6580,19 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@opencode/client@2.4.1(effect@4.1.0)':
+  '@opencode/client@2.4.2(effect@4.1.0)':
     dependencies:
-      '@opencode/protocol': 2.4.1
-      '@opencode/schema': 2.4.1
+      '@opencode/protocol': 2.4.2
+      '@opencode/schema': 2.4.2
     optionalDependencies:
       effect: 4.1.0
 
-  '@opencode/protocol@2.4.1':
+  '@opencode/protocol@2.4.2':
     dependencies:
-      '@opencode/schema': 2.4.1
+      '@opencode/schema': 2.4.2
       effect: 4.1.0
 
-  '@opencode/schema@2.4.1':
+  '@opencode/schema@2.4.2':
     dependencies:
       '@standard-schema/spec': 1.1.0
       effect: 4.1.0
