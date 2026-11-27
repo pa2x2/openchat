@@ -1,8 +1,8 @@
 {
   "name": "openchat",
   "main": "index.ts",
-  "version": "1.5.1",
-  "versionCode": 36,
+  "version": "1.5.2",
+  "versionCode": 37,
   "description": "ChatGPT-style mobile client for self-hosted AI backends. Provider-first; ships with an OpenCode V2 adapter.",
   "scripts": {
     "start": "expo start",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@formatjs/intl-pluralrules": "^6.3.15",
-    "@opencode/client": "2.4.1",
+    "@opencode/client": "2.4.2",
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-vector-icons/material-design-icons": "13.1.4",
     "@types/jest": "29.5.14",
